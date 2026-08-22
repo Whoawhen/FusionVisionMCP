@@ -5,6 +5,7 @@
 #  This software is released under the MIT License.
 #
 #  http://opensource.org/licenses/mit-license.php
+import math
 import os
 from collections.abc import AsyncIterator, Iterator
 from contextlib import ExitStack, asynccontextmanager, closing, contextmanager
@@ -24,6 +25,7 @@ from pydantic import Field
 from pypdfium2 import PdfDocument
 
 from fusion_vision_mcp import geometry
+from fusion_vision_mcp.aesthetic import DEFAULT_AESTHETIC_MODEL, Aesthetic
 from fusion_vision_mcp.florence2 import CaptionLevel, Florence2, Florence2SP
 from fusion_vision_mcp.idle import IdleProxy, IdleReleased
 from fusion_vision_mcp.moondream import DEFAULT_MOONDREAM_MODEL, DEFAULT_MOONDREAM_REVISION, Moondream
@@ -148,6 +150,14 @@ class Segmenter(Protocol):
         ...
 
 
+class AestheticScorer(Protocol):
+    """Represents a protocol for rating how aesthetically pleasing an image is."""
+
+    def score(self, images: list[Image]) -> list[dict[str, Any]]:
+        """Returns a {"score": float, "rating": str} dict per image."""
+        ...
+
+
 @dataclass
 class AppContext:
     """Context for the FastMCP app."""
@@ -155,6 +165,7 @@ class AppContext:
     processor: Processor
     vqa: VqaProcessor
     segmenter: Segmenter
+    aesthetic: AestheticScorer
 
 
 @asynccontextmanager
@@ -165,6 +176,7 @@ async def app_lifespan(
     moondream_model_id: str,
     moondream_revision: str,
     sam2_model_id: str = DEFAULT_SAM2_MODEL,
+    aesthetic_model_id: str = DEFAULT_AESTHETIC_MODEL,
     idle_timeout: float = 0,
     device: str | None = None,
 ) -> AsyncIterator[AppContext]:
@@ -177,6 +189,7 @@ async def app_lifespan(
     processor: Processor
     vqa: VqaProcessor
     segmenter: Segmenter
+    aesthetic: AestheticScorer
     if idle_timeout > 0:
         # Keep each model in this process so repeat calls stay fast, and let the
         # idle timer hand its memory back once the work stops.
@@ -208,7 +221,14 @@ async def app_lifespan(
         Segmenter,
         IdleProxy(IdleReleased(lambda: Sam2(sam2_model_id, device), idle_timeout, "SAM2")),
     )
-    yield AppContext(processor, vqa, segmenter)
+    # Same rationale as SAM2: always idle-wrapped regardless of idle_timeout, since only
+    # score_aesthetics/critique_composition pay for the CLIP backbone, and most sessions
+    # never call either.
+    aesthetic = cast(
+        AestheticScorer,
+        IdleProxy(IdleReleased(lambda: Aesthetic(aesthetic_model_id, device), idle_timeout, "Aesthetic")),
+    )
+    yield AppContext(processor, vqa, segmenter, aesthetic)
 
 
 def server(
@@ -218,6 +238,7 @@ def server(
     moondream_model_id: str = DEFAULT_MOONDREAM_MODEL,
     moondream_revision: str = DEFAULT_MOONDREAM_REVISION,
     sam2_model_id: str = DEFAULT_SAM2_MODEL,
+    aesthetic_model_id: str = DEFAULT_AESTHETIC_MODEL,
     idle_timeout: float = 0,
     device: str | None = None,
 ) -> MCPServer:
@@ -231,6 +252,7 @@ def server(
             moondream_model_id=moondream_model_id,
             moondream_revision=moondream_revision,
             sam2_model_id=sam2_model_id,
+            aesthetic_model_id=aesthetic_model_id,
             idle_timeout=idle_timeout,
             device=device,
         ),
@@ -436,6 +458,79 @@ def server(
             }
 
     @mcp.tool()
+    def score_aesthetics(ctx: Context[AppContext], src: ImagePath) -> list[dict[str, Any]]:
+        """Rate how aesthetically pleasing an image looks, independent of its content.
+
+        Uses a CLIP-based predictor trained on human aesthetic ratings (the LAION
+        "improved aesthetic predictor"). Reflects visual qualities like lighting,
+        composition and clarity — not whether the subject matter is correct or
+        matches a prompt. A technically accurate but flatly-lit, cluttered photo can
+        score low; a blurry but beautifully lit one can score comparatively higher.
+
+        Returns one {"score": float, "rating": str} object per page/image. `score`
+        is roughly on a 1-10 scale; `rating` buckets it coarsely for quick triage —
+        read `score` for anything comparative.
+        """
+        with get_images(src) as images:
+            return ctx.request_context.lifespan_context.aesthetic.score(images)
+
+    @mcp.tool()
+    def critique_composition(
+        ctx: Context[AppContext],
+        src: ImagePath,
+        target_subject: Annotated[
+            str,
+            Field(description="Name of the main subject, e.g. 'the dog'. Omit to auto-detect it."),
+        ] = "",
+        low_score_threshold: Annotated[
+            float, Field(description="Below this aesthetic score, ask Moondream2 to explain why.")
+        ] = 5.0,
+    ) -> dict[str, Any]:
+        """Critique an image's composition: framing, and, for low-scoring images, why it looks off.
+
+        Combines `score_aesthetics` (numeric quality), a rule-of-thirds/centeredness
+        check on the main subject's bounding box, and — only when the aesthetic
+        score is below `low_score_threshold` — a Moondream2 VQA explanation of what
+        specifically looks unbalanced. Pass `target_subject` if you already know
+        what the subject is; omit it to auto-detect the most prominent region via
+        `dense_region_caption`.
+
+        If no subject can be located, returns a soft-failure shape (image size,
+        the aesthetic score, and a "note" explaining why) rather than raising.
+        """
+        app = ctx.request_context.lifespan_context
+        with get_images(src) as images:
+            image = images[0]
+
+            box: list[int] | None
+            if target_subject:
+                detected = app.processor.detect_objects([image], target_subject)[0]
+                box = [int(v) for v in detected["bboxes"][0]] if detected["bboxes"] else None
+            else:
+                box = _pick_primary_subject(app.processor.dense_region_caption([image])[0], (image.width, image.height))
+
+            aesthetics = app.aesthetic.score([image])[0]
+
+            if box is None:
+                return {
+                    "image_size": [image.width, image.height],
+                    "aesthetics": aesthetics,
+                    "note": "Could not locate a subject to assess framing for.",
+                }
+
+            result: dict[str, Any] = {
+                "image_size": [image.width, image.height],
+                "subject_box": box,
+                "aesthetics": aesthetics,
+                "framing": geometry.rule_of_thirds(box, (image.width, image.height)),
+            }
+            if aesthetics["score"] < low_score_threshold:
+                result["critique"] = app.vqa.query(
+                    [image], "Critique this photo's composition and framing in 2 concise sentences."
+                )[0]
+            return result
+
+    @mcp.tool()
     def process(ctx: Context[AppContext], src: ImagePath, prompt: CustomPrompt) -> list[str]:
         """Processes an image file with a custom prompt using the Florence-2 model."""
         with get_images(src) as images:
@@ -467,7 +562,32 @@ def _dispatch(app: AppContext, operation: str, images: list[Image], *, question:
     raise ValueError(f"Unknown operation: {operation!r}")
 
 
+def _pick_primary_subject(regions: dict[str, Any], image_size: tuple[int, int]) -> list[int] | None:
+    """Picks the most prominent region from `dense_region_caption`'s output.
+
+    Scores each box by area weighted toward the image center, since the most
+    prominent subject in a photo is usually both large and roughly centered.
+    Returns None if no regions were found.
+    """
+    boxes = regions.get("bboxes") or []
+    if not boxes:
+        return None
+
+    width, height = image_size
+    diagonal = math.hypot(width, height)
+
+    def score(box: list[float]) -> float:
+        x0, y0, x1, y1 = box
+        area = max(x1 - x0, 0) * max(y1 - y0, 0)
+        distance = math.hypot((x0 + x1) / 2 - width / 2, (y0 + y1) / 2 - height / 2)
+        centrality = 1 - min(distance / diagonal, 1.0) if diagonal else 1.0
+        return area * centrality
+
+    return [int(v) for v in max(boxes, key=score)]
+
+
 __all__: Final = [
+    "DEFAULT_AESTHETIC_MODEL",
     "DEFAULT_MOONDREAM_MODEL",
     "DEFAULT_MOONDREAM_REVISION",
     "DEFAULT_SAM2_MODEL",

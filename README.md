@@ -5,7 +5,7 @@
 [![Python Application](https://github.com/Whoawhen/FusionVisionMCP/actions/workflows/python-app.yaml/badge.svg)](https://github.com/Whoawhen/FusionVisionMCP/actions/workflows/python-app.yaml)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 
-**One comprehensive package - 10 cutting-edge computer vision tools**
+**One comprehensive package - 12 cutting-edge computer vision tools**
 
 ![FusionVisionMCP Demo](FusionVisionMCP.jpg)
 
@@ -41,7 +41,7 @@ That's it! FusionVisionMCP is now available in your AI assistant.
 
 ## Powerful Computer Vision Tools
 
-With ten specialized tools, FusionVisionMCP handles any visual task:
+With twelve specialized tools, FusionVisionMCP handles any visual task:
 
 ### 🔍 Text Extraction & Understanding
 Extract text from any image, document, or screenshot with industry-leading accuracy.
@@ -69,6 +69,12 @@ Run specialized Florence-2 prompts for unique use cases.
 
 ### 🔄 Smart Analysis Router
 Automatically selects the best tool for each task.
+
+### ⭐ Aesthetic Quality Scoring
+Rate how visually pleasing an image is, independent of what it depicts.
+
+### 🖼️ Composition Critique
+Check framing against the rule of thirds and get a plain-language explanation for low-scoring shots.
 
 ## Installation
 
@@ -150,9 +156,10 @@ Process screenshots and memes to understand context and sentiment.
 | Visual Question Answering | ❌ | ✅ Open-Ended Insights |
 | Spatial Reasoning | ❌ | ✅ Touch, Containment, Distance |
 | Memory Efficiency | ❌ | ✅ Automatic Model Management |
-| Multi-Model Integration | ❌ | ✅ Florence-2, Moondream2, SAM2 |
+| Multi-Model Integration | ❌ | ✅ Florence-2, Moondream2, SAM2, CLIP/LAION |
 | Hardware Flexibility | Limited | ✅ CPU/GPU Adaptive Processing |
 | Resource Optimization | ❌ | ✅ GPU Conservation for Primary AI Tasks |
+| Aesthetic Quality Scoring | ❌ | ✅ CLIP-Based LAION Predictor |
 
 ## Tool Composition
 
@@ -161,18 +168,24 @@ Process screenshots and memes to understand context and sentiment.
 | **Florence-2** | Microsoft (Original) | OCR, captioning, custom prompting, object detection & grounding, dense region captioning | Fast, efficient multi-task vision model |
 | **Moondream2** | Vikhyat | Visual question answering | Specialized for open-ended VQA |
 | **SAM2** | Meta (Original) | Segmentation masks | Precise pixel-level object segmentation |
-| **FusionVisionMCP** | Whoawhen | `spatial_relations` | Measures spatial relationships between objects |
+| **CLIP + LAION aesthetic head** | OpenAI / LAION | Aesthetic quality scoring | Trained specifically on human aesthetic ratings |
+| **FusionVisionMCP** | Whoawhen | `spatial_relations`, `critique_composition` | Combines the four models above into measurements none of them reports alone |
 
-### FusionVisionMCP's One Novel Function
+### FusionVisionMCP's Novel Functions
 
-Most of FusionVisionMCP's tools wrap a capability one of its three underlying models already has: `detect_objects`,
-`point_objects`, and `dense_region_caption` are Florence-2 task heads, `query_image` is Moondream2's own VQA. The
-one genuinely new capability, not provided by any single model in the stack, is:
+Most of FusionVisionMCP's tools wrap a capability one of its four underlying models already has: `detect_objects`,
+`point_objects`, and `dense_region_caption` are Florence-2 task heads, `query_image` is Moondream2's own VQA, and
+`score_aesthetics` is the CLIP/LAION predictor's own output. The two genuinely new capabilities, not provided by
+any single model in the stack, are:
 
 - **`spatial_relations`** - Measures how objects relate spatially (touch, containment, distance, shape) by combining
   Florence-2 boxes, SAM2 masks, and a from-scratch geometry module. No model here answers "does this actually touch
   that" on its own — see [README_DETAILED.md](README_DETAILED.md#spatial_relations-) for how it's built and its
   measured limits.
+- **`critique_composition`** - Locates the main subject (Florence-2), checks its framing against the rule of thirds
+  (a from-scratch geometry function), scores the shot's aesthetic quality (the CLIP/LAION predictor), and — only for
+  low-scoring images — asks Moondream2 to explain what looks off. No single model in the stack combines localization,
+  framing, and a quality judgment into one answer.
 
 ### Need More Technical Details?
 
@@ -182,11 +195,12 @@ See our [complete technical documentation](README_DETAILED.md) for full API spec
 
 ## Technical Architecture
 
-FusionVisionMCP integrates three state-of-the-art computer vision models into one MCP server:
+FusionVisionMCP integrates four state-of-the-art computer vision models into one MCP server:
 
 - **Microsoft Florence-2**: Foundation model for captioning, OCR, and object detection
 - **Moondream2**: Specialized for open-ended visual question answering
 - **SAM2 (Segment Anything Model 2)**: Advanced segmentation for spatial reasoning
+- **CLIP + LAION aesthetic predictor**: Rates how aesthetically pleasing an image looks
 
 Each model loads on-demand and unloads automatically to conserve memory, ensuring optimal performance.
 

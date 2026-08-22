@@ -9,31 +9,39 @@
 [![GitHub License](https://img.shields.io/github/license/Whoawhen/FusionVisionMCP)](https://github.com/Whoawhen/FusionVisionMCP/blob/main/LICENSE)
 
 An MCP server fusing [Florence-2](https://huggingface.co/microsoft/Florence-2-large),
-[Moondream2](https://huggingface.co/vikhyatk/moondream2) and [SAM2](https://huggingface.co/facebook/sam2.1-hiera-small)
-into one computer-vision toolset. Fork of
-[jkawamoto/mcp-florence2](https://github.com/jkawamoto/mcp-florence2), which provides exactly three tools —
-`ocr`, `caption`, `process` — all against Florence-2. This fork adds everything else: Florence-2's other task
-heads exposed as their own tools (`detect_objects`, `point_objects`, `dense_region_caption`), Moondream2 for
-open-ended visual question answering (`query_image`, since Florence-2 has none), two dispatch conveniences
-(`analyze_image`, `batch_analyze_images`), and idle-timeout memory release. One tool, `spatial_relations`, isn't
-just a new model wired in — no model here answers "does this actually touch that" on its own, so it's built from
-Florence-2 boxes, SAM2 masks, and a from-scratch geometry module. See the tags on each tool below.
+[Moondream2](https://huggingface.co/vikhyatk/moondream2), [SAM2](https://huggingface.co/facebook/sam2.1-hiera-small)
+and a [CLIP](https://huggingface.co/openai/clip-vit-large-patch14)-backed
+[LAION aesthetic predictor](https://github.com/christophschuhmann/improved-aesthetic-predictor) into one
+computer-vision toolset. Fork of [jkawamoto/mcp-florence2](https://github.com/jkawamoto/mcp-florence2), which
+provides exactly three tools — `ocr`, `caption`, `process` — all against Florence-2. This fork adds everything
+else: Florence-2's other task heads exposed as their own tools (`detect_objects`, `point_objects`,
+`dense_region_caption`), Moondream2 for open-ended visual question answering (`query_image`, since Florence-2 has
+none), a CLIP/LAION aesthetic scorer (`score_aesthetics`), two dispatch conveniences (`analyze_image`,
+`batch_analyze_images`), and idle-timeout memory release. Two tools aren't just a new model wired in: no model
+here answers "does this actually touch that" on its own, so `spatial_relations` is built from Florence-2 boxes,
+SAM2 masks, and a from-scratch geometry module; and no model combines localization, framing, and a quality
+judgment into one answer, so `critique_composition` combines Florence-2, a rule-of-thirds geometry function, the
+aesthetic predictor, and (for low-scoring images) Moondream2. See the tags on each tool below.
 
 **Legend:** 🔼 upstream (unchanged from `mcp-florence2`) · ➕ added in this fork (wraps a model already in the
-stack) · ✦ novel (new capability — see [spatial_relations](#spatial_relations-)).
+stack) · ✦ novel (new capability — see [spatial_relations](#spatial_relations-) and
+[critique_composition](#critique_composition-)).
 
 You can process images or PDF files stored on a local or web server to extract text using OCR (Optical Character
 Recognition), generate descriptive captions summarizing the content of the images, locate named objects and
-return their bounding boxes or centre points, caption every salient region, and ask free-form questions about an
-image.
+return their bounding boxes or centre points, caption every salient region, ask free-form questions about an
+image, and rate how aesthetically pleasing an image looks.
 
 Florence-2 handles captioning, OCR, detection and grounding. Moondream2 backs the `query_image` tool, because
 Florence-2 has no open-ended visual question answering task. SAM2 backs `spatial_relations`, because bounding
-boxes cannot answer questions about contact or containment.
+boxes cannot answer questions about contact or containment. A CLIP ViT-L/14 backbone plus a small trained head
+backs `score_aesthetics`, because none of the other three models has any notion of how good an image looks.
 
 Each model loads on first use and is released independently, so a request only pays for what it needs: OCR never
-loads Moondream2 or SAM2. Weights are not bundled in this repository — each model downloads from the Hugging
-Face Hub on first use and is cached locally by `transformers`, the same as any other Hugging Face model.
+loads Moondream2, SAM2, or the aesthetic predictor. Weights are not bundled in this repository — the CLIP backbone
+downloads from the Hugging Face Hub on first use and is cached locally by `transformers`, the same as any other
+Hugging Face model; the small aesthetic head downloads separately from a pinned commit of its original GitHub
+repository and is cached locally after the first request, with its checksum verified on every download.
 
 > **OCR vs. query_image**: Florence-2's OCR head is built for dense, printed, document-style text and can
 > confidently misread stylized, cursive, or low-contrast text (watermarks, logos, signage) rather than failing
@@ -234,6 +242,83 @@ different ways in an ambiguous pose, which the geometry then faithfully measures
 curved object from an unnaturally bent one — on two branch-like staffs it scored 0.057 and 0.065, too close to
 threshold on. Treat it as a shape description, not a defect detector.
 
+### score_aesthetics ➕
+
+Rate how aesthetically pleasing an image looks, independent of its content. Backed by a CLIP ViT-L/14
+backbone plus the LAION "improved aesthetic predictor" head, trained on human aesthetic ratings.
+
+#### Arguments:
+
+- **src**: A file path or URL to the image file that needs to be processed.
+
+#### Returns:
+
+One `{"score": float, "rating": str}` object per page/image. `score` is roughly on a 1-10 scale;
+`rating` buckets it into `poor` / `average` / `excellent` for quick triage. Reflects visual qualities
+like lighting, composition and clarity — not whether the subject matter is correct or matches a
+prompt. A technically accurate but flatly-lit, cluttered photo can score low; a blurry but
+beautifully lit one can score comparatively higher.
+
+Note that `score_aesthetics` is the only tool besides `critique_composition` that loads the CLIP
+backbone (~1.7GB), and it loads it on first use — a server that is only ever asked for captions or
+OCR never pays for it.
+
+> **Rates photography, not fine art.** Tested live on Hokusai's *The Great Wave off Kanagawa*: a
+> world-famous masterpiece still scored only 5.83 ("average"). The predictor is trained on human
+> ratings of photographs (LAION/SAC/AVA), so it has no calibrated sense of quality for paintings,
+> illustrations, or other non-photographic content — treat scores on that kind of image as noise,
+> not signal.
+
+### critique_composition ✦
+
+Critiques an image's composition: locates the main subject, checks its framing against the rule of
+thirds, and — only for low-scoring images — asks Moondream2 to explain what specifically looks
+unbalanced. Florence-2 locates the subject, a from-scratch geometry function measures its framing,
+`score_aesthetics`'s CLIP/LAION predictor scores the shot, and Moondream2 is consulted only when the
+score is low enough to need an explanation.
+
+This is the second tool, alongside `spatial_relations`, that isn't just a model wired in: no single
+model in the stack combines localization, framing, and a quality judgment into one answer.
+
+#### Arguments:
+
+- **src**: A file path or URL to the image file that needs to be processed.
+- **target_subject**: Name of the main subject, e.g. `"the dog"`. Optional — omit it to auto-detect
+  the most prominent region via `dense_region_caption` (scored by area weighted toward the image
+  center).
+- **low_score_threshold**: Aesthetic score below which Moondream2 is asked to explain why. Defaults
+  to `5.0`.
+
+#### Returns:
+
+`image_size`, `subject_box`, `aesthetics` (the same shape `score_aesthetics` returns), and `framing`:
+`centroid`, `thirds_offset` (distance from the nearest rule-of-thirds gridline intersection, near 0
+for a well-composed shot), `center_offset` (distance from dead-centre, for comparison), and
+`nearest_gridpoint` — both offsets normalized by the frame's diagonal, so they are comparable across
+image sizes. When the aesthetic score is below `low_score_threshold`, a `critique` field carries
+Moondream2's plain-language explanation.
+
+If no subject can be located (an empty or genuinely featureless image), returns a soft-failure shape
+— `image_size`, `aesthetics`, and a `note` explaining why — rather than raising, the same convention
+`spatial_relations` uses when none of its requested objects are found.
+
+#### Limits
+
+Inherits `score_aesthetics`'s CLIP backbone cost, its photography-only calibration (see above), and
+`spatial_relations`'s detection caveats: a vague or wrong `target_subject` grounds onto whatever
+Florence-2 finds closest, the same way an ambiguous class name misleads `detect_objects` — tested
+live with `target_subject="face"` against a photo with no face in it, which still returned a box
+spanning most of the frame instead of reporting nothing found.
+
+Auto-detection (omitting `target_subject`) is only informative when the photo has one clear,
+smaller foreground subject. Tested live: on a night street scene with a clear light source, it
+picked a real, off-center subject and reported meaningfully off-center framing. On a busy
+whole-frame composition (a woodblock print, a hand holding a passport), it picked a box spanning
+nearly the entire image, which trivially reports as "centered" — not because the composition is
+centered, but because a near-full-frame box always is. The rule-of-thirds check only considers the
+primary subject's box; it does not account for secondary subjects, leading lines, or other
+compositional techniques.
+
 ### process 🔼
 
 Processes an image file with a custom prompt using the Florence-2 model. Useful for Florence-2
@@ -253,9 +338,12 @@ task tokens this server does not expose as their own tool.
 - **--sam2-model**: The SAM2 model backing `spatial_relations`. Defaults to `sam2.1-hiera-small`; measured on
   CPU, `tiny` is ~0.06s faster per call for a slightly worse mask, and `base-plus` roughly doubles inference
   time for a marginal gain.
-- **--idle-timeout**: Minutes of inactivity after which both models are unloaded and their memory released; they
+- **--aesthetic-model**: The CLIP model backing `score_aesthetics` and `critique_composition`. Defaults to
+  `openai/clip-vit-large-patch14`, the checkpoint the LAION aesthetic head was trained against — swapping this
+  invalidates the head's weights, so change it only alongside a matching head.
+- **--idle-timeout**: Minutes of inactivity after which each model is unloaded and its memory released; they
   reload automatically on the next request. `0`, the default, keeps them loaded for the lifetime of the server.
-- **--device**: Torch device all three models load onto, e.g. `cpu`, `cuda`, `cuda:1`, `mps`. Auto-detected (MPS,
+- **--device**: Torch device all models load onto, e.g. `cpu`, `cuda`, `cuda:1`, `mps`. Auto-detected (MPS,
   then CUDA, then CPU) when unset. Set this to pin the server to a specific accelerator, force CPU on a shared
   GPU box, or target a non-default GPU index — including a GPU-equipped cloud VM, since this is a plain local
   process with no separate cloud deployment path of its own.

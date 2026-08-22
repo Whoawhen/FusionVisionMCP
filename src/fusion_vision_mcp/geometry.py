@@ -25,6 +25,7 @@ spawns a spurious branch, and that noise swamps the signal being measured.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any, Final
 
 import numpy as np
@@ -202,4 +203,44 @@ def describe(mask: Mask) -> dict[str, Any]:
         "elongation": elongation(mask),
         "straightness": straightness(mask),
         "width_profile": width_profile(mask),
+    }
+
+
+#: The two gridlines rule-of-thirds composition splits each axis into.
+_THIRDS: Final[tuple[float, float]] = (1 / 3, 2 / 3)
+
+
+def rule_of_thirds(box: Sequence[float], image_size: tuple[int, int]) -> dict[str, Any]:
+    """How closely a bounding box's centroid sits to a rule-of-thirds gridline intersection.
+
+    Unlike the metrics above, this is frame-relative rather than mask-relative: it
+    only needs a box and the frame's dimensions, not a silhouette.
+
+    ``thirds_offset`` near 0 means the subject sits on a rule-of-thirds power
+    point; ``center_offset`` near 0 means it sits in the middle of the frame
+    instead. Both are normalized by the frame's diagonal, so they are comparable
+    across image sizes.
+    """
+    x0, y0, x1, y1 = box
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    width, height = image_size
+    diagonal = float(np.hypot(width, height))
+
+    empty = {
+        "centroid": [cx, cy],
+        "thirds_offset": float("nan"),
+        "center_offset": float("nan"),
+        "nearest_gridpoint": [cx, cy],
+    }
+    if diagonal <= 0:
+        return empty
+
+    gridpoints = [(width * gx, height * gy) for gx in _THIRDS for gy in _THIRDS]
+    nearest = min(gridpoints, key=lambda p: (p[0] - cx) ** 2 + (p[1] - cy) ** 2)
+
+    return {
+        "centroid": [cx, cy],
+        "thirds_offset": float(np.hypot(nearest[0] - cx, nearest[1] - cy)) / diagonal,
+        "center_offset": float(np.hypot(width / 2 - cx, height / 2 - cy)) / diagonal,
+        "nearest_gridpoint": [nearest[0], nearest[1]],
     }

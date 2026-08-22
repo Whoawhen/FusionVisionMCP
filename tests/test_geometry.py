@@ -127,3 +127,26 @@ def test_describe_reports_every_metric() -> None:
 
     assert result["area"] == 180 * 10
     assert set(result) == {"area", "elongation", "straightness", "width_profile"}
+
+
+def test_rule_of_thirds_centered_box_is_far_from_a_gridpoint() -> None:
+    result = geometry.rule_of_thirds([90.0, 90.0, 110.0, 110.0], (SIZE, SIZE))
+
+    assert result["center_offset"] < 0.02
+    assert result["thirds_offset"] > 0.1
+
+
+def test_rule_of_thirds_box_on_a_gridpoint_scores_near_zero() -> None:
+    gx = SIZE / 3
+    result = geometry.rule_of_thirds([gx - 5, gx - 5, gx + 5, gx + 5], (SIZE, SIZE))
+
+    assert result["thirds_offset"] < 0.02
+
+
+def test_rule_of_thirds_prefers_the_gridpoint_over_the_center() -> None:
+    """Negative control: a well-composed subject scores lower than a dead-centered one."""
+    gx = SIZE / 3
+    centered = geometry.rule_of_thirds([90.0, 90.0, 110.0, 110.0], (SIZE, SIZE))
+    on_gridpoint = geometry.rule_of_thirds([gx - 5, gx - 5, gx + 5, gx + 5], (SIZE, SIZE))
+
+    assert on_gridpoint["thirds_offset"] < centered["thirds_offset"]

@@ -9,7 +9,14 @@ import logging
 
 import rich_click as click
 
-from . import DEFAULT_MOONDREAM_MODEL, DEFAULT_MOONDREAM_REVISION, DEFAULT_SAM2_MODEL, SERVER_NAME, server
+from . import (
+    DEFAULT_AESTHETIC_MODEL,
+    DEFAULT_MOONDREAM_MODEL,
+    DEFAULT_MOONDREAM_REVISION,
+    DEFAULT_SAM2_MODEL,
+    SERVER_NAME,
+    server,
+)
 
 
 @click.command()
@@ -39,6 +46,12 @@ from . import DEFAULT_MOONDREAM_MODEL, DEFAULT_MOONDREAM_REVISION, DEFAULT_SAM2_
     help="Specifies the SAM2 model used for the spatial_relations tool.",
 )
 @click.option(
+    "--aesthetic-model",
+    default=DEFAULT_AESTHETIC_MODEL,
+    show_default=True,
+    help="Specifies the CLIP model used for the score_aesthetics and critique_composition tools.",
+)
+@click.option(
     "--idle-timeout",
     type=float,
     default=0,
@@ -53,7 +66,7 @@ from . import DEFAULT_MOONDREAM_MODEL, DEFAULT_MOONDREAM_REVISION, DEFAULT_SAM2_
     "--device",
     default=None,
     help=(
-        "Torch device all three models load onto, e.g. 'cpu', 'cuda', 'cuda:1', 'mps'. "
+        "Torch device all models load onto, e.g. 'cpu', 'cuda', 'cuda:1', 'mps'. "
         "Auto-detected (MPS, then CUDA, then CPU) when unset -- set this to pin the server to a "
         "specific accelerator, force CPU on a shared GPU box, or target a non-default GPU index."
     ),
@@ -65,6 +78,7 @@ def main(
     moondream_model: str,
     moondream_revision: str,
     sam2_model: str,
+    aesthetic_model: str,
     idle_timeout: float,
     device: str | None,
 ) -> None:
@@ -81,6 +95,7 @@ def main(
         moondream_model_id=moondream_model,
         moondream_revision=moondream_revision,
         sam2_model_id=sam2_model,
+        aesthetic_model_id=aesthetic_model,
         idle_timeout=idle_seconds,
         device=device,
     )

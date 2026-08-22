@@ -18,6 +18,7 @@ from typing import cast
 import pytest
 from mcp import ClientSession, StdioServerParameters, stdio_client
 from mcp.types import TextContent
+from PIL import Image
 
 TEST_DIR = Path(__file__).resolve().parent
 SAMPLE_IMAGE_FILEPATH = str(TEST_DIR / "sample.jpg")
@@ -73,6 +74,9 @@ async def test_list_tools(mcp_client_session: ClientSession) -> None:
     assert "analyze_image" in tools
     assert "batch_analyze_images" in tools
     assert "process" in tools
+    assert "spatial_relations" in tools
+    assert "score_aesthetics" in tools
+    assert "critique_composition" in tools
 
 
 @pytest.mark.anyio
@@ -319,3 +323,77 @@ async def test_process_pdf_from_web(mcp_client_session: ClientSession, static_fi
 
     assert len(text) > 0
     assert not res.is_error
+
+
+@pytest.mark.anyio
+async def test_score_aesthetics(mcp_client_session: ClientSession) -> None:
+    res = await mcp_client_session.call_tool(
+        "score_aesthetics",
+        arguments={"src": SAMPLE_IMAGE_FILEPATH},
+    )
+    results = [json.loads(cast(TextContent, c).text) for c in res.content]
+
+    assert not res.is_error
+    assert len(results) == 1
+    assert "score" in results[0]
+    assert "rating" in results[0]
+
+
+@pytest.mark.anyio
+async def test_score_aesthetics_pdf(mcp_client_session: ClientSession) -> None:
+    res = await mcp_client_session.call_tool(
+        "score_aesthetics",
+        arguments={"src": SAMPLE_PDF_FILEPATH},
+    )
+    results = [json.loads(cast(TextContent, c).text) for c in res.content]
+
+    assert not res.is_error
+    assert len(results) >= 1
+    assert all("score" in item for item in results)
+
+
+@pytest.mark.anyio
+async def test_critique_composition(mcp_client_session: ClientSession) -> None:
+    res = await mcp_client_session.call_tool(
+        "critique_composition",
+        arguments={"src": SAMPLE_IMAGE_FILEPATH, "target_subject": "person"},
+    )
+    result = json.loads("\n".join(cast(TextContent, c).text for c in res.content))
+
+    assert not res.is_error
+    assert "aesthetics" in result
+    assert "framing" in result
+    assert "subject_box" in result
+
+
+@pytest.mark.anyio
+async def test_critique_composition_auto_detects_subject(mcp_client_session: ClientSession) -> None:
+    res = await mcp_client_session.call_tool(
+        "critique_composition",
+        arguments={"src": SAMPLE_IMAGE_FILEPATH},
+    )
+    result = json.loads("\n".join(cast(TextContent, c).text for c in res.content))
+
+    assert not res.is_error
+    assert "aesthetics" in result
+
+
+@pytest.mark.anyio
+async def test_critique_composition_reports_note_when_subject_not_found(
+    mcp_client_session: ClientSession, tmp_path: Path
+) -> None:
+    """Florence-2's grounding is generous even for a nonsense phrase (it still finds *something*
+    in a real photo, per detect_objects's own ambiguous-class caveat), so the reliable way to
+    trigger the "nothing found" path is a genuinely featureless image, not an implausible phrase.
+    """
+    blank_filepath = tmp_path / "blank.jpg"
+    Image.new("RGB", (64, 64), color=(128, 128, 128)).save(blank_filepath)
+
+    res = await mcp_client_session.call_tool(
+        "critique_composition",
+        arguments={"src": str(blank_filepath)},
+    )
+    result = json.loads("\n".join(cast(TextContent, c).text for c in res.content))
+
+    assert not res.is_error
+    assert "note" in result
