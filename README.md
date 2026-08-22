@@ -1,4 +1,4 @@
-# FusionVisionMCP: Supercharge Your AI With Vision Powers 🚀
+# FusionVisionMCP: Multi-core Vision Server
 
 [![GitHub License](https://img.shields.io/github/license/Whoawhen/FusionVisionMCP)](https://github.com/Whoawhen/FusionVisionMCP/blob/main/LICENSE)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
