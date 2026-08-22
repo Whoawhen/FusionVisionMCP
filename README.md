@@ -154,16 +154,14 @@ Process screenshots and memes to understand context and sentiment.
 | Hardware Flexibility | Limited | ✅ CPU/GPU Adaptive Processing |
 | Resource Optimization | ❌ | ✅ GPU Conservation for Primary AI Tasks |
 
-## Advanced Tool Comparison
-
-Understanding the differences between vision tools helps you choose the right solution for your needs:
+## Tool Composition
 
 | Tool Name | Provider | Core Functions | Unique Advantages |
 |-----------|----------|----------------|-------------------|
 | **Florence-2** | Microsoft (Original) | `ocr`, `caption`, `process`, object detection & grounding | Fast, efficient multi-task vision model |
 | **Moondream2** | Vikhyat | Visual question answering | Specialized for open-ended VQA |
 | **SAM2** | Meta (Original) | Segmentation masks | Precise pixel-level object segmentation |
-| **FusionVisionMCP** | Whoawhen | Exposes Florence-2, Moondream2, and SAM2 as MCP tools (`ocr`, `caption`, `process`, `detect_objects`, `point_objects`, `dense_region_caption`, `query_image`, `analyze_image`, `batch_analyze_images`), plus `spatial_relations` | The only one of the four that measures spatial relationships between objects — everything else here is one of the three models' own capability, exposed as an MCP tool |
+| **FusionVisionMCP** | Whoawhen | Exposes Florence-2, Moondream2, and SAM2 as MCP tools (`ocr`, `caption`, `process`, `detect_objects`, `point_objects`, `dense_region_caption`, `query_image`, `analyze_image`, `batch_analyze_images`), plus `spatial_relations` | Measures spatial relationships between objects |
 
 ### FusionVisionMCP's One Novel Function
 
