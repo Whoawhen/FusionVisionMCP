@@ -5,6 +5,7 @@
 #  This software is released under the MIT License.
 #
 #  http://opensource.org/licenses/mit-license.php
+import importlib.metadata
 import math
 import os
 from collections.abc import AsyncIterator, Iterator
@@ -37,12 +38,19 @@ SERVER_NAME: Final[str] = "FusionVisionMCP"
 #: n(n-1)/2, so an over-broad detection could otherwise return a huge payload.
 _MAX_RELATED_OBJECTS: Final[int] = 12
 
+#: `requests`' default User-Agent identifies the library, not a specific client, and
+#: some hosts reject it outright as an anti-scraping measure — confirmed live against
+#: Wikimedia, which 403s the default UA but accepts a descriptive one.
+_USER_AGENT: Final[str] = (
+    f"{SERVER_NAME}/{importlib.metadata.version('fusion-vision-mcp')} (+https://github.com/Whoawhen/FusionVisionMCP)"
+)
+
 
 @contextmanager
 def get_images(src: os.PathLike[str] | str) -> Iterator[list[Image]]:
     """Opens and returns a list of images from a file path or URL."""
     if isinstance(src, str) and src.startswith(("http://", "https://")):
-        res = requests.get(src)
+        res = requests.get(src, headers={"User-Agent": _USER_AGENT})
         res.raise_for_status()
 
         if res.headers["Content-Type"] == "application/pdf":
