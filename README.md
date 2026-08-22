@@ -158,10 +158,10 @@ Process screenshots and memes to understand context and sentiment.
 
 | Tool Name | Provider | Core Functions | Unique Advantages |
 |-----------|----------|----------------|-------------------|
-| **Florence-2** | Microsoft (Original) | `ocr`, `caption`, `process`, object detection & grounding | Fast, efficient multi-task vision model |
+| **Florence-2** | Microsoft (Original) | OCR, captioning, custom prompting, object detection & grounding, dense region captioning | Fast, efficient multi-task vision model |
 | **Moondream2** | Vikhyat | Visual question answering | Specialized for open-ended VQA |
 | **SAM2** | Meta (Original) | Segmentation masks | Precise pixel-level object segmentation |
-| **FusionVisionMCP** | Whoawhen | Exposes Florence-2, Moondream2, and SAM2 as MCP tools (`ocr`, `caption`, `process`, `detect_objects`, `point_objects`, `dense_region_caption`, `query_image`, `analyze_image`, `batch_analyze_images`), plus `spatial_relations` | Measures spatial relationships between objects |
+| **FusionVisionMCP** | Whoawhen | `spatial_relations` | Measures spatial relationships between objects |
 
 ### FusionVisionMCP's One Novel Function
 
