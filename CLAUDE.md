@@ -70,6 +70,19 @@ when they are separated, and carrying the **highest** score, so a confidence cut
 first. `grounding_dino.py` drops boxes that swallow most of the others' centres and reports
 `group_boxes_dropped`. Without that filter every count is one too many.
 
+**Tune counting against `benchmarks/`, never against one image.** The fixture suite draws its synthetic cases
+programmatically, so their counts are exact by construction, and it includes eight negative controls that are
+each exactly one object. Two settings were chosen from it and should not be nudged without re-running it:
+the box threshold (0.25 → **0.15**) and the envelope filter's floor (4 → **3** boxes, since two instances plus
+their envelope is only three). Together those took exact positives from 6/10 to 9/10 and mean absolute count
+error from 1.07 to 0.10, holding all eight controls.
+
+The sweep is also the clearest illustration of why this repo insists on negative controls. Thresholds of 0.125
+and 0.10 score a **perfect 10/10 on positives** — and fragment a spotted ball into 3–4 objects and a rough-edged
+rod into 2. Optimising on positives alone would have shipped exactly the failure mode the project exists to
+avoid. 0.15 is the *lowest* threshold at which every control still holds, and that is the reason it is the
+default.
+
 **The honest negative result: interior structure is not recoverable here.** `tests/sample.jpg` — a paper flower
 with overlapping petals — returns 1 from *every* approach tried: Florence-2 grounding, Moondream's detect head,
 Grounding DINO, the `count_lobes` outline measurement, and SAM2 in segment-everything mode (one mask for the

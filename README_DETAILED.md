@@ -217,21 +217,44 @@ touching, carrying the **highest** score both times, so a confidence cut would r
 Boxes that swallow most of the others' centres are dropped and counted in `group_boxes_dropped`; this is what
 turns a 9 into the correct 8.
 
+#### Measured accuracy
+
+Scored by the fixture suite in [`benchmarks/`](benchmarks/), which draws its synthetic cases programmatically so
+their instance count is exact by construction. Tuning the box threshold from the upstream default of 0.25 down
+to 0.15, and letting the group-box filter apply at three detections rather than four:
+
+| | default (0.25, floor 4) | shipped (0.15, floor 3) |
+| --- | --- | --- |
+| Positives exact | 6/10 | **9/10** |
+| Negative controls held | 8/8 | **8/8** |
+| Mean absolute count error | 1.07 | **0.10** |
+
+Two cases drove that: a 30-object grid was undercounted at 15 and is now exact, and every two-instance count was
+one too high, because the detector returns both instances plus one box spanning the pair and the filter's floor
+excluded that three-box case.
+
+0.15 is a floor, not an optimum. Thresholds of 0.125 and 0.10 score a *perfect* 10/10 on positives, and both
+break the negative controls -- fragmenting a spotted ball into 3-4 objects and a rough-edged rod into 2. That is
+the failure this project refuses to ship, so the shipped value is the lowest threshold at which every control
+still holds. Pass `threshold` explicitly if your images have no such texture.
+
 #### Limits
 
-**Heavy overlap still defeats it.** Eight shapes overlapping by roughly two-thirds of their width count as 2, not
-8. A count far below what you expect means *"could not separate them"*, not a real tally.
+**Heavy overlap still defeats it.** Eight shapes overlapping by roughly two-thirds of their width count as 6, not
+8 -- improved from 3 at the old threshold, but still short. A count below what you expect means *"could not
+separate them"*, not a real tally.
 
 **Silhouettes carry no interior structure — the honest negative result.** On `tests/sample.jpg`, a paper flower
 whose petals overlap, *every* approach tried returns 1: Florence-2 grounding, Moondream2's detect head, Grounding
 DINO, the `count_lobes` outline measurement, and SAM2 in segment-everything mode (which returns exactly one mask
-for the whole flower). The reason is measurable: the flower's silhouette has **solidity 0.983** — its outline is
-98% of its own convex hull, i.e. very nearly a smooth disc. The petal boundaries exist only as *interior colour
-edges*, which no detector or outline measurement in this server recovers. Ask `query_image` for a count in that
-situation and treat the answer as an estimate.
+for the whole flower). Threshold tuning does not touch it either: it stays at 1 at every box threshold down to
+0.10, including values low enough to fragment the textured negative controls. The reason is measurable: the
+flower's silhouette has **solidity 0.984** — its outline is 98% of its own convex hull, i.e. very nearly a smooth
+disc. The petal boundaries exist only as *interior colour edges*, which no detector or outline measurement in
+this server recovers. Ask `query_image` for a count in that situation and treat the answer as an estimate.
 
-So: a real improvement for separated, touching, and awkwardly-named instances, and no improvement for heavily
-overlapping ones. Counting is not solved.
+So: a real improvement for separated, touching, dense, two-instance and awkwardly-named cases, a partial one for
+heavy overlap, and none at all where the evidence is interior rather than in the outline. Counting is not solved.
 
 ### dense_region_caption ➕
 

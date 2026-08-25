@@ -33,9 +33,17 @@ from .device import resolve_device
 DEFAULT_GROUNDING_DINO_MODEL: Final[str] = "IDEA-Research/grounding-dino-tiny"
 
 #: Box confidence below which a detection is dropped, and the separate threshold on how
-#: well it matches the prompt text. The upstream defaults; exposed per call because the
-#: right trade between recall and precision depends on what is being counted.
-DEFAULT_BOX_THRESHOLD: Final[float] = 0.25
+#: well it matches the prompt text. Both exposed per call, because the right trade
+#: between recall and precision depends on what is being counted.
+#:
+#: 0.15 rather than the upstream default of 0.25, chosen by sweeping the whole counting
+#: fixture set (`benchmarks/`): it takes exact positives from 8/10 to 9/10 and mean
+#: absolute count error from 1.15 to 0.10 while still holding all eight negative
+#: controls. Dropping further scores better on positives alone -- 0.125 and 0.10 both
+#: reach 10/10 -- but each breaks a negative control, fragmenting a spotted ball into
+#: 3-4 objects and a rough-edged rod into 2. That is the failure this project refuses to
+#: ship, so 0.15 is the floor: the lowest threshold at which every control still holds.
+DEFAULT_BOX_THRESHOLD: Final[float] = 0.15
 DEFAULT_TEXT_THRESHOLD: Final[float] = 0.25
 
 #: Share of the other detections whose centres a box must swallow to count as an
@@ -47,8 +55,12 @@ DEFAULT_TEXT_THRESHOLD: Final[float] = 0.25
 _ENVELOPE_CONTAINMENT: Final[float] = 0.6
 
 #: Below this many detections there is no "group" for a box to enclose, and a genuine
-#: pair of nested objects would be discarded instead.
-_MIN_BOXES_FOR_ENVELOPE: Final[int] = 4
+#: pair of nested objects would be discarded instead. Three is the floor worth applying:
+#: at three boxes the containment rule below requires one box to swallow *both* others,
+#: which is a strong signal, while at two it would only require swallowing one and would
+#: discard a genuinely nested object. Measured: two touching instances come back as
+#: 2 instances plus 1 envelope, so a floor of 4 left every two-instance count one too high.
+_MIN_BOXES_FOR_ENVELOPE: Final[int] = 3
 
 
 class GroundingDino:
