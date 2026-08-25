@@ -2,15 +2,15 @@
 
 Fork of [jkawamoto/mcp-florence2](https://github.com/jkawamoto/mcp-florence2), renamed and rebranded as
 **FusionVisionMCP** (Python package `fusion-vision-mcp`, module `fusion_vision_mcp`, binary
-`fusion-vision-mcp.exe`), adding Moondream2 VQA, object grounding (`detect_objects`, `point_objects`,
-`dense_region_caption`), batch analysis, and an `--idle-timeout` that releases model memory after a period of
-inactivity. See [README.md](README.md) for the tool and option reference.
+`fusion-vision-mcp.exe`), adding Moondream2 VQA, object grounding (`detect_objects`,
+`dense_region_caption`), CLIP/LAION aesthetic scoring, batch analysis, and a `--memory-mode` that controls how
+long models stay resident after use. See [README.md](README.md) for the tool and option reference.
 
 ## This is an editable install — checking out a branch changes the running server
 
 `fusion-vision-mcp` is installed as an editable `uv` tool pointing at this checkout (`uv tool install --editable . --force ...`). The MCP server both Cline and Claude Code run **is whatever branch is checked out here**, live, with no reinstall needed to pick up source changes.
 
-This bit us once already: checking out `main` to catch up with upstream silently removed `--idle-timeout` and the Moondream tools from the running server, and it came back as `✘ Failed to connect` in both clients because `main` doesn't accept `--idle-timeout`. Always confirm you're on `feature/moondream-vqa-and-idle-release` (or a later feature branch) before assuming the server has this fork's tools, and re-run `uv tool install --editable . --force ...` after any change to `pyproject.toml` — source edits are live immediately, but dependency changes are not until reinstalled.
+This bit us once already: checking out `main` to catch up with upstream silently removed the idle-release option and the Moondream tools from the running server, and it came back as `✘ Failed to connect` in both clients because `main` doesn't accept that flag. The same trap now applies to `--memory-mode`, which is newer still. Always confirm you're on `feature/moondream-vqa-and-idle-release` (or a later feature branch) before assuming the server has this fork's tools, and re-run `uv tool install --editable . --force ...` after any change to `pyproject.toml` — source edits are live immediately, but dependency changes are not until reinstalled.
 
 ## `pyvips` is required transitively, not by this package directly
 

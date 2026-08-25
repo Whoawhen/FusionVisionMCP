@@ -14,10 +14,10 @@ and a [CLIP](https://huggingface.co/openai/clip-vit-large-patch14)-backed
 [LAION aesthetic predictor](https://github.com/christophschuhmann/improved-aesthetic-predictor) into one
 computer-vision toolset. Fork of [jkawamoto/mcp-florence2](https://github.com/jkawamoto/mcp-florence2), which
 provides exactly three tools — `ocr`, `caption`, `process` — all against Florence-2. This fork adds everything
-else: Florence-2's other task heads exposed as their own tools (`detect_objects`, `point_objects`,
+else: Florence-2's other task heads exposed as their own tools (`detect_objects`,
 `dense_region_caption`), Moondream2 for open-ended visual question answering (`query_image`, since Florence-2 has
-none), a CLIP/LAION aesthetic scorer (`score_aesthetics`), two dispatch conveniences (`analyze_image`,
-`batch_analyze_images`), and idle-timeout memory release. Two tools aren't just a new model wired in: no model
+none), a CLIP/LAION aesthetic scorer (`score_aesthetics`), a batch dispatch convenience
+(`batch_analyze_images`), and configurable memory release. Two tools aren't just a new model wired in: no model
 here answers "does this actually touch that" on its own, so `spatial_relations` is built from Florence-2 boxes,
 SAM2 masks, and a from-scratch geometry module; and no model combines localization, framing, and a quality
 judgment into one answer, so `critique_composition` combines Florence-2, a rule-of-thirds geometry function, the
@@ -54,6 +54,10 @@ repository and is cached locally after the first request, with its checksum veri
 Download the latest MCP bundle `fusion-vision-mcp.mcpb` from
 the [Releases](https://github.com/Whoawhen/FusionVisionMCP/releases) page,
 then open the downloaded `.mcpb `file or drag it into the Claude Desktop's Settings window.
+
+The bundle offers one setting at install time, **Memory mode**, which controls how long the vision models stay
+in memory after use — see [Memory modes](#memory-modes) for the choices. It defaults to `standard` and can be
+changed later from the server's settings.
 
 <details>
 <summary>Manually configuration</summary>
@@ -117,7 +121,9 @@ Process an image file or URL using OCR to extract text.
 
 ### caption 🔼
 
-Processes an image file and generates captions for the image.
+Describe what an image shows, as one detailed prose caption of the whole scene. No coordinates. Use
+`dense_region_caption` instead for a separate caption and box per region, `query_image` to ask something
+specific, and `ocr` to transcribe text rather than describe it. Returns one caption per page for a PDF.
 
 #### Arguments:
 
@@ -125,7 +131,8 @@ Processes an image file and generates captions for the image.
 
 ### detect_objects ➕
 
-Detect instances of a named object in an image, returning bounding boxes and labels.
+Locate a named object in an image, returning `bboxes` (`[x1, y1, x2, y2]` each), `points` (the centre of each
+box) and `labels`, all index-aligned.
 
 #### Arguments:
 
@@ -138,21 +145,18 @@ Detect instances of a named object in an image, returning bounding boxes and lab
 > spanning both, not two. Prefer a more specific `object_name`, and treat results as candidates to
 > inspect, not a reliable count.
 
-### point_objects ➕
+> Boxes cannot tell you whether two objects actually touch, or whether one is inside another — they overlap the
+> moment one object is merely in front of another. Use [`spatial_relations`](#spatial_relations-) for that.
 
-Locate instances of a named object in an image, returning the centre coordinates of each match.
-
-#### Arguments:
-
-- **src**: A file path or URL to the image file that needs to be processed.
-- **object_name**: Name of the object to locate, e.g. `person`, `car`, `face`.
-
-> Same caveat as `detect_objects`: point count is not a reliable proxy for object count on an
-> ambiguous class name.
+> **Merged in this fork.** Centre points used to be a separate `point_objects` tool. It ran the identical
+> Florence-2 grounding call and only averaged the boxes afterwards, so a caller who wanted points paid for a
+> second, redundant model pass. The centres now ride along with the boxes at no extra cost.
 
 ### dense_region_caption ➕
 
-Generate a caption for every salient region of an image, with bounding boxes.
+Caption every salient region of an image at once, with bounding boxes. Unlike `detect_objects`, it discovers the
+objects itself rather than needing one named, which makes it the tool for inventorying an image you know nothing
+about.
 
 #### Arguments:
 
@@ -167,22 +171,15 @@ Ask a free-form question about an image (visual question answering). Backed by M
 - **src**: A file path or URL to the image file that needs to be processed.
 - **question**: A free-form question to ask about the image.
 
-### analyze_image ➕
-
-Multi-purpose tool that dispatches to any of the operations above. Useful for agents that would rather choose an
-operation by name than pick between tools.
-
-#### Arguments:
-
-- **src**: A file path or URL to the image file that needs to be processed.
-- **operation**: One of `caption`, `ocr`, `detect`, `point`, `dense_caption`, `query`.
-- **question**: Required when the operation is `query`.
-- **object_name**: Required when the operation is `detect` or `point`.
-
 ### batch_analyze_images ➕
 
-Runs `analyze_image`'s operation over several images. Each image reports its own success or failure, so one bad
-file does not abort the batch.
+Run one operation across many images in a single call — the batch form of `caption`, `ocr`, `detect_objects`,
+`dense_region_caption` and `query_image`. Costs one round trip instead of one per image, and loads each model
+once for the whole run. Each image reports its own success or failure, so one bad file does not abort the batch;
+results come back in the order given.
+
+For a single image, call the named tool directly: its arguments are checked up front rather than depending on
+`operation`.
 
 #### Arguments:
 
@@ -341,15 +338,36 @@ task tokens this server does not expose as their own tool.
 - **--aesthetic-model**: The CLIP model backing `score_aesthetics` and `critique_composition`. Defaults to
   `openai/clip-vit-large-patch14`, the checkpoint the LAION aesthetic head was trained against — swapping this
   invalidates the head's weights, so change it only alongside a matching head.
-- **--idle-timeout**: Minutes of inactivity after which each model is unloaded and its memory released; they
-  reload automatically on the next request. `0`, the default, keeps them loaded for the lifetime of the server.
+- **--memory-mode**: How long each model stays in memory after its last use. See
+  [Memory modes](#memory-modes) below.
+- **--idle-timeout**: Deprecated alias for `--memory-mode` expressed in minutes; overrides it when given.
 - **--device**: Torch device all models load onto, e.g. `cpu`, `cuda`, `cuda:1`, `mps`. Auto-detected (MPS,
   then CUDA, then CPU) when unset. Set this to pin the server to a specific accelerator, force CPU on a shared
   GPU box, or target a non-default GPU index — including a GPU-equipped cloud VM, since this is a plain local
   process with no separate cloud deployment path of its own.
 
-The models are large, so a server left running holds several gigabytes of memory. Setting `--idle-timeout 10`
-keeps repeat calls fast during a burst of work while handing the memory back once the work stops.
+## Memory modes
+
+The models are large, so a server left running can hold several gigabytes. `--memory-mode` sets where you sit on
+the trade between memory and speed. When installing the `.mcpb` bundle, the same setting is offered as the
+**Memory mode** configuration field, so it can be chosen without touching a command line.
+
+| Mode | Behaviour | Choose it when |
+| --- | --- | --- |
+| `instant` | Releases every model as soon as each call returns. | Memory is tight, or vision calls are rare and scattered. Lowest memory; every call pays the load cost. |
+| `aggressive` | Releases after **5 minutes** of inactivity. | You want most of the memory back quickly but still work in short bursts. |
+| `standard` | Releases after **10 minutes** of inactivity. **Default.** | General use — repeat calls stay fast during a burst of work, and the memory comes back once the work stops. |
+| `persistent` | Never releases; models stay loaded for the server's lifetime. | Throughput matters more than memory, e.g. a dedicated machine or a long batch job. Highest memory, fastest. |
+| *a number* | Releases after that many minutes, e.g. `--memory-mode 30`. | You know your own working rhythm and want to match it. |
+
+Every mode reloads automatically on the next request, so none of them can lose work — only time. Releasing is
+also per model: a session that only ever captions never loads SAM2 or the CLIP backbone in the first place, so
+these settings govern what is held *after* use, not what gets loaded.
+
+`instant` is not simply a very short timeout. The idle timer is restarted by attribute lookup, so a timeout short
+enough to fire promptly would also fire mid-inference, while the caller still holds a live reference and nothing
+is actually freed. `instant` instead releases at the point each call returns, which is the only moment the
+release is guaranteed to reclaim anything.
 
 
 ## License

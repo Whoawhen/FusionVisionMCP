@@ -65,18 +65,18 @@ async def test_list_tools(mcp_client_session: ClientSession) -> None:
     res = await mcp_client_session.list_tools()
     tools = {tool.name for tool in res.tools}
 
-    assert "caption" in tools
-    assert "ocr" in tools
-    assert "detect_objects" in tools
-    assert "point_objects" in tools
-    assert "dense_region_caption" in tools
-    assert "query_image" in tools
-    assert "analyze_image" in tools
-    assert "batch_analyze_images" in tools
-    assert "process" in tools
-    assert "spatial_relations" in tools
-    assert "score_aesthetics" in tools
-    assert "critique_composition" in tools
+    assert tools == {
+        "caption",
+        "ocr",
+        "detect_objects",
+        "dense_region_caption",
+        "query_image",
+        "batch_analyze_images",
+        "process",
+        "spatial_relations",
+        "score_aesthetics",
+        "critique_composition",
+    }
 
 
 @pytest.mark.anyio
@@ -189,18 +189,22 @@ async def test_detect_objects(mcp_client_session: ClientSession) -> None:
 
 
 @pytest.mark.anyio
-async def test_point_objects(mcp_client_session: ClientSession) -> None:
+async def test_detect_objects_returns_center_points_alongside_boxes(mcp_client_session: ClientSession) -> None:
+    """Center points used to be their own tool; they now ride along with the boxes."""
     res = await mcp_client_session.call_tool(
-        "point_objects",
+        "detect_objects",
         arguments={"src": SAMPLE_IMAGE_FILEPATH, "object_name": "person"},
     )
     regions = json.loads("\n".join(cast(TextContent, c).text for c in res.content))
 
     assert not res.is_error
     assert "points" in regions
-    assert "labels" in regions
-    # Points are centres, so each one carries an x and a y.
+    # Points are centres, so each one carries an x and a y, one per box.
+    assert len(regions["points"]) == len(regions["bboxes"])
     assert all(len(point) == 2 for point in regions["points"])
+    for (x1, y1, x2, y2), (px, py) in zip(regions["bboxes"], regions["points"], strict=True):
+        assert px == pytest.approx((x1 + x2) / 2)
+        assert py == pytest.approx((y1 + y2) / 2)
 
 
 @pytest.mark.anyio
@@ -217,35 +221,29 @@ async def test_dense_region_caption(mcp_client_session: ClientSession) -> None:
 
 
 @pytest.mark.anyio
-async def test_analyze_image_dispatches_to_ocr(mcp_client_session: ClientSession) -> None:
+async def test_batch_analyze_images_rejects_unknown_operation(mcp_client_session: ClientSession) -> None:
     res = await mcp_client_session.call_tool(
-        "analyze_image",
-        arguments={"src": SAMPLE_IMAGE_FILEPATH, "operation": "ocr"},
+        "batch_analyze_images",
+        arguments={"srcs": [SAMPLE_IMAGE_FILEPATH], "operation": "translate"},
     )
-    text = "\n".join(cast(TextContent, c).text for c in res.content)
+    results = [json.loads(cast(TextContent, c).text) for c in res.content]
+
+    # Per-image isolation means a bad operation surfaces as a failed entry, not a raised call.
+    assert not res.is_error
+    assert not results[0]["success"]
+
+
+@pytest.mark.anyio
+async def test_batch_analyze_images_requires_object_name_for_detect(mcp_client_session: ClientSession) -> None:
+    res = await mcp_client_session.call_tool(
+        "batch_analyze_images",
+        arguments={"srcs": [SAMPLE_IMAGE_FILEPATH], "operation": "detect"},
+    )
+    results = [json.loads(cast(TextContent, c).text) for c in res.content]
 
     assert not res.is_error
-    assert len(text) > 0
-
-
-@pytest.mark.anyio
-async def test_analyze_image_rejects_unknown_operation(mcp_client_session: ClientSession) -> None:
-    res = await mcp_client_session.call_tool(
-        "analyze_image",
-        arguments={"src": SAMPLE_IMAGE_FILEPATH, "operation": "translate"},
-    )
-
-    assert res.is_error
-
-
-@pytest.mark.anyio
-async def test_analyze_image_requires_object_name_for_detect(mcp_client_session: ClientSession) -> None:
-    res = await mcp_client_session.call_tool(
-        "analyze_image",
-        arguments={"src": SAMPLE_IMAGE_FILEPATH, "operation": "detect"},
-    )
-
-    assert res.is_error
+    assert not results[0]["success"]
+    assert "object_name" in results[0]["error"]
 
 
 @pytest.mark.anyio

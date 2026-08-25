@@ -51,11 +51,8 @@ class Florence2:
         return self.generate(str(level.value), images)
 
     def detect_objects(self, images: list[Image], object_name: str) -> list[dict[str, Any]]:
-        return self.generate_structured("<CAPTION_TO_PHRASE_GROUNDING>", images, text=object_name)
-
-    def point_objects(self, images: list[Image], object_name: str) -> list[dict[str, Any]]:
         grounded = self.generate_structured("<CAPTION_TO_PHRASE_GROUNDING>", images, text=object_name)
-        return [_bboxes_to_points(region) for region in grounded]
+        return [_with_center_points(region) for region in grounded]
 
     def dense_region_caption(self, images: list[Image]) -> list[dict[str, Any]]:
         return self.generate_structured("<DENSE_REGION_CAPTION>", images)
@@ -97,10 +94,19 @@ class Florence2:
         return res
 
 
-def _bboxes_to_points(region: dict[str, Any]) -> dict[str, Any]:
-    """Converts a Florence-2 bboxes/labels region result into center-point/labels form."""
-    points = [[(x1 + x2) / 2, (y1 + y2) / 2] for x1, y1, x2, y2 in region.get("bboxes", [])]
-    return {"points": points, "labels": region.get("labels", [])}
+def _with_center_points(region: dict[str, Any]) -> dict[str, Any]:
+    """Adds each box's center point to a Florence-2 bboxes/labels region result.
+
+    The grounding call already produces the boxes, so the centers cost two arithmetic
+    operations apiece. Returning both spares a caller that only wants a point from
+    having to make a second, identical model call to get it.
+    """
+    bboxes = region.get("bboxes", [])
+    return {
+        "bboxes": bboxes,
+        "points": [[(x1 + x2) / 2, (y1 + y2) / 2] for x1, y1, x2, y2 in bboxes],
+        "labels": region.get("labels", []),
+    }
 
 
 class Florence2SP:
@@ -122,10 +128,6 @@ class Florence2SP:
     @subprocess
     def detect_objects(self, images: list[Image], object_name: str) -> list[dict[str, Any]]:
         return Florence2(self.model_id, self.device).detect_objects(images, object_name)
-
-    @subprocess
-    def point_objects(self, images: list[Image], object_name: str) -> list[dict[str, Any]]:
-        return Florence2(self.model_id, self.device).point_objects(images, object_name)
 
     @subprocess
     def dense_region_caption(self, images: list[Image]) -> list[dict[str, Any]]:

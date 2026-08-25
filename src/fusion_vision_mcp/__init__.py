@@ -109,11 +109,7 @@ class Processor(Protocol):
         ...
 
     def detect_objects(self, images: list[Image], object_name: str) -> list[dict[str, Any]]:
-        """Locates instances of the named object, returning bounding boxes and labels."""
-        ...
-
-    def point_objects(self, images: list[Image], object_name: str) -> list[dict[str, Any]]:
-        """Locates instances of the named object, returning center points and labels."""
+        """Locates instances of the named object, returning bounding boxes, center points and labels."""
         ...
 
     def dense_region_caption(self, images: list[Image]) -> list[dict[str, Any]]:
@@ -186,6 +182,7 @@ async def app_lifespan(
     sam2_model_id: str = DEFAULT_SAM2_MODEL,
     aesthetic_model_id: str = DEFAULT_AESTHETIC_MODEL,
     idle_timeout: float = 0,
+    release_after_call: bool = False,
     device: str | None = None,
 ) -> AsyncIterator[AppContext]:
     """Context manager for the FastMCP app lifespan.
@@ -193,17 +190,25 @@ async def app_lifespan(
     Each model is wrapped separately, so a request only ever loads the model it
     actually needs: captioning never pulls in Moondream, and nothing but
     `spatial_relations` pulls in SAM2. Each is released on its own idle timer.
+
+    `idle_timeout` and `release_after_call` are the two ends of the CLI's
+    `--memory-mode` scale: a positive timeout releases each model that many
+    seconds after its last use, while `release_after_call` releases it as soon as
+    every call returns. Neither set leaves the models resident for the process's
+    lifetime, which is the fastest and most memory-hungry setting.
     """
     processor: Processor
     vqa: VqaProcessor
     segmenter: Segmenter
     aesthetic: AestheticScorer
-    if idle_timeout > 0:
+    if idle_timeout > 0 or release_after_call:
         # Keep each model in this process so repeat calls stay fast, and let the
         # idle timer hand its memory back once the work stops.
         processor = cast(
             Processor,
-            IdleProxy(IdleReleased(lambda: Florence2(model_id, device), idle_timeout, "Florence-2")),
+            IdleProxy(
+                IdleReleased(lambda: Florence2(model_id, device), idle_timeout, "Florence-2"), release_after_call
+            ),
         )
         vqa = cast(
             VqaProcessor,
@@ -212,7 +217,8 @@ async def app_lifespan(
                     lambda: Moondream(moondream_model_id, moondream_revision, device),
                     idle_timeout,
                     "Moondream",
-                )
+                ),
+                release_after_call,
             ),
         )
     else:
@@ -227,14 +233,16 @@ async def app_lifespan(
     # calls `spatial_relations` never pays for SAM2 at all.
     segmenter = cast(
         Segmenter,
-        IdleProxy(IdleReleased(lambda: Sam2(sam2_model_id, device), idle_timeout, "SAM2")),
+        IdleProxy(IdleReleased(lambda: Sam2(sam2_model_id, device), idle_timeout, "SAM2"), release_after_call),
     )
     # Same rationale as SAM2: always idle-wrapped regardless of idle_timeout, since only
     # score_aesthetics/critique_composition pay for the CLIP backbone, and most sessions
     # never call either.
     aesthetic = cast(
         AestheticScorer,
-        IdleProxy(IdleReleased(lambda: Aesthetic(aesthetic_model_id, device), idle_timeout, "Aesthetic")),
+        IdleProxy(
+            IdleReleased(lambda: Aesthetic(aesthetic_model_id, device), idle_timeout, "Aesthetic"), release_after_call
+        ),
     )
     yield AppContext(processor, vqa, segmenter, aesthetic)
 
@@ -248,6 +256,7 @@ def server(
     sam2_model_id: str = DEFAULT_SAM2_MODEL,
     aesthetic_model_id: str = DEFAULT_AESTHETIC_MODEL,
     idle_timeout: float = 0,
+    release_after_call: bool = False,
     device: str | None = None,
 ) -> MCPServer:
     """Creates a new FastMCP server instance with the specified name and model ID."""
@@ -262,15 +271,49 @@ def server(
             sam2_model_id=sam2_model_id,
             aesthetic_model_id=aesthetic_model_id,
             idle_timeout=idle_timeout,
+            release_after_call=release_after_call,
             device=device,
         ),
     )
 
     ImagePath = Annotated[
-        os.PathLike[str] | str, Field(description="A file path or URL to the image file that needs to be processed.")
+        os.PathLike[str] | str,
+        Field(
+            description=(
+                "Local file path or http(s) URL of the image to process. PDFs are also accepted "
+                "and are rendered one image per page, so tools that return a list return one entry "
+                "per page."
+            )
+        ),
     ]
-    ObjectName = Annotated[str, Field(description="Name of the object to locate, e.g. 'person', 'car', 'face'.")]
-    CustomPrompt = Annotated[str, Field(description="A custom prompt for the Florence-2 model.")]
+    ObjectName = Annotated[
+        str,
+        Field(
+            description=(
+                "Name of the object to locate, e.g. 'person', 'car', 'face'. A short noun phrase "
+                "works too ('the red mug'). More specific names ground more reliably than broad ones."
+            )
+        ),
+    ]
+    CustomPrompt = Annotated[
+        str,
+        Field(
+            description=(
+                "A Florence-2 task token, e.g. '<OD>', '<CAPTION>', '<REGION_PROPOSAL>'. Not a "
+                "natural-language instruction -- plain English here produces garbage, not an answer."
+            )
+        ),
+    ]
+    Operation = Annotated[
+        str,
+        Field(
+            description=(
+                "One of: 'caption', 'ocr', 'detect', 'dense_caption', 'query'. Use 'query' (with "
+                "`question`) rather than 'ocr' for watermarks, logos, signage, or stylized/cursive "
+                "text -- 'ocr' misreads that kind of text confidently."
+            )
+        ),
+    ]
 
     @mcp.tool()
     def ocr(ctx: Context[AppContext], src: ImagePath) -> list[str]:
@@ -288,36 +331,51 @@ def server(
 
     @mcp.tool()
     def caption(ctx: Context[AppContext], src: ImagePath) -> list[str]:
-        """Processes an image file and generates captions for the image."""
+        """Describe what an image shows, as one detailed prose caption.
+
+        The default choice for "what is this a picture of". Returns a single
+        paragraph covering the scene as a whole, with no coordinates.
+
+        Reach for a different tool when the question is narrower: `query_image`
+        to ask something specific about the image, `dense_region_caption` to get
+        a separate caption and box for each thing in it, and `ocr` to transcribe
+        text rather than describe it. Returns one caption per page for a PDF.
+        """
         with get_images(src) as images:
             return ctx.request_context.lifespan_context.processor.caption(images, CaptionLevel.MORE_DETAILED)
 
     @mcp.tool()
     def detect_objects(ctx: Context[AppContext], src: ImagePath, object_name: ObjectName) -> list[dict[str, Any]]:
-        """Detect instances of a named object in an image, returning bounding boxes.
+        """Locate a named object in an image, as bounding boxes and center points.
 
-        Box count is not a reliable proxy for object count on an ambiguous class name:
-        Florence-2 can return several overlapping boxes for one physical object (a whole-animal
-        box plus sub-part boxes all labelled 'wing'), or a single box spanning two touching
-        instances of the same object (two fused blades labelled once as 'sword blade'). Prefer a
-        more specific object_name, and treat the boxes as candidates to inspect rather than a count.
+        Returns `bboxes` ([x1, y1, x2, y2] each), `points` (the center of each box)
+        and `labels`, all index-aligned -- so use this whether you want regions or
+        coordinates; the centers come free with the boxes.
+
+        The count of results is NOT a reliable count of objects on an ambiguous
+        class name: Florence-2 can return several overlapping results for one
+        physical object (a whole-animal box plus sub-part boxes all labelled
+        'wing'), or a single result spanning two touching instances (two fused
+        blades labelled once as 'sword blade'). Prefer a more specific
+        `object_name`, and treat results as candidates to inspect, not a tally.
+
+        Boxes cannot answer whether two objects actually touch or whether one is
+        inside another -- they overlap the moment one object is merely in front
+        of another. Use `spatial_relations` for that.
         """
         with get_images(src) as images:
             return ctx.request_context.lifespan_context.processor.detect_objects(images, object_name)
 
     @mcp.tool()
-    def point_objects(ctx: Context[AppContext], src: ImagePath, object_name: ObjectName) -> list[dict[str, Any]]:
-        """Locate instances of a named object in an image, returning center coordinates.
-
-        Same caveat as detect_objects: point count is not a reliable proxy for object count on an
-        ambiguous class name, since one physical object can be pointed at more than once.
-        """
-        with get_images(src) as images:
-            return ctx.request_context.lifespan_context.processor.point_objects(images, object_name)
-
-    @mcp.tool()
     def dense_region_caption(ctx: Context[AppContext], src: ImagePath) -> list[dict[str, Any]]:
-        """Generate a caption for every salient region of an image, with bounding boxes."""
+        """Caption every salient region of an image at once, with bounding boxes.
+
+        Use this to inventory an image without knowing in advance what is in it --
+        it returns `bboxes` and `labels` for each region it finds, discovering the
+        objects itself. That is the difference from `detect_objects`, which needs
+        you to name the object you are looking for, and from `caption`, which
+        describes the whole scene in prose with no coordinates.
+        """
         with get_images(src) as images:
             return ctx.request_context.lifespan_context.processor.dense_region_caption(images)
 
@@ -338,50 +396,29 @@ def server(
             return ctx.request_context.lifespan_context.vqa.query(images, question)
 
     @mcp.tool()
-    def analyze_image(
-        ctx: Context[AppContext],
-        src: ImagePath,
-        operation: Annotated[
-            str,
-            Field(
-                description=(
-                    "One of: 'caption', 'ocr', 'detect', 'point', 'dense_caption', 'query'. "
-                    "For watermarks, logos, signage, or stylized/cursive text, use 'query' "
-                    '(e.g. question="What does the text/watermark say, exactly?") instead of '
-                    "'ocr' — 'ocr' misreads that kind of text confidently."
-                )
-            ),
-        ],
-        question: Annotated[str, Field(description="Required when operation is 'query'.")] = "",
-        object_name: Annotated[str, Field(description="Required when operation is 'detect' or 'point'.")] = "",
-    ) -> Any:
-        """Multi-purpose image analysis tool dispatching to caption/ocr/detect/point/dense_caption/query."""
-        with get_images(src) as images:
-            return _dispatch(
-                ctx.request_context.lifespan_context, operation, images, question=question, object_name=object_name
-            )
-
-    @mcp.tool()
     def batch_analyze_images(
         ctx: Context[AppContext],
         srcs: Annotated[
             list[os.PathLike[str] | str], Field(description="File paths or URLs of the images to process.")
         ],
-        operation: Annotated[
-            str,
-            Field(
-                description=(
-                    "One of: 'caption', 'ocr', 'detect', 'point', 'dense_caption', 'query'. "
-                    "For watermarks, logos, signage, or stylized/cursive text, use 'query' "
-                    '(e.g. question="What does the text/watermark say, exactly?") instead of '
-                    "'ocr' — 'ocr' misreads that kind of text confidently."
-                )
-            ),
-        ],
+        operation: Operation,
         question: Annotated[str, Field(description="Required when operation is 'query'.")] = "",
-        object_name: Annotated[str, Field(description="Required when operation is 'detect' or 'point'.")] = "",
+        object_name: Annotated[str, Field(description="Required when operation is 'detect'.")] = "",
     ) -> list[dict[str, Any]]:
-        """Runs analyze_image's operation over multiple images, reporting per-image success/failure."""
+        """Run one operation across many images in a single call.
+
+        The batch form of `caption`, `ocr`, `detect_objects`, `dense_region_caption`
+        and `query_image` -- pick which with `operation`. Use it when the same
+        question applies to a whole set of images, since it costs one round trip
+        instead of one per image and loads each model once for the whole run.
+
+        Failures are isolated per image: a missing file or an unreachable URL is
+        reported as its own {"src", "success": false, "error"} entry and the rest
+        of the batch still runs. Results come back in the order given.
+
+        For a single image, call the named tool directly -- its arguments are
+        checked up front rather than depending on `operation`.
+        """
         results = []
         for src in srcs:
             try:
@@ -478,6 +515,13 @@ def server(
         Returns one {"score": float, "rating": str} object per page/image. `score`
         is roughly on a 1-10 scale; `rating` buckets it coarsely for quick triage —
         read `score` for anything comparative.
+
+        Its training set was photographic, so it rates photographs, not fine art:
+        celebrated paintings and illustrations score middling (Hokusai's "The Great
+        Wave" comes back around 5.8) without that meaning anything is wrong with
+        them. Use it to compare like with like — several shots of the same subject,
+        or successive edits of one image — and do not read a single absolute score
+        as a verdict on quality.
         """
         with get_images(src) as images:
             return ctx.request_context.lifespan_context.aesthetic.score(images)
@@ -499,12 +543,20 @@ def server(
         Combines `score_aesthetics` (numeric quality), a rule-of-thirds/centeredness
         check on the main subject's bounding box, and — only when the aesthetic
         score is below `low_score_threshold` — a Moondream2 VQA explanation of what
-        specifically looks unbalanced. Pass `target_subject` if you already know
-        what the subject is; omit it to auto-detect the most prominent region via
-        `dense_region_caption`.
+        specifically looks unbalanced. Use it over `score_aesthetics` alone when you
+        need to know *why* a shot is weak and where its subject sits in the frame,
+        rather than just how it scores.
 
-        If no subject can be located, returns a soft-failure shape (image size,
-        the aesthetic score, and a "note" explaining why) rather than raising.
+        Returns `image_size`, `subject_box`, `aesthetics`, and `framing` (with
+        `thirds_offset` near 0 meaning the subject sits on a rule-of-thirds power
+        point, and `center_offset` near 0 meaning it is dead-center instead).
+
+        Pass `target_subject` whenever you know what the subject is — from your own
+        context or a prior `caption` call. Auto-detection picks the largest,
+        most central region and degrades on busy scenes that fill the frame, where
+        no single region is the subject. If nothing can be located, returns a
+        soft-failure shape (image size, aesthetic score, and a "note") rather than
+        raising. Only the first page of a PDF is assessed.
         """
         app = ctx.request_context.lifespan_context
         with get_images(src) as images:
@@ -540,7 +592,19 @@ def server(
 
     @mcp.tool()
     def process(ctx: Context[AppContext], src: ImagePath, prompt: CustomPrompt) -> list[str]:
-        """Processes an image file with a custom prompt using the Florence-2 model."""
+        """Run a raw Florence-2 task token against an image (escape hatch).
+
+        `prompt` must be a Florence-2 task token, not an instruction: '<OD>',
+        '<REGION_PROPOSAL>', '<OCR_WITH_REGION>' and the like. Passing plain
+        English ("describe this image") does not fail — it returns confident
+        nonsense, because the model has no such task and decodes the words as
+        one anyway.
+
+        Only for task tokens the named tools do not already cover. Prefer
+        `caption`, `ocr`, `detect_objects` and `dense_region_caption`: they wrap
+        the common tokens, parse the structured output into usable fields, and
+        document where each one misleads. This returns raw text either way.
+        """
         with get_images(src) as images:
             return ctx.request_context.lifespan_context.processor.generate(prompt, images)
 
@@ -548,7 +612,7 @@ def server(
 
 
 def _dispatch(app: AppContext, operation: str, images: list[Image], *, question: str, object_name: str) -> Any:
-    """Routes an `analyze_image`/`batch_analyze_images` operation to the right processor call."""
+    """Routes a `batch_analyze_images` operation to the right processor call."""
     if operation == "caption":
         return app.processor.caption(images, CaptionLevel.MORE_DETAILED)
     if operation == "ocr":
@@ -557,10 +621,6 @@ def _dispatch(app: AppContext, operation: str, images: list[Image], *, question:
         if not object_name:
             raise ValueError("object_name is required for the 'detect' operation")
         return app.processor.detect_objects(images, object_name)
-    if operation == "point":
-        if not object_name:
-            raise ValueError("object_name is required for the 'point' operation")
-        return app.processor.point_objects(images, object_name)
     if operation == "dense_caption":
         return app.processor.dense_region_caption(images)
     if operation == "query":

@@ -5,7 +5,7 @@
 [![Python Application](https://github.com/Whoawhen/FusionVisionMCP/actions/workflows/python-app.yaml/badge.svg)](https://github.com/Whoawhen/FusionVisionMCP/actions/workflows/python-app.yaml)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 
-**One comprehensive package - 12 cutting-edge computer vision tools**
+**One comprehensive package - 10 cutting-edge computer vision tools**
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="FusionVisionMCP-Dark.jpg">
@@ -19,7 +19,7 @@ While other vision tools offer basic OCR or simple captioning, FusionVisionMCP d
 
 > **Quick Navigation**
 >
-> [Get Started](#get-started-in-seconds) | [Powerful Tools](#powerful-computer-vision-tools) | [Real-World Examples](#real-world-examples) | [Installation](#installation)
+> [Get Started](#get-started-in-seconds) | [Powerful Tools](#powerful-computer-vision-tools) | [Memory Modes](#memory-modes-you-choose-the-trade-off) | [Real-World Examples](#real-world-examples) | [Installation](#installation)
 
 ---
 
@@ -45,7 +45,7 @@ That's it! FusionVisionMCP is now available in your AI assistant.
 
 ## Powerful Computer Vision Tools
 
-With twelve specialized tools, FusionVisionMCP handles any visual task:
+Ten specialized tools, each with one clear job — no overlapping duties for your AI to guess between:
 
 ### 🔍 Text Extraction & Understanding
 Extract text from any image, document, or screenshot with industry-leading accuracy.
@@ -54,7 +54,7 @@ Extract text from any image, document, or screenshot with industry-leading accur
 Generate rich, contextual descriptions that capture the essence of complex visuals.
 
 ### 🎯 Object Detection & Pointing
-Locate specific objects with precise bounding boxes or center coordinates.
+Locate specific objects with precise bounding boxes *and* center coordinates in one call.
 
 ### ❓ Visual Question Answering
 Ask open-ended questions about images and get detailed, accurate answers.
@@ -71,20 +71,36 @@ Process multiple images simultaneously for large-scale analysis.
 ### 🔧 Custom Prompt Processing
 Run specialized Florence-2 prompts for unique use cases.
 
-### 🔄 Smart Analysis Router
-Automatically selects the best tool for each task.
-
 ### ⭐ Aesthetic Quality Scoring
 Rate how visually pleasing an image is, independent of what it depicts.
 
 ### 🖼️ Composition Critique
 Check framing against the rule of thirds and get a plain-language explanation for low-scoring shots.
 
+---
+
+## Memory Modes: You Choose the Trade-Off
+
+Vision models are large. FusionVisionMCP lets you decide how long they stay in memory after use — picked right
+at install time, no config file required:
+
+| Mode | Models released | Best for |
+|------|----------------|----------|
+| **Instant** | Immediately after every call | Tight memory budgets, occasional vision work |
+| **Aggressive** | After 5 minutes idle | Short bursts of work, memory back quickly |
+| **Standard** *(default)* | After 10 minutes idle | Everyday use — fast during work, tidy afterwards |
+| **Persistent** | Never | Maximum speed on a dedicated machine |
+| **Custom** | After *N* minutes you set | Matching your own working rhythm |
+
+Models reload automatically on the next request, so no setting can ever lose work — only time. And releasing is
+per model: a session that only captions never loads the segmentation or aesthetic models at all.
+
 ## Installation
 
 ### Claude Desktop (Recommended)
 1. Download the latest MCP bundle `fusion-vision-mcp.mcpb` from [Releases](https://github.com/Whoawhen/FusionVisionMCP/releases)
 2. Open the downloaded `.mcpb` file or drag it into Claude Desktop's Settings window
+3. Pick a **Memory mode** — or leave it on *Standard* and change it later
 
 ### Manual Installation
 For advanced users or custom setups:
@@ -108,11 +124,13 @@ Add to your MCP client configuration:
   "mcpServers": {
     "fusionvision": {
       "command": "uv",
-      "args": ["run", "fusionvision-mcp"]
+      "args": ["run", "fusion-vision-mcp", "--memory-mode", "standard"]
     }
   }
 }
 ```
+
+Swap `standard` for `instant`, `aggressive`, `persistent`, or any number of minutes.
 
 ---
 
@@ -159,7 +177,7 @@ Process screenshots and memes to understand context and sentiment.
 | Object Detection | ❌ | ✅ Precise Bounding Boxes |
 | Visual Question Answering | ❌ | ✅ Open-Ended Insights |
 | Spatial Reasoning | ❌ | ✅ Touch, Containment, Distance |
-| Memory Efficiency | ❌ | ✅ Automatic Model Management |
+| Memory Efficiency | ❌ | ✅ Five Selectable Memory Modes |
 | Multi-Model Integration | ❌ | ✅ Florence-2, Moondream2, SAM2, CLIP/LAION |
 | Hardware Flexibility | Limited | ✅ CPU/GPU Adaptive Processing |
 | Resource Optimization | ❌ | ✅ GPU Conservation for Primary AI Tasks |
@@ -177,8 +195,8 @@ Process screenshots and memes to understand context and sentiment.
 
 ### FusionVisionMCP's Novel Functions
 
-Most of FusionVisionMCP's tools wrap a capability one of its four underlying models already has: `detect_objects`,
-`point_objects`, and `dense_region_caption` are Florence-2 task heads, `query_image` is Moondream2's own VQA, and
+Most of FusionVisionMCP's tools wrap a capability one of its four underlying models already has: `detect_objects`
+and `dense_region_caption` are Florence-2 task heads, `query_image` is Moondream2's own VQA, and
 `score_aesthetics` is the CLIP/LAION predictor's own output. The two genuinely new capabilities, not provided by
 any single model in the stack, are:
 

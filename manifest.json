@@ -4,7 +4,7 @@
   "name": "fusion-vision-mcp",
   "display_name": "FusionVisionMCP",
   "version": "0.4.0",
-  "description": "An MCP server fusing Florence-2 and Moondream2 for image captioning, OCR, object detection/grounding, and visual question answering",
+  "description": "An MCP server fusing Florence-2, Moondream2, SAM2 and CLIP for image captioning, OCR, object detection/grounding, visual question answering, spatial measurement and aesthetic scoring",
   "author": {
     "name": "Whoawhen",
     "email": "warrens951@gmail.com",
@@ -21,59 +21,72 @@
       "args": [
         "--from",
         "${__dirname}",
-        "fusion-vision-mcp"
+        "fusion-vision-mcp",
+        "--memory-mode",
+        "${user_config.memory_mode}"
       ]
+    }
+  },
+  "user_config": {
+    "memory_mode": {
+      "type": "string",
+      "title": "Memory mode",
+      "description": "How long the vision models stay in memory after their last use, trading memory against speed. \"instant\" releases immediately after every call (lowest memory, slowest repeat calls). \"aggressive\" holds them for 5 minutes. \"standard\" holds them for 10 minutes. \"persistent\" never releases them (fastest, highest memory). You can also enter a number of minutes, such as 30. Models always reload automatically on the next request, so no setting can lose work -- only time.",
+      "default": "standard",
+      "required": false
     }
   },
   "tools": [
     {
       "name": "ocr",
-      "description": "Process an image file or URL using OCR to extract text."
+      "description": "Transcribe dense printed text from an image or PDF. Use query_image instead for watermarks, logos and stylized text."
     },
     {
       "name": "caption",
-      "description": "Processes an image file and generates captions for the image."
+      "description": "Describe what an image shows, as one detailed prose caption of the whole scene."
     },
     {
       "name": "detect_objects",
-      "description": "Detect instances of a named object in an image, returning bounding boxes."
-    },
-    {
-      "name": "point_objects",
-      "description": "Locate instances of a named object in an image, returning center coordinates."
+      "description": "Locate a named object in an image, returning bounding boxes, center points and labels."
     },
     {
       "name": "dense_region_caption",
-      "description": "Generate a caption for every salient region of an image, with bounding boxes."
+      "description": "Caption every salient region of an image at once, with bounding boxes, without naming objects first."
     },
     {
       "name": "query_image",
       "description": "Ask a free-form question about an image (visual question answering), backed by Moondream2."
     },
     {
-      "name": "analyze_image",
-      "description": "Multi-purpose image analysis tool dispatching to caption/ocr/detect/point/dense_caption/query."
-    },
-    {
       "name": "batch_analyze_images",
-      "description": "Runs analyze_image's operation over several images, reporting per-image success or failure."
+      "description": "Run one operation across many images in a single call, isolating failures per image."
     },
     {
       "name": "spatial_relations",
       "description": "Measure contact, gaps, containment depth and shape between named objects using SAM2 masks."
     },
     {
+      "name": "score_aesthetics",
+      "description": "Rate how aesthetically pleasing an image looks on a 1-10 scale, using the CLIP/LAION predictor."
+    },
+    {
+      "name": "critique_composition",
+      "description": "Critique an image's framing against the rule of thirds and explain, for low-scoring shots, what looks off."
+    },
+    {
       "name": "process",
-      "description": "Processes an image file with a custom prompt using the Florence-2 model."
+      "description": "Run a raw Florence-2 task token against an image, for tasks the named tools do not cover."
     }
   ],
   "keywords": [
     "florence-2",
     "moondream2",
     "sam2",
+    "clip",
     "segmentation",
     "ocr",
     "vqa",
+    "aesthetics",
     "vision"
   ],
   "license": "MIT",
