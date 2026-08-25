@@ -8,7 +8,7 @@
 **One comprehensive package - 12 cutting-edge computer vision tools**
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="FusionVisionMCP-Dark.png">
+  <source media="(prefers-color-scheme: dark)" srcset="FusionVisionMCP-Dark.jpg">
   <source media="(prefers-color-scheme: light)" srcset="FusionVisionMCP-Light.png">
   <img alt="FusionVisionMCP" src="FusionVisionMCP-Light.png">
 </picture>
