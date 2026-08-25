@@ -11,11 +11,7 @@ An MCP server that fuses five local, CPU-capable vision models — Florence-2, M
 CLIP/LAION — behind eleven tools: OCR, captioning, object detection/grounding, instance counting, visual question
 answering, spatial measurement (touch/gap/containment), and aesthetic scoring.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="FusionVisionMCP-Dark.jpg">
-  <source media="(prefers-color-scheme: light)" srcset="FusionVisionMCP-Light.jpg">
-  <img alt="FusionVisionMCP" src="FusionVisionMCP-Light.jpg">
-</picture>
+<img alt="FusionVisionMCP" src="FusionVisionMCP-Dark.jpg">
 
 ---
 
