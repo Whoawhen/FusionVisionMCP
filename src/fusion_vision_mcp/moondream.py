@@ -14,18 +14,30 @@ from transformers import AutoModelForCausalLM
 from .device import resolve_device
 
 DEFAULT_MOONDREAM_MODEL: str = "vikhyatk/moondream2"
-DEFAULT_MOONDREAM_REVISION: str = "2025-01-09"
+#: Pinned rather than tracking `main`, since this repository ships its model code via
+#: `trust_remote_code` and reshapes it between revisions. `2025-06-21` is chosen over the
+#: earlier `2025-01-09` pin because it fixed a measured self-consistency failure: asked to
+#: count the petals in `tests/sample.jpg` the old pin answered 12 and then listed 6 colours
+#: for them, while this one answers 10 and lists exactly 10.
+DEFAULT_MOONDREAM_REVISION: str = "2025-06-21"
 
 
 class Moondream:
     """Wraps Moondream2 for free-form visual question answering (VQA).
 
-    Florence-2 has no open-ended VQA task token, so this second, smaller
-    model is kept loaded alongside Florence2 specifically for `query`.
+    Florence-2 has no open-ended VQA task token, so this second, smaller model is
+    kept loaded alongside Florence2 specifically for `query`.
+
+    This model's own detection head used to back `count_objects` too. It was replaced
+    by Grounding DINO after a measured head-to-head: the two tie on cleanly separated
+    instances, but this one collapses to a single region when the same shapes are
+    named differently (8 as `petal`, 1 as `pink circle`), and is roughly four times
+    slower. See README_DETAILED.md for the full comparison.
     """
 
     device: str
     model: Any
+    revision: str
 
     def __init__(
         self,
@@ -34,6 +46,7 @@ class Moondream:
         device: str | None = None,
     ) -> None:
         self.device = resolve_device(device)
+        self.revision = revision
         torch_dtype = torch.float32 if self.device == "cpu" else torch.float16
 
         # `transformers` wraps the auto classes in a decorator that mypy reads as taking a

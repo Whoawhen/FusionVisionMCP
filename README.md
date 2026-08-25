@@ -5,7 +5,7 @@
 [![Python Application](https://github.com/Whoawhen/FusionVisionMCP/actions/workflows/python-app.yaml/badge.svg)](https://github.com/Whoawhen/FusionVisionMCP/actions/workflows/python-app.yaml)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 
-**One comprehensive package - 10 cutting-edge computer vision tools**
+**One comprehensive package - 11 cutting-edge computer vision tools**
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="FusionVisionMCP-Dark.jpg">
@@ -45,7 +45,7 @@ That's it! FusionVisionMCP is now available in your AI assistant.
 
 ## Powerful Computer Vision Tools
 
-Ten specialized tools, each with one clear job — no overlapping duties for your AI to guess between:
+Eleven specialized tools, each with one clear job — no overlapping duties for your AI to guess between:
 
 ### 🔍 Text Extraction & Understanding
 Extract text from any image, document, or screenshot with industry-leading accuracy.
@@ -55,6 +55,11 @@ Generate rich, contextual descriptions that capture the essence of complex visua
 
 ### 🎯 Object Detection & Pointing
 Locate specific objects with precise bounding boxes *and* center coordinates in one call.
+
+### 🔢 Instance Counting
+Answer "how many" with an open-vocabulary detector that scores every instance in parallel — separated and touching
+instances count correctly and the phrasing you use doesn't change the answer. Heavily overlapping ones still
+collapse, and the tool says so rather than guessing.
 
 ### ❓ Visual Question Answering
 Ask open-ended questions about images and get detailed, accurate answers.
@@ -136,7 +141,7 @@ Swap `standard` for `aggressive`, `persistent`, or any number of minutes.
 ## System Requirements
 
 - **RAM**: 8GB minimum (16GB+ recommended)
-- **Storage**: 15GB free space for model weights
+- **Storage**: 16GB free space for model weights
 - **OS**: Windows 10+, macOS 12+, or Linux
 - **Internet**: Required for initial model download
 
@@ -177,7 +182,7 @@ Process screenshots and memes to understand context and sentiment.
 | Visual Question Answering | ❌ | ✅ Open-Ended Insights |
 | Spatial Reasoning | ❌ | ✅ Touch, Containment, Distance |
 | Memory Efficiency | ❌ | ✅ Selectable Memory Modes |
-| Multi-Model Integration | ❌ | ✅ Florence-2, Moondream2, SAM2, CLIP/LAION |
+| Multi-Model Integration | ❌ | ✅ Florence-2, Moondream2, SAM2, CLIP/LAION, Grounding DINO |
 | Hardware Flexibility | Limited | ✅ CPU/GPU Adaptive Processing |
 | Resource Optimization | ❌ | ✅ GPU Conservation for Primary AI Tasks |
 | Aesthetic Quality Scoring | ❌ | ✅ CLIP-Based LAION Predictor |
@@ -188,6 +193,7 @@ Process screenshots and memes to understand context and sentiment.
 |-----------|----------|----------------|-------------------|
 | **Florence-2** | Microsoft (Original) | OCR, captioning, custom prompting, object detection & grounding, dense region captioning | Fast, efficient multi-task vision model |
 | **Moondream2** | Vikhyat | Visual question answering | Specialized for open-ended VQA |
+| **Grounding DINO** | IDEA-Research | Instance counting (`count_objects`) | Open-vocabulary detection with parallel object queries — a real per-instance tally, insensitive to how the object is named |
 | **SAM2** | Meta (Original) | Segmentation masks | Precise pixel-level object segmentation |
 | **CLIP + LAION aesthetic head** | OpenAI / LAION | Aesthetic quality scoring | Trained specifically on human aesthetic ratings |
 | **FusionVisionMCP** | Whoawhen | `spatial_relations`, `critique_composition` | Combines the four models above into measurements none of them reports alone |
@@ -195,9 +201,9 @@ Process screenshots and memes to understand context and sentiment.
 ### FusionVisionMCP's Novel Functions
 
 Most of FusionVisionMCP's tools wrap a capability one of its four underlying models already has: `detect_objects`
-and `dense_region_caption` are Florence-2 task heads, `query_image` is Moondream2's own VQA, and
-`score_aesthetics` is the CLIP/LAION predictor's own output. The two genuinely new capabilities, not provided by
-any single model in the stack, are:
+and `dense_region_caption` are Florence-2 task heads, `query_image` is Moondream2's own VQA, `count_objects`
+wraps Grounding DINO's detector, and `score_aesthetics` is the CLIP/LAION predictor's own output. The genuinely
+new capabilities, not provided by any single model in the stack, are:
 
 - **`spatial_relations`** - Measures how objects relate spatially (touch, containment, distance, shape) by combining
   Florence-2 boxes, SAM2 masks, and a from-scratch geometry module. No model here answers "does this actually touch
@@ -216,12 +222,13 @@ See our [complete technical documentation](README_DETAILED.md) for full API spec
 
 ## Technical Architecture
 
-FusionVisionMCP integrates four state-of-the-art computer vision models into one MCP server:
+FusionVisionMCP integrates five state-of-the-art computer vision models into one MCP server:
 
 - **Microsoft Florence-2**: Foundation model for captioning, OCR, and object detection
 - **Moondream2**: Specialized for open-ended visual question answering
 - **SAM2 (Segment Anything Model 2)**: Advanced segmentation for spatial reasoning
 - **CLIP + LAION aesthetic predictor**: Rates how aesthetically pleasing an image looks
+- **Grounding DINO**: Open-vocabulary detection backing instance counting
 
 Each model loads on-demand and unloads automatically to conserve memory, ensuring optimal performance.
 

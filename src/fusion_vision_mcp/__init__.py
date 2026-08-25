@@ -28,6 +28,7 @@ from pypdfium2 import PdfDocument
 from fusion_vision_mcp import geometry
 from fusion_vision_mcp.aesthetic import DEFAULT_AESTHETIC_MODEL, Aesthetic
 from fusion_vision_mcp.florence2 import CaptionLevel, Florence2, Florence2SP
+from fusion_vision_mcp.grounding_dino import DEFAULT_GROUNDING_DINO_MODEL, GroundingDino
 from fusion_vision_mcp.idle import IdleProxy, IdleReleased
 from fusion_vision_mcp.moondream import DEFAULT_MOONDREAM_MODEL, DEFAULT_MOONDREAM_REVISION, Moondream
 from fusion_vision_mcp.sam2 import DEFAULT_SAM2_MODEL, MASK_DECODE_RESOLUTION, Sam2
@@ -146,6 +147,14 @@ class VqaProcessor(Protocol):
         ...
 
 
+class InstanceDetector(Protocol):
+    """Represents a protocol for open-vocabulary detection that tallies instances."""
+
+    def detect_objects(self, images: list[Image], object_name: str) -> list[dict[str, Any]]:
+        """Locates every instance of the named object, with a count and per-box scores."""
+        ...
+
+
 class Segmenter(Protocol):
     """Represents a protocol for turning bounding boxes into segmentation masks."""
 
@@ -170,6 +179,7 @@ class AppContext:
     vqa: VqaProcessor
     segmenter: Segmenter
     aesthetic: AestheticScorer
+    counter: InstanceDetector
 
 
 @asynccontextmanager
@@ -181,6 +191,7 @@ async def app_lifespan(
     moondream_revision: str,
     sam2_model_id: str = DEFAULT_SAM2_MODEL,
     aesthetic_model_id: str = DEFAULT_AESTHETIC_MODEL,
+    grounding_dino_model_id: str = DEFAULT_GROUNDING_DINO_MODEL,
     idle_timeout: float = 0,
     device: str | None = None,
 ) -> AsyncIterator[AppContext]:
@@ -236,7 +247,13 @@ async def app_lifespan(
         AestheticScorer,
         IdleProxy(IdleReleased(lambda: Aesthetic(aesthetic_model_id, device), idle_timeout, "Aesthetic")),
     )
-    yield AppContext(processor, vqa, segmenter, aesthetic)
+    # Same rationale again: only count_objects loads Grounding DINO, so a session that
+    # never counts never pays the ~690MB.
+    counter = cast(
+        InstanceDetector,
+        IdleProxy(IdleReleased(lambda: GroundingDino(grounding_dino_model_id, device), idle_timeout, "Grounding DINO")),
+    )
+    yield AppContext(processor, vqa, segmenter, aesthetic, counter)
 
 
 def server(
@@ -247,6 +264,7 @@ def server(
     moondream_revision: str = DEFAULT_MOONDREAM_REVISION,
     sam2_model_id: str = DEFAULT_SAM2_MODEL,
     aesthetic_model_id: str = DEFAULT_AESTHETIC_MODEL,
+    grounding_dino_model_id: str = DEFAULT_GROUNDING_DINO_MODEL,
     idle_timeout: float = 0,
     device: str | None = None,
 ) -> MCPServer:
@@ -261,6 +279,7 @@ def server(
             moondream_revision=moondream_revision,
             sam2_model_id=sam2_model_id,
             aesthetic_model_id=aesthetic_model_id,
+            grounding_dino_model_id=grounding_dino_model_id,
             idle_timeout=idle_timeout,
             device=device,
         ),
@@ -298,9 +317,11 @@ def server(
         str,
         Field(
             description=(
-                "One of: 'caption', 'ocr', 'detect', 'dense_caption', 'query'. Use 'query' (with "
-                "`question`) rather than 'ocr' for watermarks, logos, signage, or stylized/cursive "
-                "text -- 'ocr' misreads that kind of text confidently."
+                "One of: 'caption', 'ocr', 'detect', 'count', 'dense_caption', 'query'. Use 'query' "
+                "(with `question`) rather than 'ocr' for watermarks, logos, signage, or "
+                "stylized/cursive text -- 'ocr' misreads that kind of text confidently. Use 'count' "
+                "(with `object_name`) rather than 'detect' for 'how many' -- 'detect' returns "
+                "regions, which are not a tally."
             )
         ),
     ]
@@ -330,6 +351,14 @@ def server(
         to ask something specific about the image, `dense_region_caption` to get
         a separate caption and box for each thing in it, and `ocr` to transcribe
         text rather than describe it. Returns one caption per page for a PDF.
+
+        Do not trust any text this quotes back. A caption that mentions a name,
+        brand or label is describing it, not transcribing it, and Florence-2
+        misspells text here that it reads correctly under `ocr` -- it rendered a
+        logo reading "FusionVisionMCP" as "FusionVisionMP" mid-caption while both
+        `ocr` and `query_image` read the same image exactly. When a specific piece
+        of text matters, confirm it with `ocr` (printed, document-style) or
+        `query_image` (stylized, cursive, low-contrast) rather than quoting this.
         """
         with get_images(src) as images:
             return ctx.request_context.lifespan_context.processor.caption(images, CaptionLevel.MORE_DETAILED)
@@ -348,6 +377,10 @@ def server(
         'wing'), or a single result spanning two touching instances (two fused
         blades labelled once as 'sword blade'). Prefer a more specific
         `object_name`, and treat results as candidates to inspect, not a tally.
+        Use `count_objects` when you actually need "how many" -- it runs a
+        detection head that emits one region per instance, which this head does
+        not. Neither can separate heavily overlapping instances, so a count of 1
+        from either means "could not separate", not "there is one".
 
         Boxes cannot answer whether two objects actually touch or whether one is
         inside another -- they overlap the moment one object is merely in front
@@ -386,6 +419,65 @@ def server(
             return ctx.request_context.lifespan_context.vqa.query(images, question)
 
     @mcp.tool()
+    def count_objects(
+        ctx: Context[AppContext],
+        src: ImagePath,
+        object_name: ObjectName,
+        verify_silhouette: Annotated[
+            bool,
+            Field(
+                description=(
+                    "When the detector finds only one region, segment it and measure how many "
+                    "repeated lobes its outline has. Costs one SAM2 load on the first such call."
+                )
+            ),
+        ] = True,
+    ) -> list[dict[str, Any]]:
+        """Count how many instances of a named object an image contains.
+
+        Use this, not `detect_objects`, whenever the question is "how many".
+        `detect_objects` returns however many regions Florence-2's grounding head
+        emits, which is not a tally: it collapses several repeated, undifferentiated
+        parts into one box (every petal of a flower, both halves of a fused blade)
+        and conversely splits one object into overlapping sub-part boxes.
+
+        Returns `count`, plus `bboxes`/`points`/`labels`/`scores` for the instances
+        found, index-aligned and in the same pixel-space convention `detect_objects`
+        uses. `scores` are per-detection confidences, so a count resting on marginal
+        detections is visible rather than implied. `group_boxes_dropped` counts
+        detections that enclosed the whole arrangement rather than one instance.
+
+        Measured limits, worth checking before trusting a count:
+
+        Heavy overlap still collapses the count. On eight identical shapes in a ring
+        this counts 8 separated and 8 touching, but only 2 once they overlap by
+        roughly two-thirds of their width. A count far below what you expect means
+        "could not separate them", not a real tally.
+
+        Silhouettes carry no interior structure. On a photo of a paper flower whose
+        petals overlap, this returns 1 at every resolution from 128px to 768px -- as
+        does every other detector tried. The flower's outline is 98% convex, so the
+        petal boundaries exist only as interior colour edges that no detector or
+        outline measurement in this server recovers. Ask `query_image` for a count in
+        that situation and treat it as an estimate.
+
+        When only one region is found, a `silhouette` block is added measuring how
+        many repeated lobes that region's outline contains. `count` and
+        `silhouette.lobes` come from different methods and **neither overrides the
+        other**: `count: 1` beside `silhouette.lobes: 8` means the detector could not
+        separate the instances while the outline shows eight cores. `agreement: true`
+        means a second, independent estimator matched it; `shattered` or `clipped`
+        mean the number should not be used at all.
+        """
+        app = ctx.request_context.lifespan_context
+        with get_images(src) as images:
+            results = app.counter.detect_objects(images, object_name)
+            if verify_silhouette:
+                for image, result in zip(images, results, strict=True):
+                    _add_silhouette(app, image, result)
+            return results
+
+    @mcp.tool()
     def batch_analyze_images(
         ctx: Context[AppContext],
         srcs: Annotated[
@@ -393,12 +485,13 @@ def server(
         ],
         operation: Operation,
         question: Annotated[str, Field(description="Required when operation is 'query'.")] = "",
-        object_name: Annotated[str, Field(description="Required when operation is 'detect'.")] = "",
+        object_name: Annotated[str, Field(description="Required when operation is 'detect' or 'count'.")] = "",
     ) -> list[dict[str, Any]]:
         """Run one operation across many images in a single call.
 
-        The batch form of `caption`, `ocr`, `detect_objects`, `dense_region_caption`
-        and `query_image` -- pick which with `operation`. Use it when the same
+        The batch form of `caption`, `ocr`, `detect_objects`, `count_objects`,
+        `dense_region_caption` and `query_image` -- pick which with `operation`.
+        Use it when the same
         question applies to a whole set of images, since it costs one round trip
         instead of one per image and loads each model once for the whole run.
 
@@ -601,6 +694,39 @@ def server(
     return mcp
 
 
+#: Only a single detection triggers the silhouette check -- that is precisely the
+#: answer `count_objects` documents as "could not separate them", so the segmentation
+#: buys information where there currently is none. Any healthy count skips it, which
+#: is what keeps SAM2 unloaded for sessions that never hit the collapse case.
+_COLLAPSE_SUSPECT_COUNT: Final[int] = 1
+
+#: A box smaller than this share of the frame is one small object, not a merged group.
+_MIN_VERIFY_BOX_AREA: Final[float] = 0.01
+
+
+def _add_silhouette(app: AppContext, image: Image, result: dict[str, Any]) -> None:
+    """Attach a geometric second opinion when the detector collapsed to one region.
+
+    Segments that single region and measures its outline, adding the result under
+    `silhouette` without touching `count`. The two numbers are produced by different
+    methods and the tool deliberately reports both rather than reconciling them.
+    """
+    if result.get("count") != _COLLAPSE_SUSPECT_COUNT or not result.get("bboxes"):
+        return
+
+    box = [int(v) for v in result["bboxes"][0]]
+    width, height = max(box[2] - box[0], 0), max(box[3] - box[1], 0)
+    if not image.width or not image.height:
+        return
+    if width * height < _MIN_VERIFY_BOX_AREA * image.width * image.height:
+        return
+
+    masks = app.segmenter.segment(image, [box])
+    if not masks:
+        return
+    result["silhouette"] = {"box": box, **geometry.count_lobes(masks[0])}
+
+
 def _dispatch(app: AppContext, operation: str, images: list[Image], *, question: str, object_name: str) -> Any:
     """Routes a `batch_analyze_images` operation to the right processor call."""
     if operation == "caption":
@@ -617,6 +743,12 @@ def _dispatch(app: AppContext, operation: str, images: list[Image], *, question:
         if not question:
             raise ValueError("question is required for the 'query' operation")
         return app.vqa.query(images, question)
+    if operation == "count":
+        if not object_name:
+            raise ValueError("object_name is required for the 'count' operation")
+        # No silhouette check here: batching is the throughput path, and the check
+        # would pull SAM2 in behind the caller's back once per collapsed image.
+        return app.counter.detect_objects(images, object_name)
     raise ValueError(f"Unknown operation: {operation!r}")
 
 
@@ -646,6 +778,7 @@ def _pick_primary_subject(regions: dict[str, Any], image_size: tuple[int, int]) 
 
 __all__: Final = [
     "DEFAULT_AESTHETIC_MODEL",
+    "DEFAULT_GROUNDING_DINO_MODEL",
     "DEFAULT_MOONDREAM_MODEL",
     "DEFAULT_MOONDREAM_REVISION",
     "DEFAULT_SAM2_MODEL",

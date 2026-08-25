@@ -69,6 +69,7 @@ async def test_list_tools(mcp_client_session: ClientSession) -> None:
         "caption",
         "ocr",
         "detect_objects",
+        "count_objects",
         "dense_region_caption",
         "query_image",
         "batch_analyze_images",
@@ -205,6 +206,91 @@ async def test_detect_objects_returns_center_points_alongside_boxes(mcp_client_s
     for (x1, y1, x2, y2), (px, py) in zip(regions["bboxes"], regions["points"], strict=True):
         assert px == pytest.approx((x1 + x2) / 2)
         assert py == pytest.approx((y1 + y2) / 2)
+
+
+@pytest.mark.anyio
+async def test_count_objects(mcp_client_session: ClientSession) -> None:
+    res = await mcp_client_session.call_tool(
+        "count_objects",
+        arguments={"src": SAMPLE_IMAGE_FILEPATH, "object_name": "petal"},
+    )
+    counted = json.loads("\n".join(cast(TextContent, c).text for c in res.content))
+
+    assert not res.is_error
+    assert isinstance(counted["count"], int)
+    # The count IS the number of detections kept -- that equality is the whole point of
+    # the tool, since `detect_objects`' region count is explicitly not a tally.
+    assert counted["count"] == len(counted["bboxes"])
+    assert len(counted["labels"]) == len(counted["bboxes"])
+    assert len(counted["scores"]) == len(counted["bboxes"])
+    assert all(0.0 <= score <= 1.0 for score in counted["scores"])
+    assert isinstance(counted["group_boxes_dropped"], int)
+
+
+@pytest.mark.anyio
+async def test_count_objects_returns_pixel_space_boxes(mcp_client_session: ClientSession) -> None:
+    """Boxes must land on the image's own pixel grid, matching detect_objects."""
+    with Image.open(SAMPLE_IMAGE_FILEPATH) as img:
+        width, height = img.size
+
+    res = await mcp_client_session.call_tool(
+        "count_objects",
+        arguments={"src": SAMPLE_IMAGE_FILEPATH, "object_name": "petal"},
+    )
+    counted = json.loads("\n".join(cast(TextContent, c).text for c in res.content))
+
+    assert not res.is_error
+    # A box still in normalized space would sit inside 0-1 and fail this on any real image.
+    for x1, y1, x2, y2 in counted["bboxes"]:
+        assert 0 <= x1 <= width and 0 <= x2 <= width
+        assert 0 <= y1 <= height and 0 <= y2 <= height
+    for (x1, y1, x2, y2), (px, py) in zip(counted["bboxes"], counted["points"], strict=True):
+        assert px == pytest.approx((x1 + x2) / 2)
+        assert py == pytest.approx((y1 + y2) / 2)
+
+
+@pytest.mark.anyio
+async def test_count_objects_adds_a_silhouette_when_it_finds_only_one(mcp_client_session: ClientSession) -> None:
+    """A lone detection is the collapse case, so it gets a geometric second opinion."""
+    res = await mcp_client_session.call_tool(
+        "count_objects",
+        arguments={"src": SAMPLE_IMAGE_FILEPATH, "object_name": "petal"},
+    )
+    counted = json.loads("\n".join(cast(TextContent, c).text for c in res.content))
+
+    assert not res.is_error
+    if counted["count"] == 1:
+        # `count` is never rewritten -- the estimate arrives beside it, not instead.
+        assert counted["count"] == 1
+        assert "lobes" in counted["silhouette"]
+        assert counted["silhouette"]["box"] == [int(v) for v in counted["bboxes"][0]]
+    else:
+        assert "silhouette" not in counted
+
+
+@pytest.mark.anyio
+async def test_count_objects_can_skip_the_silhouette_check(mcp_client_session: ClientSession) -> None:
+    res = await mcp_client_session.call_tool(
+        "count_objects",
+        arguments={"src": SAMPLE_IMAGE_FILEPATH, "object_name": "petal", "verify_silhouette": False},
+    )
+    counted = json.loads("\n".join(cast(TextContent, c).text for c in res.content))
+
+    assert not res.is_error
+    assert "silhouette" not in counted
+
+
+@pytest.mark.anyio
+async def test_batch_analyze_images_requires_object_name_for_count(mcp_client_session: ClientSession) -> None:
+    res = await mcp_client_session.call_tool(
+        "batch_analyze_images",
+        arguments={"srcs": [SAMPLE_IMAGE_FILEPATH], "operation": "count"},
+    )
+    results = [json.loads(cast(TextContent, c).text) for c in res.content]
+
+    assert not res.is_error
+    assert not results[0]["success"]
+    assert "object_name" in results[0]["error"]
 
 
 @pytest.mark.anyio

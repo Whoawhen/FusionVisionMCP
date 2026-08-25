@@ -2,9 +2,10 @@
 
 Fork of [jkawamoto/mcp-florence2](https://github.com/jkawamoto/mcp-florence2), renamed and rebranded as
 **FusionVisionMCP** (Python package `fusion-vision-mcp`, module `fusion_vision_mcp`, binary
-`fusion-vision-mcp.exe`), adding Moondream2 VQA, object grounding (`detect_objects`,
-`dense_region_caption`), CLIP/LAION aesthetic scoring, batch analysis, and a `--memory-mode` that controls how
-long models stay resident after use. See [README.md](README.md) for the tool and option reference.
+`fusion-vision-mcp.exe`), adding Moondream2 VQA and counting (`query_image`, `count_objects`), object grounding
+(`detect_objects`, `dense_region_caption`), CLIP/LAION aesthetic scoring, batch analysis, and a `--memory-mode`
+that controls how long models stay resident after use. See [README.md](README.md) for the tool and option
+reference.
 
 ## This is an editable install — checking out a branch changes the running server
 
@@ -50,6 +51,60 @@ upstream so a PR can be opened from a branch without carrying unrelated history.
 - **`query_image` (Moondream2)**, e.g. `question="What does the text/watermark say, exactly?"`, for stylized/logo/cursive/low-contrast text — photo watermarks, signage, logotypes. Florence2's OCR head misreads these; it read a real watermark reading "Ride the Sky / Equine Photography / ridetheskyequine.com" as "SQUINT PHOTOGRAPHY / squentphotography.com" (2026-08-20 test on `testpette.jpg`). Moondream2 read the same image correctly.
 
 Don't hard-route `ocr` to always call Moondream instead — Moondream is a VQA model, not a transcription specialist, and is more prone to paraphrasing rather than verbatim-transcribing long or dense text blocks. Keep both tools and choose per call.
+
+There's a third path that is not a text tool at all and must not be used as one: **`caption` describes text, it does not transcribe it.** Tested live on this repo's own banner (2026-08-25): `caption` rendered the logo "FusionVisionMCP" as "FusionVisionMP" mid-sentence, while `ocr` and `query_image` both read the same image exactly right. A caption quoting a name, brand or label is not evidence of what it says — confirm it with `ocr` or `query_image` per the routing above. This is now stated in `caption`'s MCP description, for the same reason the OCR routing is.
+
+## Counting is a separate tool from detection, and it is still not solved
+
+`detect_objects`' region count was never a tally (see the `wing` and `sword blade` cases in
+[README_DETAILED.md](README_DETAILED.md#detect_objects-)), so `count_objects` routes "how many" elsewhere.
+
+**Grounding DINO backs it, chosen by measurement rather than taste.** Moondream2's detect head held the job
+first; both were built and benchmarked against the same cases before either shipped. They tie on eight shapes
+separated (8) and touching (8), but Moondream collapses to **1** when those same *separated* shapes are asked
+for as `pink circle` instead of `petal`, where Grounding DINO still returns 8 — the class-name sensitivity is
+gone. It is also ~4x faster (2.1s vs 8.6s per call). Both pass the negative controls (one blob → 1, a rod → 1).
+
+Grounding DINO returns one box around the whole arrangement *in addition to* the instances — 68% of the frame
+when they are separated, and carrying the **highest** score, so a confidence cut removes the real instances
+first. `grounding_dino.py` drops boxes that swallow most of the others' centres and reports
+`group_boxes_dropped`. Without that filter every count is one too many.
+
+**The honest negative result: interior structure is not recoverable here.** `tests/sample.jpg` — a paper flower
+with overlapping petals — returns 1 from *every* approach tried: Florence-2 grounding, Moondream's detect head,
+Grounding DINO, the `count_lobes` outline measurement, and SAM2 in segment-everything mode (one mask for the
+whole flower). The measurement that explains it: the flower's silhouette has **solidity 0.983**, so its outline
+is essentially a smooth disc and the petal boundaries live only in interior colour edges. Don't spend another
+pass trying to recover this from silhouettes or detectors — the information is not in either.
+
+Two rules follow, both stated in the tool's own MCP description because a calling agent reads that and not this
+file. A low count on something expected to be many means *"could not separate them"*, not a tally. And `count`
+is never rewritten by the silhouette check — `count: 1` beside `silhouette.lobes: 8` reports two methods
+disagreeing, which is information, rather than hiding one behind the other.
+
+The Moondream pin still moved `2025-01-09` → `2025-06-21` (`src/fusion_vision_mcp/moondream.py`) and stays there
+for `query_image`: it fixed a measured *self-consistency* failure, where asked to count the petals in
+`tests/sample.jpg` the old pin answered 12 then listed 6 colors for them, and the new pin answers 10 and lists
+exactly 10.
+
+## `count_lobes` splits a silhouette, and the pixel floor is what makes it safe
+
+`geometry.count_lobes` estimates how many repeated parts compose one mask, for when a detector collapses a group
+into a single region. Two estimators, reported side by side and never reconciled: a distance-transform level
+sweep that requires a count to hold across a *contiguous run* of levels (persistence without a merge tree), and
+a hull-residual angular harmonic that only speaks for rosettes and returns `0` for *not measured* otherwise.
+
+The hull step is not decoration. A raw radius profile reports a **square as four lobes** and a rod as two,
+because those shapes are genuinely non-circular; dividing by the convex hull's radius measures *concavity*
+instead, so every convex shape scores zero by construction and the negative controls pass structurally rather
+than by tuning a threshold.
+
+The constant that actually matters was found by sweep, not judgement: `_SMOOTH_FLOOR_PX`. A rod with ±2px edge
+jitter — standing in for a photographic silhouette — **splits into 8 spurious lobes at a floor of 1.0px** and
+holds at 1 from 2.0px upward, at every sigma tried. The scale-relative `_EDT_SMOOTH` term cannot defend against
+this, because a tenth of a thin object's inradius is under a pixel. Raising sigma instead of the floor breaks
+the positives: 8 discs at 40% overlap collapse to 1 at sigma 0.25. If you touch either constant, re-run the
+whole case table, negative controls included.
 
 ## `spatial_relations` measures; it does not judge
 

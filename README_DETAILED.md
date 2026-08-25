@@ -9,14 +9,16 @@
 [![GitHub License](https://img.shields.io/github/license/Whoawhen/FusionVisionMCP)](https://github.com/Whoawhen/FusionVisionMCP/blob/main/LICENSE)
 
 An MCP server fusing [Florence-2](https://huggingface.co/microsoft/Florence-2-large),
-[Moondream2](https://huggingface.co/vikhyatk/moondream2), [SAM2](https://huggingface.co/facebook/sam2.1-hiera-small)
-and a [CLIP](https://huggingface.co/openai/clip-vit-large-patch14)-backed
+[Moondream2](https://huggingface.co/vikhyatk/moondream2), [SAM2](https://huggingface.co/facebook/sam2.1-hiera-small),
+[Grounding DINO](https://huggingface.co/IDEA-Research/grounding-dino-tiny) and a
+[CLIP](https://huggingface.co/openai/clip-vit-large-patch14)-backed
 [LAION aesthetic predictor](https://github.com/christophschuhmann/improved-aesthetic-predictor) into one
 computer-vision toolset. Fork of [jkawamoto/mcp-florence2](https://github.com/jkawamoto/mcp-florence2), which
 provides exactly three tools — `ocr`, `caption`, `process` — all against Florence-2. This fork adds everything
 else: Florence-2's other task heads exposed as their own tools (`detect_objects`,
 `dense_region_caption`), Moondream2 for open-ended visual question answering (`query_image`, since Florence-2 has
-none), a CLIP/LAION aesthetic scorer (`score_aesthetics`), a batch dispatch convenience
+no VQA head), Grounding DINO for instance counting (`count_objects`, since Florence-2's grounding head's region
+count is not a tally), a CLIP/LAION aesthetic scorer (`score_aesthetics`), a batch dispatch convenience
 (`batch_analyze_images`), and configurable memory release. Two tools aren't just a new model wired in: no model
 here answers "does this actually touch that" on its own, so `spatial_relations` is built from Florence-2 boxes,
 SAM2 masks, and a from-scratch geometry module; and no model combines localization, framing, and a quality
@@ -33,12 +35,14 @@ return their bounding boxes or centre points, caption every salient region, ask 
 image, and rate how aesthetically pleasing an image looks.
 
 Florence-2 handles captioning, OCR, detection and grounding. Moondream2 backs the `query_image` tool, because
-Florence-2 has no open-ended visual question answering task. SAM2 backs `spatial_relations`, because bounding
-boxes cannot answer questions about contact or containment. A CLIP ViT-L/14 backbone plus a small trained head
-backs `score_aesthetics`, because none of the other three models has any notion of how good an image looks.
+Florence-2 has no open-ended visual question answering task. Grounding DINO backs `count_objects`, because a
+sequence-emitting grounding head cannot produce a reliable tally and is sensitive to how the object is named.
+SAM2 backs `spatial_relations`, because bounding boxes cannot answer questions about contact or containment.
+A CLIP ViT-L/14 backbone plus a small trained head backs `score_aesthetics`, because none of the other models has
+any notion of how good an image looks.
 
 Each model loads on first use and is released independently, so a request only pays for what it needs: OCR never
-loads Moondream2, SAM2, or the aesthetic predictor. Weights are not bundled in this repository — the CLIP backbone
+loads Moondream2, SAM2, Grounding DINO, or the aesthetic predictor. Weights are not bundled in this repository — the CLIP backbone
 downloads from the Hugging Face Hub on first use and is cached locally by `transformers`, the same as any other
 Hugging Face model; the small aesthetic head downloads separately from a pinned commit of its original GitHub
 repository and is cached locally after the first request, with its checksum verified on every download.
@@ -125,6 +129,13 @@ Describe what an image shows, as one detailed prose caption of the whole scene. 
 `dense_region_caption` instead for a separate caption and box per region, `query_image` to ask something
 specific, and `ocr` to transcribe text rather than describe it. Returns one caption per page for a PDF.
 
+> **Don't trust text a caption quotes back.** A caption that mentions a name, brand or label is *describing*
+> it, not transcribing it, and Florence-2 misspells text here that it reads correctly elsewhere. Tested live
+> on this repository's own banner image: `caption` rendered the logo "FusionVisionMCP" as **"FusionVisionMP"**
+> mid-sentence, while `ocr` and `query_image` both read the identical image exactly right. When a specific
+> piece of text matters, confirm it with `ocr` (printed, document-style) or `query_image` (stylized, cursive,
+> low-contrast) rather than quoting the caption. Same routing principle as the OCR note above, one level up.
+
 #### Arguments:
 
 - **src**: A file path or URL to the image file that needs to be processed.
@@ -143,7 +154,9 @@ box) and `labels`, all index-aligned.
 > one wing missing still returned 3 overlapping boxes (a whole-body box plus two sub-part boxes,
 > all labelled `wing`). Tested on `sword blade` against an image with two fused blades: one box
 > spanning both, not two. Prefer a more specific `object_name`, and treat results as candidates to
-> inspect, not a reliable count.
+> inspect, not a reliable count. When the question is genuinely "how many", use
+> [`count_objects`](#count_objects-) instead — but read its limits first, since neither tool can
+> separate heavily overlapping instances.
 
 > Boxes cannot tell you whether two objects actually touch, or whether one is inside another — they overlap the
 > moment one object is merely in front of another. Use [`spatial_relations`](#spatial_relations-) for that.
@@ -151,6 +164,74 @@ box) and `labels`, all index-aligned.
 > **Merged in this fork.** Centre points used to be a separate `point_objects` tool. It ran the identical
 > Florence-2 grounding call and only averaged the boxes afterwards, so a caller who wanted points paid for a
 > second, redundant model pass. The centres now ride along with the boxes at no extra cost.
+
+### count_objects ✦
+
+Count how many instances of a named object an image contains. Backed by **Grounding DINO**, which scores a fixed
+set of parallel object queries and suppresses duplicates, so overlapping instances stay separate detections —
+unlike `detect_objects`, whose region count is explicitly not a tally. When only one instance is found, the
+region is segmented with SAM2 and its outline measured by `geometry.count_lobes`, adding a second, independent
+estimate of how many parts it contains.
+
+#### Arguments:
+
+- **src**: A file path or URL to the image file that needs to be processed.
+- **object_name**: Name of the object to count, e.g. `person`, `petal`, `car`.
+- **verify_silhouette**: Run the outline measurement when only one region is found. Defaults to `true`; set it
+  false to keep a run off the segmenter entirely.
+
+#### Returns:
+
+`count`, plus `bboxes` / `points` / `labels` / `scores` for the instances found, index-aligned and in the same
+pixel-space convention `detect_objects` uses. `scores` are per-detection confidences, so a count resting on
+marginal detections is visible rather than implied. `group_boxes_dropped` counts detections that enclosed the
+whole arrangement rather than one instance (see below). When only one region is found, `silhouette` carries the
+box that was segmented and the full `count_lobes` measurement of it.
+
+**`count` is never rewritten by the silhouette check.** The two numbers come from different methods and neither
+overrides the other: `count: 1` beside `silhouette.lobes: 8` means the detector could not separate the instances
+while the outline shows eight cores.
+
+#### Why this backend
+
+Measured head-to-head against Moondream2's detection head, which previously backed this tool, on eight identical
+shapes in a ring:
+
+| Case | Moondream2 | Grounding DINO |
+| --- | --- | --- |
+| Eight separated | 8 ✅ | 8 ✅ |
+| Eight touching | 8 ✅ | 8 ✅ |
+| Eight overlapping (~⅔ of their width) | 1 ❌ | 2 ❌ |
+| Eight separated, asked as `pink circle` | **1** ❌ | **8** ✅ |
+| Negative control: one blob | 1 ✅ | 1 ✅ |
+| Negative control: a rod | 1 ✅ | 1 ✅ |
+| Warm inference, per call | 8.6s | **2.1s** |
+
+Grounding DINO matches on the clean cases, is **not class-name sensitive** where Moondream was badly so, and is
+four times faster. It costs a ~690MB checkpoint, loaded on first use and released on the same idle timer as every
+other model — a session that never counts never pays for it.
+
+One artifact is corrected rather than passed through: asked for a repeated part, the model returns the instances
+*and* one box drawn around the whole arrangement (68% of the frame when the shapes are separated, 38% when
+touching, carrying the **highest** score both times, so a confidence cut would remove the real instances first).
+Boxes that swallow most of the others' centres are dropped and counted in `group_boxes_dropped`; this is what
+turns a 9 into the correct 8.
+
+#### Limits
+
+**Heavy overlap still defeats it.** Eight shapes overlapping by roughly two-thirds of their width count as 2, not
+8. A count far below what you expect means *"could not separate them"*, not a real tally.
+
+**Silhouettes carry no interior structure — the honest negative result.** On `tests/sample.jpg`, a paper flower
+whose petals overlap, *every* approach tried returns 1: Florence-2 grounding, Moondream2's detect head, Grounding
+DINO, the `count_lobes` outline measurement, and SAM2 in segment-everything mode (which returns exactly one mask
+for the whole flower). The reason is measurable: the flower's silhouette has **solidity 0.983** — its outline is
+98% of its own convex hull, i.e. very nearly a smooth disc. The petal boundaries exist only as *interior colour
+edges*, which no detector or outline measurement in this server recovers. Ask `query_image` for a count in that
+situation and treat the answer as an estimate.
+
+So: a real improvement for separated, touching, and awkwardly-named instances, and no improvement for heavily
+overlapping ones. Counting is not solved.
 
 ### dense_region_caption ➕
 
@@ -174,7 +255,7 @@ Ask a free-form question about an image (visual question answering). Backed by M
 ### batch_analyze_images ➕
 
 Run one operation across many images in a single call — the batch form of `caption`, `ocr`, `detect_objects`,
-`dense_region_caption` and `query_image`. Costs one round trip instead of one per image, and loads each model
+`count_objects`, `dense_region_caption` and `query_image`. Costs one round trip instead of one per image, and loads each model
 once for the whole run. Each image reports its own success or failure, so one bad file does not abort the batch;
 results come back in the order given.
 
@@ -184,9 +265,9 @@ For a single image, call the named tool directly: its arguments are checked up f
 #### Arguments:
 
 - **srcs**: File paths or URLs of the images to process.
-- **operation**: One of `caption`, `ocr`, `detect`, `point`, `dense_caption`, `query`.
+- **operation**: One of `caption`, `ocr`, `detect`, `count`, `dense_caption`, `query`.
 - **question**: Required when the operation is `query`.
-- **object_name**: Required when the operation is `detect` or `point`.
+- **object_name**: Required when the operation is `detect` or `count`.
 
 ### spatial_relations ✦
 
@@ -335,6 +416,9 @@ task tokens this server does not expose as their own tool.
 - **--sam2-model**: The SAM2 model backing `spatial_relations`. Defaults to `sam2.1-hiera-small`; measured on
   CPU, `tiny` is ~0.06s faster per call for a slightly worse mask, and `base-plus` roughly doubles inference
   time for a marginal gain.
+- **--grounding-dino-model**: The Grounding DINO model backing `count_objects`. Defaults to
+  `IDEA-Research/grounding-dino-tiny` (~690MB); `grounding-dino-base` roughly triples the download for a
+  marginal gain on the short noun phrases this server sends.
 - **--aesthetic-model**: The CLIP model backing `score_aesthetics` and `critique_composition`. Defaults to
   `openai/clip-vit-large-patch14`, the checkpoint the LAION aesthetic head was trained against — swapping this
   invalidates the head's weights, so change it only alongside a matching head.

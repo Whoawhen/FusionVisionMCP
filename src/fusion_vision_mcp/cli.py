@@ -12,6 +12,7 @@ import rich_click as click
 
 from . import (
     DEFAULT_AESTHETIC_MODEL,
+    DEFAULT_GROUNDING_DINO_MODEL,
     DEFAULT_MOONDREAM_MODEL,
     DEFAULT_MOONDREAM_REVISION,
     DEFAULT_SAM2_MODEL,
@@ -87,6 +88,12 @@ def resolve_memory_mode(memory_mode: str) -> float:
     help="Specifies the CLIP model used for the score_aesthetics and critique_composition tools.",
 )
 @click.option(
+    "--grounding-dino-model",
+    default=DEFAULT_GROUNDING_DINO_MODEL,
+    show_default=True,
+    help="Specifies the Grounding DINO model used for the count_objects tool.",
+)
+@click.option(
     "--memory-mode",
     default=DEFAULT_MEMORY_MODE,
     show_default=True,
@@ -126,12 +133,13 @@ def main(
     moondream_revision: str,
     sam2_model: str,
     aesthetic_model: str,
+    grounding_dino_model: str,
     memory_mode: str,
     idle_timeout: float | None,
     device: str | None,
 ) -> None:
     """
-    An MCP server for processing images using Florence-2, Moondream2, SAM2 and CLIP.
+    An MCP server for processing images using Florence-2, Moondream2, SAM2, CLIP and Grounding DINO.
     """
     logger = logging.getLogger(__name__)
 
@@ -145,6 +153,7 @@ def main(
         moondream_revision=moondream_revision,
         sam2_model_id=sam2_model,
         aesthetic_model_id=aesthetic_model,
+        grounding_dino_model_id=grounding_dino_model,
         idle_timeout=idle_minutes * 60,
         device=device,
     )
