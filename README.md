@@ -9,8 +9,8 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="FusionVisionMCP-Dark.jpg">
-  <source media="(prefers-color-scheme: light)" srcset="FusionVisionMCP-Light.png">
-  <img alt="FusionVisionMCP" src="FusionVisionMCP-Light.png">
+  <source media="(prefers-color-scheme: light)" srcset="FusionVisionMCP-Light.jpg">
+  <img alt="FusionVisionMCP" src="FusionVisionMCP-Light.jpg">
 </picture>
 
 While other vision tools offer basic OCR or simple captioning, FusionVisionMCP delivers comprehensive visual intelligence built from industry leading solutions — all in a single, easy-to-use package.
