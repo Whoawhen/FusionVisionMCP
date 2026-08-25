@@ -83,12 +83,21 @@ rod into 2. Optimising on positives alone would have shipped exactly the failure
 avoid. 0.15 is the *lowest* threshold at which every control still holds, and that is the reason it is the
 default.
 
-**The honest negative result: interior structure is not recoverable here.** `tests/sample.jpg` — a paper flower
+**The honest negative result: the flower is not counted by anything here.** `tests/sample.jpg` — a paper flower
 with overlapping petals — returns 1 from *every* approach tried: Florence-2 grounding, Moondream's detect head,
-Grounding DINO, the `count_lobes` outline measurement, and SAM2 in segment-everything mode (one mask for the
-whole flower). The measurement that explains it: the flower's silhouette has **solidity 0.983**, so its outline
-is essentially a smooth disc and the petal boundaries live only in interior colour edges. Don't spend another
-pass trying to recover this from silhouettes or detectors — the information is not in either.
+Grounding DINO (at every box threshold down to 0.10), the `count_lobes` outline measurement, SAM2 in
+segment-everything mode (one mask for the whole flower), and a CIELAB interior-colour experiment.
+
+Two measurements explain it, and together they close the case. Its silhouette has **solidity 0.984**, so the
+outline is essentially a smooth disc — nothing there. And its interior colour boundary strength is **0.87**,
+barely above a plain textured blob's 0.52, because the petals are pastel and low-contrast; the interior
+experiment returns 1 even with its validity gate disabled entirely, so that is an absence of signal rather than
+a threshold rejecting one. See `benchmarks/interior_structure.py`, which is kept *only* to make this
+reproducible. Don't spend another pass on silhouettes, detectors, or colour for this image.
+
+That experiment also failed the controls it had to pass: a striped ball came back as **7** objects and a
+four-colour logo as **4**. Interior colour cannot distinguish a pattern from a group of parts, and fixing that
+would still not deliver the flower, because the contrast is not there to begin with.
 
 Two rules follow, both stated in the tool's own MCP description because a calling agent reads that and not this
 file. A low count on something expected to be many means *"could not separate them"*, not a tally. And `count`
