@@ -490,10 +490,10 @@ def server(
         """Run one operation across many images in a single call.
 
         The batch form of `caption`, `ocr`, `detect_objects`, `count_objects`,
-        `dense_region_caption` and `query_image` -- pick which with `operation`.
-        Use it when the same
-        question applies to a whole set of images, since it costs one round trip
-        instead of one per image and loads each model once for the whole run.
+        `dense_region_caption` and `query_image` -- pick which with `operation`. Use
+        it when the same question applies to a whole set of images, since it costs
+        one round trip instead of one per image and loads each model once for the
+        whole run.
 
         Failures are isolated per image: a missing file or an unreachable URL is
         reported as its own {"src", "success": false, "error"} entry and the rest

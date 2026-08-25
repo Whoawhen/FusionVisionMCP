@@ -4,7 +4,7 @@
   "name": "fusion-vision-mcp",
   "display_name": "FusionVisionMCP",
   "version": "0.4.0",
-  "description": "An MCP server fusing Florence-2, Moondream2, SAM2 and CLIP for image captioning, OCR, object detection/grounding, visual question answering, spatial measurement and aesthetic scoring",
+  "description": "An MCP server fusing Florence-2, Moondream2, SAM2, Grounding DINO and CLIP for image captioning, OCR, object detection/grounding, instance counting, visual question answering, spatial measurement and aesthetic scoring",
   "author": {
     "name": "Whoawhen",
     "email": "warrens951@gmail.com",
@@ -58,6 +58,10 @@
       "description": "Ask a free-form question about an image (visual question answering), backed by Moondream2."
     },
     {
+      "name": "count_objects",
+      "description": "Count how many instances of a named object an image contains, backed by Grounding DINO. Use this, not detect_objects, whenever the question is \"how many\"."
+    },
+    {
       "name": "batch_analyze_images",
       "description": "Run one operation across many images in a single call, isolating failures per image."
     },
@@ -82,8 +86,11 @@
     "florence-2",
     "moondream2",
     "sam2",
+    "grounding-dino",
     "clip",
     "segmentation",
+    "object-detection",
+    "counting",
     "ocr",
     "vqa",
     "aesthetics",
