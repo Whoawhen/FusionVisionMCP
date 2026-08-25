@@ -95,8 +95,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 COUNTGD_REPO = "nikigoli/CountGD"
 #: The conversion mapping lives in the transformers repository rather than the wheel.
+#: Pinned to a tag rather than `main`: the mapping itself is stable, but `main`'s copy
+#: has since grown an `httpx` import this project does not carry.
 CONVERT_SCRIPT_URL = (
-    "https://raw.githubusercontent.com/huggingface/transformers/main/"
+    "https://raw.githubusercontent.com/huggingface/transformers/v4.46.0/"
     "src/transformers/models/grounding_dino/convert_grounding_dino_to_hf.py"
 )
 

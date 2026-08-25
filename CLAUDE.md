@@ -108,7 +108,20 @@ demands. On identical fixtures it scores 8/10 positives against 9/10, holds **4 
 back as 11, 4 and 5 at three resolutions of the *same image* — a spread that is noise, not a count. Rejected;
 see `benchmarks/countgd_spike.py`, which is kept only to make that reproducible.
 
-One trap that spike recorded is worth knowing generally: **safetensors deduplicates shared tensors.** CountGD's
+**Tiling and exemplar prompting were also tried, and fail the same way.** Tiled inference (2x2 and 3x3
+overlapping crops, merged by IoU) buys one point on the heavy-overlap case and costs 5-12x the latency while
+dropping to 7/8 and then 5/8 negative controls. CountGD's visual-exemplar path, reimplemented onto the HF graph,
+breaks five of six controls. See `benchmarks/tiling.py` and `benchmarks/countgd_exemplar.py`.
+
+**All four rejected approaches failed in exactly the same place, and it is worth naming.** Interior colour,
+tiled crops, and exemplar matching each raise recall by attending to sub-object detail — and each one turns the
+**spotted ball**, a single object covered in high-contrast spots, into many objects: 6 at 2x2 tiling, 15 at 3x3,
+and 31 with an exemplar. Any future method that zooms in, matches appearance, or reads interior contrast will
+meet the same wall. A spot, a stripe, a logo segment and a petal are the same thing to a detector; what
+separates them is knowing what the object *is*, which is the calling model's job and not a measurement this
+server can make. Test any new idea against `neg_spotted_ball` first — it is the cheapest possible disproof.
+
+One trap the text-only spike recorded is worth knowing generally: **safetensors deduplicates shared tensors.** CountGD's
 six `bbox_embed` heads are stored once with the aliases in `__metadata__`, so a naive `load_file` leaves 66
 decoder box-head tensors missing and randomly initialised. HF ties those weights, so the outputs looked fine
 anyway — restore aliases from the metadata before converting any checkpoint, and check *substantive* missing
