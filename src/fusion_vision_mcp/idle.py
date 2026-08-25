@@ -15,16 +15,14 @@ hand, keeps gigabytes of resident memory tied up between bursts of work.
 as long as calls keep arriving, and dropped once `timeout` seconds pass with no
 activity. The next call transparently rebuilds it.
 
-Either end of that trade-off is still reachable. A `timeout` of 0 never schedules
-a release, holding the object for the process's lifetime; an `IdleProxy` built with
-`release_after_call=True` drops it the moment each call returns, which is the
-lowest-memory setting available and what the CLI's "instant" memory mode selects.
+A `timeout` of 0 never schedules a release, holding the object for the process's
+lifetime -- the fastest and most memory-hungry end of that trade-off, which the
+CLI's "persistent" memory mode selects.
 """
 
 from __future__ import annotations
 
 import ctypes
-import functools
 import gc
 import logging
 import sys
@@ -116,30 +114,10 @@ class IdleProxy:
     Every lookup goes through `get()`, so any method call both loads the model if
     it was released and resets the idle countdown. This lets the proxy stand in
     for a `Florence2` or `Moondream` instance without restating their methods.
-
-    Args:
-        cache: The `IdleReleased` holding the object to forward to.
-        release_after_call: Release the object as soon as each forwarded method
-            returns, rather than waiting for an idle timer. The idle timer cannot
-            express this on its own: it is restarted by attribute *lookup*, so any
-            timeout short enough to fire promptly would also fire mid-inference,
-            while the caller still holds a live reference and nothing is freed.
     """
 
-    def __init__(self, cache: IdleReleased[Any], release_after_call: bool = False) -> None:
+    def __init__(self, cache: IdleReleased[Any]) -> None:
         self._cache = cache
-        self._release_after_call = release_after_call
 
     def __getattr__(self, name: str) -> Any:
-        attr = getattr(self._cache.get(), name)
-        if not self._release_after_call or not callable(attr):
-            return attr
-
-        @functools.wraps(attr)
-        def call_and_release(*args: Any, **kwargs: Any) -> Any:
-            try:
-                return attr(*args, **kwargs)
-            finally:
-                self._cache.release()
-
-        return call_and_release
+        return getattr(self._cache.get(), name)

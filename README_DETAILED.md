@@ -354,20 +354,18 @@ the trade between memory and speed. When installing the `.mcpb` bundle, the same
 
 | Mode | Behaviour | Choose it when |
 | --- | --- | --- |
-| `instant` | Releases every model as soon as each call returns. | Memory is tight, or vision calls are rare and scattered. Lowest memory; every call pays the load cost. |
-| `aggressive` | Releases after **5 minutes** of inactivity. | You want most of the memory back quickly but still work in short bursts. |
+| `aggressive` | Releases after **5 minutes** of inactivity. | Memory is tight, or you work in short scattered bursts. Lowest memory of the presets. |
 | `standard` | Releases after **10 minutes** of inactivity. **Default.** | General use — repeat calls stay fast during a burst of work, and the memory comes back once the work stops. |
 | `persistent` | Never releases; models stay loaded for the server's lifetime. | Throughput matters more than memory, e.g. a dedicated machine or a long batch job. Highest memory, fastest. |
-| *a number* | Releases after that many minutes, e.g. `--memory-mode 30`. | You know your own working rhythm and want to match it. |
+| *a number* | Releases after that many minutes, e.g. `--memory-mode 30`. | You know your own working rhythm and want to match it. `0` is the same as `persistent`. |
 
 Every mode reloads automatically on the next request, so none of them can lose work — only time. Releasing is
 also per model: a session that only ever captions never loads SAM2 or the CLIP backbone in the first place, so
 these settings govern what is held *after* use, not what gets loaded.
 
-`instant` is not simply a very short timeout. The idle timer is restarted by attribute lookup, so a timeout short
-enough to fire promptly would also fire mid-inference, while the caller still holds a live reference and nothing
-is actually freed. `instant` instead releases at the point each call returns, which is the only moment the
-release is guaranteed to reclaim anything.
+There is deliberately no "release after every call" mode. The idle timer is restarted by attribute lookup, so a
+timeout short enough to approximate one would also fire mid-inference, while the caller still holds a live
+reference and nothing is actually freed. Set a small number of minutes instead if you want memory back quickly.
 
 
 ## License

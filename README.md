@@ -86,8 +86,7 @@ at install time, no config file required:
 
 | Mode | Models released | Best for |
 |------|----------------|----------|
-| **Instant** | Immediately after every call | Tight memory budgets, occasional vision work |
-| **Aggressive** | After 5 minutes idle | Short bursts of work, memory back quickly |
+| **Aggressive** | After 5 minutes idle | Tight memory budgets, short bursts of work |
 | **Standard** *(default)* | After 10 minutes idle | Everyday use — fast during work, tidy afterwards |
 | **Persistent** | Never | Maximum speed on a dedicated machine |
 | **Custom** | After *N* minutes you set | Matching your own working rhythm |
@@ -130,7 +129,7 @@ Add to your MCP client configuration:
 }
 ```
 
-Swap `standard` for `instant`, `aggressive`, `persistent`, or any number of minutes.
+Swap `standard` for `aggressive`, `persistent`, or any number of minutes.
 
 ---
 
@@ -177,7 +176,7 @@ Process screenshots and memes to understand context and sentiment.
 | Object Detection | ❌ | ✅ Precise Bounding Boxes |
 | Visual Question Answering | ❌ | ✅ Open-Ended Insights |
 | Spatial Reasoning | ❌ | ✅ Touch, Containment, Distance |
-| Memory Efficiency | ❌ | ✅ Five Selectable Memory Modes |
+| Memory Efficiency | ❌ | ✅ Selectable Memory Modes |
 | Multi-Model Integration | ❌ | ✅ Florence-2, Moondream2, SAM2, CLIP/LAION |
 | Hardware Flexibility | Limited | ✅ CPU/GPU Adaptive Processing |
 | Resource Optimization | ❌ | ✅ GPU Conservation for Primary AI Tasks |

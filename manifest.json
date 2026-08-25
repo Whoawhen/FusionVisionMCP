@@ -31,7 +31,7 @@
     "memory_mode": {
       "type": "string",
       "title": "Memory mode",
-      "description": "How long the vision models stay in memory after their last use, trading memory against speed. \"instant\" releases immediately after every call (lowest memory, slowest repeat calls). \"aggressive\" holds them for 5 minutes. \"standard\" holds them for 10 minutes. \"persistent\" never releases them (fastest, highest memory). You can also enter a number of minutes, such as 30. Models always reload automatically on the next request, so no setting can lose work -- only time.",
+      "description": "How long the vision models stay in memory after their last use, trading memory against speed. \"aggressive\" releases them after 5 minutes idle (lowest memory). \"standard\" releases them after 10 minutes. \"persistent\" never releases them (fastest, highest memory). You can also enter a number of minutes, such as 30. Models always reload automatically on the next request, so no setting can lose work -- only time.",
       "default": "standard",
       "required": false
     }

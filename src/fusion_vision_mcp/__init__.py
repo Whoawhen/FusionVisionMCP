@@ -182,7 +182,6 @@ async def app_lifespan(
     sam2_model_id: str = DEFAULT_SAM2_MODEL,
     aesthetic_model_id: str = DEFAULT_AESTHETIC_MODEL,
     idle_timeout: float = 0,
-    release_after_call: bool = False,
     device: str | None = None,
 ) -> AsyncIterator[AppContext]:
     """Context manager for the FastMCP app lifespan.
@@ -191,24 +190,20 @@ async def app_lifespan(
     actually needs: captioning never pulls in Moondream, and nothing but
     `spatial_relations` pulls in SAM2. Each is released on its own idle timer.
 
-    `idle_timeout` and `release_after_call` are the two ends of the CLI's
-    `--memory-mode` scale: a positive timeout releases each model that many
-    seconds after its last use, while `release_after_call` releases it as soon as
-    every call returns. Neither set leaves the models resident for the process's
-    lifetime, which is the fastest and most memory-hungry setting.
+    `idle_timeout` is what the CLI's `--memory-mode` resolves to: a positive value
+    releases each model that many seconds after its last use, while 0 leaves them
+    resident for the process's lifetime -- the fastest, most memory-hungry setting.
     """
     processor: Processor
     vqa: VqaProcessor
     segmenter: Segmenter
     aesthetic: AestheticScorer
-    if idle_timeout > 0 or release_after_call:
+    if idle_timeout > 0:
         # Keep each model in this process so repeat calls stay fast, and let the
         # idle timer hand its memory back once the work stops.
         processor = cast(
             Processor,
-            IdleProxy(
-                IdleReleased(lambda: Florence2(model_id, device), idle_timeout, "Florence-2"), release_after_call
-            ),
+            IdleProxy(IdleReleased(lambda: Florence2(model_id, device), idle_timeout, "Florence-2")),
         )
         vqa = cast(
             VqaProcessor,
@@ -217,8 +212,7 @@ async def app_lifespan(
                     lambda: Moondream(moondream_model_id, moondream_revision, device),
                     idle_timeout,
                     "Moondream",
-                ),
-                release_after_call,
+                )
             ),
         )
     else:
@@ -233,16 +227,14 @@ async def app_lifespan(
     # calls `spatial_relations` never pays for SAM2 at all.
     segmenter = cast(
         Segmenter,
-        IdleProxy(IdleReleased(lambda: Sam2(sam2_model_id, device), idle_timeout, "SAM2"), release_after_call),
+        IdleProxy(IdleReleased(lambda: Sam2(sam2_model_id, device), idle_timeout, "SAM2")),
     )
     # Same rationale as SAM2: always idle-wrapped regardless of idle_timeout, since only
     # score_aesthetics/critique_composition pay for the CLIP backbone, and most sessions
     # never call either.
     aesthetic = cast(
         AestheticScorer,
-        IdleProxy(
-            IdleReleased(lambda: Aesthetic(aesthetic_model_id, device), idle_timeout, "Aesthetic"), release_after_call
-        ),
+        IdleProxy(IdleReleased(lambda: Aesthetic(aesthetic_model_id, device), idle_timeout, "Aesthetic")),
     )
     yield AppContext(processor, vqa, segmenter, aesthetic)
 
@@ -256,7 +248,6 @@ def server(
     sam2_model_id: str = DEFAULT_SAM2_MODEL,
     aesthetic_model_id: str = DEFAULT_AESTHETIC_MODEL,
     idle_timeout: float = 0,
-    release_after_call: bool = False,
     device: str | None = None,
 ) -> MCPServer:
     """Creates a new FastMCP server instance with the specified name and model ID."""
@@ -271,7 +262,6 @@ def server(
             sam2_model_id=sam2_model_id,
             aesthetic_model_id=aesthetic_model_id,
             idle_timeout=idle_timeout,
-            release_after_call=release_after_call,
             device=device,
         ),
     )

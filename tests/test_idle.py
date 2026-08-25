@@ -8,8 +8,6 @@
 import threading
 import time
 
-import pytest
-
 from fusion_vision_mcp.idle import IdleProxy, IdleReleased
 
 
@@ -107,43 +105,8 @@ def test_proxy_forwards_calls_and_reloads() -> None:
     assert Counter.builds == 2
 
 
-def test_release_after_call_drops_the_object_once_each_call_returns() -> None:
-    """The "instant" memory mode: no timer, released the moment the work finishes."""
-    Counter.builds = 0
-    proxy = IdleProxy(IdleReleased(Counter, timeout=0, name="counter"), release_after_call=True)
-
-    assert proxy.double(21) == 42
-    assert Counter.builds == 1
-
-    # No sleep: a second call must rebuild immediately, so the first was already gone.
-    assert proxy.double(4) == 8
-    assert Counter.builds == 2
-
-
-def test_release_after_call_still_releases_when_the_call_raises() -> None:
-    """A failed inference must not strand the model in memory."""
-    Counter.builds = 0
-    proxy = IdleProxy(IdleReleased(Counter, timeout=0, name="counter"), release_after_call=True)
-
-    with pytest.raises(TypeError):
-        proxy.double()  # missing the required argument
-    assert Counter.builds == 1
-
-    # Having to build again proves the failed call still handed the first one back.
-    assert proxy.double(3) == 6
-    assert Counter.builds == 2
-
-
-def test_release_after_call_leaves_plain_attributes_alone() -> None:
-    """Only calls trigger a release; reading an attribute must not wrap or drop anything."""
-    Counter.builds = 0
-    proxy = IdleProxy(IdleReleased(Counter, timeout=0, name="counter"), release_after_call=True)
-
-    assert proxy.builds == 1
-
-
-def test_a_proxy_without_release_after_call_keeps_the_object() -> None:
-    """The default has to stay unchanged: no release until the idle timer says so."""
+def test_a_proxy_holds_the_object_across_calls_until_the_timer_fires() -> None:
+    """Repeat calls inside the idle window must reuse one instance, not rebuild per call."""
     Counter.builds = 0
     proxy = IdleProxy(IdleReleased(Counter, timeout=60, name="counter"))
 

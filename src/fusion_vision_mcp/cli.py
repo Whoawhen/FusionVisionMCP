@@ -20,41 +20,38 @@ from . import (
 )
 
 #: Named presets for `--memory-mode`, in minutes of inactivity before a model is
-#: released. "instant" is not a duration -- it releases after every call -- and
-#: "persistent" never releases, so both are handled separately in `resolve_memory_mode`.
+#: released. "persistent" is 0 because a timeout of 0 never schedules a release,
+#: which is exactly what it means.
 MEMORY_MODE_MINUTES: Final[dict[str, float]] = {
     "aggressive": 5.0,
     "standard": 10.0,
+    "persistent": 0.0,
 }
 
 DEFAULT_MEMORY_MODE: Final[str] = "standard"
 
 
-def resolve_memory_mode(memory_mode: str) -> tuple[float, bool]:
-    """Turns a `--memory-mode` value into (minutes of idle time, release after every call).
+def resolve_memory_mode(memory_mode: str) -> float:
+    """Turns a `--memory-mode` value into minutes of idle time before models are released.
 
     Accepts a preset name or a bare number of minutes, so the single option covers
-    both the four presets and the user-defined case.
+    both the presets and the user-defined case. 0 means never release.
     """
     mode = memory_mode.strip().lower()
-    if mode == "instant":
-        return 0.0, True
-    if mode == "persistent":
-        return 0.0, False
     if mode in MEMORY_MODE_MINUTES:
-        return MEMORY_MODE_MINUTES[mode], False
+        return MEMORY_MODE_MINUTES[mode]
 
     try:
         minutes = float(mode)
     except ValueError:
         raise click.BadParameter(
-            f"{memory_mode!r} is not a preset (instant, aggressive, standard, persistent) or a number of minutes.",
+            f"{memory_mode!r} is not a preset ({', '.join(MEMORY_MODE_MINUTES)}) or a number of minutes.",
             param_hint="--memory-mode",
         ) from None
     if minutes < 0:
         raise click.BadParameter("minutes cannot be negative.", param_hint="--memory-mode")
-    # A user-defined 0 means the same thing the preset does: hold the models forever.
-    return minutes, False
+    # A user-defined 0 means the same thing "persistent" does: hold the models forever.
+    return minutes
 
 
 @click.command()
@@ -96,11 +93,10 @@ def resolve_memory_mode(memory_mode: str) -> tuple[float, bool]:
     metavar="MODE",
     help=(
         "How long models stay in memory after their last use, trading memory against speed. "
-        "'instant' releases immediately after every call (lowest memory, slowest repeat calls); "
-        "'aggressive' holds for 5 minutes; 'standard' holds for 10 minutes; 'persistent' never "
-        "releases (fastest, highest memory). Any number of minutes also works, e.g. '30' or '2.5'. "
-        "Models always reload automatically on the next request, so no mode can lose work -- only "
-        "time. Implies --cache-model unless set to 'persistent'."
+        "'aggressive' releases after 5 minutes idle (lowest memory); 'standard' after 10 minutes; "
+        "'persistent' never releases (fastest, highest memory). Any number of minutes also works, "
+        "e.g. '30' or '2.5'. Models always reload automatically on the next request, so no mode can "
+        "lose work -- only time. Implies --cache-model unless set to 'persistent'."
     ),
 )
 @click.option(
@@ -139,10 +135,7 @@ def main(
     """
     logger = logging.getLogger(__name__)
 
-    if idle_timeout is not None:
-        idle_minutes, release_after_call = float(idle_timeout), False
-    else:
-        idle_minutes, release_after_call = resolve_memory_mode(memory_mode)
+    idle_minutes = float(idle_timeout) if idle_timeout is not None else resolve_memory_mode(memory_mode)
 
     s = server(
         SERVER_NAME,
@@ -153,14 +146,11 @@ def main(
         sam2_model_id=sam2_model,
         aesthetic_model_id=aesthetic_model,
         idle_timeout=idle_minutes * 60,
-        release_after_call=release_after_call,
         device=device,
     )
 
     logger.info(f"Starting server with {model} + {moondream_model}@{moondream_revision} (Press CTRL+D to quit)")
-    if release_after_call:
-        logger.info("Models will be released immediately after every call")
-    elif idle_minutes > 0:
+    if idle_minutes > 0:
         logger.info(f"Models will be released after {idle_minutes:g} minutes of inactivity")
     else:
         logger.info("Models will stay loaded for the lifetime of the server")
