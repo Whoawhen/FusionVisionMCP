@@ -1,47 +1,97 @@
 {
   "$schema": "https://raw.githubusercontent.com/anthropics/mcpb/refs/heads/main/schemas/mcpb-manifest-v0.4.schema.json",
   "manifest_version": "0.4",
-  "name": "mcp-florence2",
-  "display_name": "Florence-2 MCP Server",
+  "name": "fusion-vision-mcp",
+  "display_name": "FusionVisionMCP",
   "version": "0.4.0",
-  "description": "An MCP server for processing images using Florence-2",
+  "description": "An MCP server fusing Florence-2, Moondream2, SAM2 and CLIP for image captioning, OCR, object detection/grounding, visual question answering, spatial measurement and aesthetic scoring",
   "author": {
-    "name": "Junpei Kawamoto",
-    "email": "kawamoto.junpei.s64@kyoto-u.jp",
-    "url": "https://github.com/jkawamoto"
+    "name": "Whoawhen",
+    "email": "warrens951@gmail.com",
+    "url": "https://github.com/Whoawhen"
   },
-  "homepage": "https://github.com/jkawamoto/mcp-florence2",
-  "documentation": "https://github.com/jkawamoto/mcp-florence2",
-  "support": "https://github.com/jkawamoto/mcp-florence2/issues",
+  "homepage": "https://github.com/Whoawhen/FusionVisionMCP",
+  "documentation": "https://github.com/Whoawhen/FusionVisionMCP",
+  "support": "https://github.com/Whoawhen/FusionVisionMCP/issues",
   "server": {
     "type": "python",
-    "entry_point": "src/mcp_florence2/__main__.py",
+    "entry_point": "src/fusion_vision_mcp/__main__.py",
     "mcp_config": {
       "command": "uvx",
       "args": [
         "--from",
         "${__dirname}",
-        "mcp-florence2"
+        "fusion-vision-mcp",
+        "--memory-mode",
+        "${user_config.memory_mode}"
       ]
+    }
+  },
+  "user_config": {
+    "memory_mode": {
+      "type": "string",
+      "title": "Memory mode",
+      "description": "How long the vision models stay in memory after their last use, trading memory against speed. \"aggressive\" releases them after 5 minutes idle (lowest memory). \"standard\" releases them after 10 minutes. \"persistent\" never releases them (fastest, highest memory). You can also enter a number of minutes, such as 30. Models always reload automatically on the next request, so no setting can lose work -- only time.",
+      "default": "standard",
+      "required": false
     }
   },
   "tools": [
     {
       "name": "ocr",
-      "description": "Process an image file or URL using OCR to extract text."
+      "description": "Transcribe dense printed text from an image or PDF. Use query_image instead for watermarks, logos and stylized text."
     },
     {
       "name": "caption",
-      "description": "Processes an image file and generates captions for the image."
+      "description": "Describe what an image shows, as one detailed prose caption of the whole scene."
+    },
+    {
+      "name": "detect_objects",
+      "description": "Locate a named object in an image, returning bounding boxes, center points and labels."
+    },
+    {
+      "name": "dense_region_caption",
+      "description": "Caption every salient region of an image at once, with bounding boxes, without naming objects first."
+    },
+    {
+      "name": "query_image",
+      "description": "Ask a free-form question about an image (visual question answering), backed by Moondream2."
+    },
+    {
+      "name": "batch_analyze_images",
+      "description": "Run one operation across many images in a single call, isolating failures per image."
+    },
+    {
+      "name": "spatial_relations",
+      "description": "Measure contact, gaps, containment depth and shape between named objects using SAM2 masks."
+    },
+    {
+      "name": "score_aesthetics",
+      "description": "Rate how aesthetically pleasing an image looks on a 1-10 scale, using the CLIP/LAION predictor."
+    },
+    {
+      "name": "critique_composition",
+      "description": "Critique an image's framing against the rule of thirds and explain, for low-scoring shots, what looks off."
+    },
+    {
+      "name": "process",
+      "description": "Run a raw Florence-2 task token against an image, for tasks the named tools do not cover."
     }
   ],
   "keywords": [
     "florence-2",
+    "moondream2",
+    "sam2",
+    "clip",
+    "segmentation",
+    "ocr",
+    "vqa",
+    "aesthetics",
     "vision"
   ],
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jkawamoto/mcp-florence2"
+    "url": "https://github.com/Whoawhen/FusionVisionMCP"
   }
 }
