@@ -244,17 +244,27 @@ still holds. Pass `threshold` explicitly if your images have no such texture.
 8 -- improved from 3 at the old threshold, but still short. A count below what you expect means *"could not
 separate them"*, not a real tally.
 
-**Silhouettes carry no interior structure — the honest negative result.** On `tests/sample.jpg`, a paper flower
-whose petals overlap, *every* approach tried returns 1: Florence-2 grounding, Moondream2's detect head, Grounding
-DINO, the `count_lobes` outline measurement, and SAM2 in segment-everything mode (which returns exactly one mask
-for the whole flower). Threshold tuning does not touch it either: it stays at 1 at every box threshold down to
-0.10, including values low enough to fragment the textured negative controls. The reason is measurable: the
-flower's silhouette has **solidity 0.984** — its outline is 98% of its own convex hull, i.e. very nearly a smooth
-disc. The petal boundaries exist only as *interior colour edges*, which no detector or outline measurement in
-this server recovers. Ask `query_image` for a count in that situation and treat the answer as an estimate.
+**Some evidence is simply not in the picture — the honest negative result.** On `tests/sample.jpg`, a paper
+flower whose petals overlap, *seven* independent approaches all return 1: Florence-2 grounding, Moondream2's
+detect head, Grounding DINO, the `count_lobes` outline measurement, SAM2 in segment-everything mode (one mask for
+the whole flower), tiled inference, and a CIELAB interior-colour analysis. Threshold tuning does not touch it
+either — it stays at 1 at every box threshold down to 0.10, including values low enough to fragment the textured
+controls.
+
+Two measurements explain why, and together they close the case: the flower's silhouette has **solidity 0.984**,
+so its outline is very nearly a smooth disc, and its **interior contrast is 0.87**, barely above a plain textured
+blob's 0.52. There is no outline evidence and no colour evidence. Ask `query_image` for a count in that situation
+and treat the answer as an estimate.
+
+**Everything that raises recall breaks the texture controls.** Four approaches were built and rejected —
+interior colour, tiled crops, visual exemplars, and lower thresholds — and each one turns a *single* ball covered
+in high-contrast spots into many objects: 6 with 2×2 tiling, 15 with 3×3, 31 with an exemplar, and 3–4 at a box
+threshold of 0.10. A spot, a stripe, a logo segment and a petal are indistinguishable to a detector; separating
+them requires knowing what the object *is*, which is the calling model's job rather than a measurement. The
+evidence for each rejection is reproducible under [`benchmarks/`](benchmarks/).
 
 So: a real improvement for separated, touching, dense, two-instance and awkwardly-named cases, a partial one for
-heavy overlap, and none at all where the evidence is interior rather than in the outline. Counting is not solved.
+heavy overlap, and none where the evidence is neither in the outline nor the colour. Counting is not solved.
 
 ### dense_region_caption ➕
 

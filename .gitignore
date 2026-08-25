@@ -223,3 +223,14 @@ __marimo__/
 
 # Fetched on demand by benchmarks/countgd_spike.py, not vendored.
 benchmarks/_convert_grounding_dino_to_hf.py
+
+# Local developer environment, not part of the project.
+.clinerules/
+CLINE_INTEGRATION.md
+
+# Working documents kept out of the repository by choice.
+BRIEFING.md
+COUNTING_IMPLEMENTATION_PLAN.md
+
+# Ad-hoc scratch script at the repo root; the real suite is tests/test_server.py.
+/test_server.py
