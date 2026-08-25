@@ -99,6 +99,21 @@ That experiment also failed the controls it had to pass: a striped ball came bac
 four-colour logo as **4**. Interior colour cannot distinguish a pattern from a group of parts, and fixing that
 would still not deliver the flower, because the contrast is not there to begin with.
 
+**CountGD was ported and measured, and is worse than what ships.** It was the counting plan's recommended
+candidate, and the port turned out easy: its checkpoint is Grounding DINO Swin-B plus a single 1x1 conv for
+visual exemplars, so HF's own conversion mapping loads it onto stock `GroundingDinoForObjectDetection` with zero
+substantive missing keys, CPU-only, no compiled ops — none of the GCC/CUDA/Python-3.9 apparatus its repository
+demands. On identical fixtures it scores 8/10 positives against 9/10, holds **4 of 8** negative controls against
+8/8, and triples the mean count error. It misses a rough-edged rod entirely (0 objects), and the flower comes
+back as 11, 4 and 5 at three resolutions of the *same image* — a spread that is noise, not a count. Rejected;
+see `benchmarks/countgd_spike.py`, which is kept only to make that reproducible.
+
+One trap that spike recorded is worth knowing generally: **safetensors deduplicates shared tensors.** CountGD's
+six `bbox_embed` heads are stored once with the aliases in `__metadata__`, so a naive `load_file` leaves 66
+decoder box-head tensors missing and randomly initialised. HF ties those weights, so the outputs looked fine
+anyway — restore aliases from the metadata before converting any checkpoint, and check *substantive* missing
+keys rather than trusting that inference produced plausible numbers.
+
 Two rules follow, both stated in the tool's own MCP description because a calling agent reads that and not this
 file. A low count on something expected to be many means *"could not separate them"*, not a tally. And `count`
 is never rewritten by the silhouette check — `count: 1` beside `silhouette.lobes: 8` reports two methods

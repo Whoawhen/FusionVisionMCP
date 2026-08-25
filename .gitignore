@@ -220,3 +220,6 @@ __marimo__/
 
 # MCP Bundle file
 *.mcpb
+
+# Fetched on demand by benchmarks/countgd_spike.py, not vendored.
+benchmarks/_convert_grounding_dino_to_hf.py
