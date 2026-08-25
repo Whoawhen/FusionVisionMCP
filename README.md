@@ -1,11 +1,15 @@
-# FusionVisionMCP: Multi-core Vision Server
+# FusionVisionMCP: Multi-model Vision Server
 
 [![GitHub License](https://img.shields.io/github/license/Whoawhen/FusionVisionMCP)](https://github.com/Whoawhen/FusionVisionMCP/blob/main/LICENSE)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Python Application](https://github.com/Whoawhen/FusionVisionMCP/actions/workflows/python-app.yaml/badge.svg)](https://github.com/Whoawhen/FusionVisionMCP/actions/workflows/python-app.yaml)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 
-**One comprehensive package - 11 cutting-edge computer vision tools**
+🚧 **Work in progress** — see [README_DETAILED.md](README_DETAILED.md) for current limits and measured results before relying on this for anything important.
+
+An MCP server that fuses five local, CPU-capable vision models — Florence-2, Moondream2, SAM2, Grounding DINO and
+CLIP/LAION — behind eleven tools: OCR, captioning, object detection/grounding, instance counting, visual question
+answering, spatial measurement (touch/gap/containment), and aesthetic scoring.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="FusionVisionMCP-Dark.jpg">
@@ -13,108 +17,103 @@
   <img alt="FusionVisionMCP" src="FusionVisionMCP-Light.jpg">
 </picture>
 
-While other vision tools offer basic OCR or simple captioning, FusionVisionMCP delivers comprehensive visual intelligence built from industry leading solutions — all in a single, easy-to-use package.
-
 ---
 
 > **Quick Navigation**
 >
-> [Get Started](#get-started-in-seconds) | [Powerful Tools](#powerful-computer-vision-tools) | [Memory Modes](#memory-modes-you-choose-the-trade-off) | [Real-World Examples](#real-world-examples) | [Installation](#installation)
+> [Why FusionVisionMCP?](#why-fusionvisionmcp) | [Tools](#tools) | [Installation](#installation) | [Memory Modes](#memory-modes) | [Architecture](#architecture)
 
 ---
 
-## Get Started in Seconds
+## Why FusionVisionMCP?
 
-**Step 1: Download the latest release**
+I kept running computer-vision tasks through Claude's native (frontier-model) vision and burning through a 5-hour
+usage allocation in about an hour — CV work is token-hungry in a way that's easy to underestimate until you watch
+the budget disappear. Moving that work to my GPU wasn't an option either: the GPU was already committed to image
+generation, and running vision inference alongside those testing loops would have contended for the same VRAM.
 
-Download the latest MCP bundle `fusion-vision-mcp.mcpb` from our [Releases](https://github.com/Whoawhen/FusionVisionMCP/releases) page.
+What was sitting idle was CPU and system RAM. FusionVisionMCP runs Florence-2, Moondream2, SAM2, Grounding DINO
+and CLIP entirely on CPU, so routine vision work — reading text, describing an image, counting objects, checking
+whether two things touch — no longer has to spend a frontier model's own multimodal tokens. Building it out also
+meant finding the gaps against Claude's native vision one by one and closing them; it's now close to that
+capability for most everyday CV tasks, and a few tools here (`spatial_relations`' touch/gap/containment
+measurement, `count_objects`' parallel-query instance counting) aren't things Claude's native vision does at all.
 
-**Step 2: Install with one click**
+| Capability | How it's provided |
+|---|---|
+| OCR & document text | Florence-2's OCR head, or Moondream2 for stylized/logo text (see [routing notes](README_DETAILED.md)) |
+| Captioning | Florence-2, whole-scene or per-region |
+| Object detection / grounding | Florence-2's grounding head — boxes and center points for a named object |
+| Instance counting | Grounding DINO — parallel object queries, not a sequential emission, so overlapping-but-separate instances don't collapse into one |
+| Visual question answering | Moondream2 — free-form questions about image content |
+| Spatial measurement | SAM2 masks plus a from-scratch geometry module — touch, gap, containment depth, shape |
+| Aesthetic scoring | CLIP + a LAION-trained aesthetic head |
+| Memory footprint | Configurable idle-release timers, per model, chosen at install time |
+| Hardware | Runs on CPU; uses a GPU automatically if one is available |
 
-Open the downloaded `.mcpb` file or drag it into Claude Desktop's Settings window.
+## Tools
 
-That's it! FusionVisionMCP is now available in your AI assistant.
+| Tool | Model(s) | Description |
+|---|---|---|
+| `ocr` | Florence-2 | Transcribe dense, printed, document-style text from an image or PDF. |
+| `caption` | Florence-2 | Describe what an image shows as one detailed prose caption of the whole scene. |
+| `detect_objects` | Florence-2 | Locate a named object, returning bounding boxes, center points and labels. |
+| `dense_region_caption` | Florence-2 | Caption every salient region of an image at once, without naming objects first. |
+| `query_image` | Moondream2 | Ask a free-form question about an image (visual question answering). |
+| `count_objects` | Grounding DINO | Count how many instances of a named object an image contains. Use this, not `detect_objects`, for "how many" questions. |
+| `spatial_relations` | Florence-2 + SAM2 | Measure contact, gaps, containment depth and shape between two named objects. |
+| `score_aesthetics` | CLIP + LAION | Rate how aesthetically pleasing an image looks on a 1-10 scale. |
+| `critique_composition` | Florence-2 + CLIP/LAION + Moondream2 | Check framing against the rule of thirds; for low-scoring shots, explain what looks off. |
+| `batch_analyze_images` | (routes to any tool above) | Run one operation across many images in a single call, isolating failures per image. |
+| `process` | Florence-2 | Run a raw Florence-2 task token for tasks the named tools don't cover. |
 
-### Works With Your Favorite AI Tools
+Full argument reference, measured accuracy, and known limits for each tool: [README_DETAILED.md](README_DETAILED.md).
 
-- **Claude Desktop** - Native integration with one-click setup
-- **Cursor / Windsurf / VS Code** - Connect via MCP configuration
-- **Any MCP-compatible client** - Universal compatibility
+### Example
+
+Once connected, an assistant calls these tools on its own when a request needs them — there's nothing to invoke
+by hand. For example, asking *"How many bolts are in this photo?"* with an image attached routes to
+`count_objects(src=..., object_name="bolt")`, which returns:
+
+```json
+{
+  "count": 6,
+  "bboxes": [[102, 44, 138, 79], "... 5 more"],
+  "scores": [0.91, "... 5 more"],
+  "group_boxes_dropped": 0
+}
+```
+
+### What's genuinely new here, not just a wrapper
+
+Most tools above expose one underlying model's own capability directly. Two do not — no single model in the
+stack answers these on its own:
+
+- **`spatial_relations`** combines Florence-2 boxes, SAM2 masks, and a from-scratch geometry module to measure
+  whether two objects actually touch, contain, or overlap — a bounding box alone can't answer that, since boxes
+  overlap the instant one object is merely in front of another.
+- **`critique_composition`** combines Florence-2 localization, a from-scratch rule-of-thirds check, the CLIP/LAION
+  aesthetic score, and — only for low-scoring images — a Moondream2 explanation, into one composition critique.
 
 ---
-
-## Powerful Computer Vision Tools
-
-Eleven specialized tools, each with one clear job — no overlapping duties for your AI to guess between:
-
-### 🔍 Text Extraction & Understanding
-Extract text from any image, document, or screenshot with industry-leading accuracy.
-
-### 📝 Intelligent Image Captioning
-Generate rich, contextual descriptions that capture the essence of complex visuals.
-
-### 🎯 Object Detection & Pointing
-Locate specific objects with precise bounding boxes *and* center coordinates in one call.
-
-### 🔢 Instance Counting
-Answer "how many" with an open-vocabulary detector that scores every instance in parallel — separated and touching
-instances count correctly and the phrasing you use doesn't change the answer. Heavily overlapping ones still
-collapse, and the tool says so rather than guessing.
-
-### ❓ Visual Question Answering
-Ask open-ended questions about images and get detailed, accurate answers.
-
-### 🧭 Spatial Relationship Analysis
-Understand how objects relate physically—whether they touch, contain, or overlap each other.
-
-### 📊 Dense Region Captioning
-Automatically caption every important region in complex images.
-
-### ⚡ Batch Processing
-Process multiple images simultaneously for large-scale analysis.
-
-### 🔧 Custom Prompt Processing
-Run specialized Florence-2 prompts for unique use cases.
-
-### ⭐ Aesthetic Quality Scoring
-Rate how visually pleasing an image is, independent of what it depicts.
-
-### 🖼️ Composition Critique
-Check framing against the rule of thirds and get a plain-language explanation for low-scoring shots.
-
----
-
-## Memory Modes: You Choose the Trade-Off
-
-Vision models are large. FusionVisionMCP lets you decide how long they stay in memory after use — picked right
-at install time, no config file required:
-
-| Mode | Models released | Best for |
-|------|----------------|----------|
-| **Aggressive** | After 5 minutes idle | Tight memory budgets, short bursts of work |
-| **Standard** *(default)* | After 10 minutes idle | Everyday use — fast during work, tidy afterwards |
-| **Persistent** | Never | Maximum speed on a dedicated machine |
-| **Custom** | After *N* minutes you set | Matching your own working rhythm |
-
-Models reload automatically on the next request, so no setting can ever lose work — only time. And releasing is
-per model: a session that only captions never loads the segmentation or aesthetic models at all.
 
 ## Installation
 
-### Claude Desktop (Recommended)
+### Claude Desktop
 1. Download the latest MCP bundle `fusion-vision-mcp.mcpb` from [Releases](https://github.com/Whoawhen/FusionVisionMCP/releases)
-2. Open the downloaded `.mcpb` file or drag it into Claude Desktop's Settings window
-3. Pick a **Memory mode** — or leave it on *Standard* and change it later
+2. Open the downloaded `.mcpb` file, or drag it into Claude Desktop's Settings window
+3. Pick a **Memory mode** (or leave it on *Standard* and change it later)
+
+Also connectable from Cursor, Windsurf, VS Code, or any other MCP-compatible client via manual configuration below.
 
 ### Manual Installation
-For advanced users or custom setups:
 
 #### Prerequisites
-- Python 3.10+
+- Python 3.12+
 - Git
 - 8GB+ RAM recommended
 
-#### Setup Steps
+#### Setup
 ```bash
 git clone https://github.com/Whoawhen/FusionVisionMCP.git
 cd FusionVisionMCP
@@ -122,7 +121,6 @@ pip install -e .
 ```
 
 #### Configuration
-Add to your MCP client configuration:
 ```json
 {
   "mcpServers": {
@@ -136,126 +134,50 @@ Add to your MCP client configuration:
 
 Swap `standard` for `aggressive`, `persistent`, or any number of minutes.
 
----
-
-## System Requirements
+### System Requirements
 
 - **RAM**: 8GB minimum (16GB+ recommended)
-- **Storage**: 16GB free space for model weights
+- **Storage**: 16GB free space for model weights (downloaded automatically on first use, then cached locally)
 - **OS**: Windows 10+, macOS 12+, or Linux
-- **Internet**: Required for initial model download
-
-Models are automatically downloaded on first use and cached locally for offline operation.
 
 ---
 
-## Real-World Examples
+## Memory Modes
 
-### Document Processing
-Turn receipts, contracts, and forms into searchable text instantly.
+Vision models are large. FusionVisionMCP lets you decide how long each one stays resident in memory after its
+last use, picked at install time — no config file required:
 
-### Product Analysis
-Examine product photos to extract specifications, compare features, and answer questions.
+| Mode | Models released | Best for |
+|------|----------------|----------|
+| **Aggressive** | After 5 minutes idle | Tight memory budgets, short bursts of work |
+| **Standard** *(default)* | After 10 minutes idle | Everyday use — fast during work, tidy afterwards |
+| **Persistent** | Never | Maximum speed on a dedicated machine |
+| **Custom** | After *N* minutes you set | Matching your own working rhythm |
 
-### Technical Diagrams
-Understand flowcharts, schematics, and architectural diagrams by asking specific questions.
-
-### Quality Control
-Verify that components are properly assembled by analyzing spatial relationships.
-
-### Educational Content
-Extract equations, diagrams, and illustrations from textbooks and academic papers.
-
-### Social Media Analysis
-Process screenshots and memes to understand context and sentiment.
+Models reload automatically on the next request, so no setting can lose work — only time. Release is per model:
+a session that only captions never loads the segmentation or aesthetic models at all.
 
 ---
 
-## Why FusionVisionMCP?
+## Architecture
 
+Five models, each loaded on-demand and released on its own idle timer:
 
+- **Florence-2** (Microsoft) — captioning, OCR, object detection/grounding, dense region captioning
+- **Moondream2** (Vikhyat) — visual question answering
+- **SAM2** (Meta) — segmentation masks, the basis for `spatial_relations`
+- **Grounding DINO** (IDEA-Research) — open-vocabulary detection backing `count_objects`
+- **CLIP + LAION aesthetic head** — aesthetic quality scoring
 
-| Feature | Basic Vision Tools | FusionVisionMCP |
-|---------|-------------------|------------------|
-| Image Understanding | ✅ Basic OCR & Captioning | ✅ Advanced Spatial Analysis |
-| Object Detection | ❌ | ✅ Precise Bounding Boxes |
-| Visual Question Answering | ❌ | ✅ Open-Ended Insights |
-| Spatial Reasoning | ❌ | ✅ Touch, Containment, Distance |
-| Memory Efficiency | ❌ | ✅ Selectable Memory Modes |
-| Multi-Model Integration | ❌ | ✅ Florence-2, Moondream2, SAM2, CLIP/LAION, Grounding DINO |
-| Hardware Flexibility | Limited | ✅ CPU/GPU Adaptive Processing |
-| Resource Optimization | ❌ | ✅ GPU Conservation for Primary AI Tasks |
-| Aesthetic Quality Scoring | ❌ | ✅ CLIP-Based LAION Predictor |
+Runs on CPU by default; uses a GPU automatically if one is available. Because inference happens locally, no image
+data leaves the machine, and the CPU/RAM budget it uses is generally idle capacity rather than resources
+competing with a GPU-bound workload.
 
-## Tool Composition
-
-| Tool Name | Provider | Core Functions | Unique Advantages |
-|-----------|----------|----------------|-------------------|
-| **Florence-2** | Microsoft (Original) | OCR, captioning, custom prompting, object detection & grounding, dense region captioning | Fast, efficient multi-task vision model |
-| **Moondream2** | Vikhyat | Visual question answering | Specialized for open-ended VQA |
-| **Grounding DINO** | IDEA-Research | Instance counting (`count_objects`) | Open-vocabulary detection with parallel object queries — a real per-instance tally, insensitive to how the object is named |
-| **SAM2** | Meta (Original) | Segmentation masks | Precise pixel-level object segmentation |
-| **CLIP + LAION aesthetic head** | OpenAI / LAION | Aesthetic quality scoring | Trained specifically on human aesthetic ratings |
-| **FusionVisionMCP** | Whoawhen | `spatial_relations`, `critique_composition` | Combines the four models above into measurements none of them reports alone |
-
-### FusionVisionMCP's Novel Functions
-
-Most of FusionVisionMCP's tools wrap a capability one of its four underlying models already has: `detect_objects`
-and `dense_region_caption` are Florence-2 task heads, `query_image` is Moondream2's own VQA, `count_objects`
-wraps Grounding DINO's detector, and `score_aesthetics` is the CLIP/LAION predictor's own output. The genuinely
-new capabilities, not provided by any single model in the stack, are:
-
-- **`spatial_relations`** - Measures how objects relate spatially (touch, containment, distance, shape) by combining
-  Florence-2 boxes, SAM2 masks, and a from-scratch geometry module. No model here answers "does this actually touch
-  that" on its own — see [README_DETAILED.md](README_DETAILED.md#spatial_relations-) for how it's built and its
-  measured limits.
-- **`critique_composition`** - Locates the main subject (Florence-2), checks its framing against the rule of thirds
-  (a from-scratch geometry function), scores the shot's aesthetic quality (the CLIP/LAION predictor), and — only for
-  low-scoring images — asks Moondream2 to explain what looks off. No single model in the stack combines localization,
-  framing, and a quality judgment into one answer.
-
-### Need More Technical Details?
-
-See our [complete technical documentation](README_DETAILED.md) for full API specifications, tool arguments, and advanced configuration options.
-
----
-
-## Technical Architecture
-
-FusionVisionMCP integrates five state-of-the-art computer vision models into one MCP server:
-
-- **Microsoft Florence-2**: Foundation model for captioning, OCR, and object detection
-- **Moondream2**: Specialized for open-ended visual question answering
-- **SAM2 (Segment Anything Model 2)**: Advanced segmentation for spatial reasoning
-- **CLIP + LAION aesthetic predictor**: Rates how aesthetically pleasing an image looks
-- **Grounding DINO**: Open-vocabulary detection backing instance counting
-
-Each model loads on-demand and unloads automatically to conserve memory, ensuring optimal performance.
-
-Fork of [jkawamoto/mcp-florence2](https://github.com/jkawamoto/mcp-florence2), which provides exactly three tools —
-`ocr`, `caption`, `process` — all against Florence-2.
-
----
-
-## Hardware Flexibility & Resource Optimization
-
-FusionVisionMCP is designed to run efficiently across multiple hardware configurations:
-
-### Multi-Hardware Support
-- **CPU-Only Systems** - Optimized to run on capable CPUs with sufficient system memory
-- **GPU-Accelerated Systems** - Leverages GPUs for faster processing when available
-- **Hybrid Configurations** - Intelligently distributes workload based on system capabilities
-
-### Resource Optimization Benefits
-- **GPU Conservation** - Offloads token-intensive computer vision tasks to local processing, freeing up valuable GPU resources for primary AI workloads
-- **Scalable Performance** - Adapts to available hardware without requiring dedicated high-end GPUs
-- **Memory Management** - Automatic model loading/unloading conserves system resources during inactive periods
-- **Cost-Effective Deployment** - Reduces dependency on expensive cloud GPU instances for routine vision tasks
-
-FusionVisionMCP enhances your AI workflow without competing for critical computational resources.
+Fork of [jkawamoto/mcp-florence2](https://github.com/jkawamoto/mcp-florence2), which provides three tools —
+`ocr`, `caption`, `process` — against Florence-2 alone.
 
 ---
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
