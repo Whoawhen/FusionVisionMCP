@@ -5,7 +5,10 @@ requires = [ "hatchling" ]
 [project]
 name = "fusion-vision-mcp"
 version = "0.5.0"
-description = "FusionVisionMCP: an MCP server fusing Florence-2, Moondream2, SAM2, Grounding DINO and CLIP for captioning, OCR, object detection/grounding, instance counting, visual question answering, spatial measurement and aesthetic scoring"
+description = """\
+    FusionVisionMCP: an MCP server fusing Florence-2, Moondream2, SAM2, Grounding DINO and CLIP for captioning, OCR, \
+    object detection/grounding, instance counting, visual question answering, spatial measurement and aesthetic scoring\
+    """
 readme = "README.md"
 authors = [
     { name = "Junpei Kawamoto", email = "kawamoto.junpei.s64@kyoto-u.jp" },

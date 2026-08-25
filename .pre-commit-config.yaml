@@ -29,6 +29,7 @@ repos:
     hooks:
       - id: mypy
         args: []
+        files: ^src/
         additional_dependencies:
           - "mcp>=2"
           - "rich-click>=1.8.8"
@@ -36,6 +37,9 @@ repos:
           - "torch>=2.6"
           - "pillow>=11.1"
           - "pytest>=8.3.4"
+          - "numpy>=2.1"
+          - "scipy>=1.14"
+          - "scipy-stubs"
   - repo: local
     hooks:
       - id: pytest
