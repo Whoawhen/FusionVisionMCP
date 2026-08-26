@@ -25,7 +25,7 @@ from PIL.Image import open as open_image
 from pydantic import Field
 from pypdfium2 import PdfDocument
 
-from fusion_vision_mcp import geometry
+from fusion_vision_mcp import geometry, layout
 from fusion_vision_mcp.aesthetic import DEFAULT_AESTHETIC_MODEL, Aesthetic
 from fusion_vision_mcp.florence2 import CaptionLevel, Florence2, Florence2SP
 from fusion_vision_mcp.grounding_dino import DEFAULT_GROUNDING_DINO_MODEL, GroundingDino
@@ -336,9 +336,23 @@ def server(
         kind of text (fabricates plausible-looking wrong words) rather than
         failing visibly. Use `query_image` instead for that case, e.g. with
         the question "What does the text/watermark say, exactly?".
+
+        A page laid out in side-by-side columns (a form, meeting notes, a
+        resume) is detected automatically: each column is OCR'd separately and
+        joined in reading order, so fields from different columns don't get
+        interleaved the way naive raster-order OCR would interleave them.
         """
+        processor = ctx.request_context.lifespan_context.processor
         with get_images(src) as images:
-            return ctx.request_context.lifespan_context.processor.ocr(images)
+            per_page_columns = [layout.split_columns(image) for image in images]
+            flat_texts = processor.ocr([crop for columns in per_page_columns for crop in columns])
+
+            results = []
+            i = 0
+            for columns in per_page_columns:
+                results.append("\n".join(flat_texts[i : i + len(columns)]))
+                i += len(columns)
+            return results
 
     @mcp.tool()
     def caption(ctx: Context[AppContext], src: ImagePath) -> list[str]:

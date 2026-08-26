@@ -119,6 +119,14 @@ configuration above.
 
 Process an image file or URL using OCR to extract text.
 
+> **Multi-column layouts are detected automatically.** A page laid out in side-by-side columns (a form, meeting
+> notes, a resume) breaks naive raster-order OCR: reading strictly left-to-right interleaves unrelated fields
+> from different columns. `ocr` finds the column gutter (a blank vertical strip, pure numpy/PIL, no model call)
+> and OCRs each column independently before joining the results in reading order. A ruled divider line down the
+> real gutter doesn't defeat this, and a page's own title/heading can't mask a gutter that starts below it. A
+> table's column gaps don't trigger a false split — see `src/fusion_vision_mcp/layout.py` and `CLAUDE.md` for
+> the measured case that motivated this and the negative controls it holds.
+
 #### Arguments:
 
 - **src**: A file path or URL to the image file that needs to be processed.

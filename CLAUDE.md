@@ -54,6 +54,44 @@ Don't hard-route `ocr` to always call Moondream instead — Moondream is a VQA m
 
 There's a third path that is not a text tool at all and must not be used as one: **`caption` describes text, it does not transcribe it.** Tested live on this repo's own banner (2026-08-25): `caption` rendered the logo "FusionVisionMCP" as "FusionVisionMP" mid-sentence, while `ocr` and `query_image` both read the same image exactly right. A caption quoting a name, brand or label is not evidence of what it says — confirm it with `ocr` or `query_image` per the routing above. This is now stated in `caption`'s MCP description, for the same reason the OCR routing is.
 
+## Multi-column layouts are handled by geometry, not by asking the model harder
+
+`ocr` reads strictly in raster order, so a document laid out in side-by-side columns (a two-column form, meeting
+notes, a resume) gets its fields interleaved: a synthetic two-column fixture (`tests/layout_two_column.png`) came
+back as `Attendee: Alice, Location: Room 4B, Attende: Ben, Duration: 45 min, ...` — alternating between two
+unrelated columns line by line, with two names mangled in the process (2026-08-25).
+
+**Re-prompting `query_image` to read the columns separately is not a reliable fix.** Four phrasings were tried —
+asking for both columns in one call, asking for each column separately, insisting on an exact line count, asking
+for a table — and `Deadline: Sept 10` never appeared in *any* of them, matching Moondream2's documented tendency
+to paraphrase rather than exhaustively transcribe (see the OCR-routing note above). One phrasing even bled left-
+column fields into the right-column answer.
+
+**What ships instead: `layout.find_column_splits`/`split_columns` (`src/fusion_vision_mcp/layout.py`), pure
+numpy/PIL, no model call.** It sums ink pixels per x-column, finds a vertical strip with near-zero ink density
+that's wide enough and far enough from the edges to be a real gutter rather than word-spacing or a margin, and
+crops there. `ocr` calls it automatically on every page: each column is OCR'd independently and the results
+joined in reading order, so nothing has to reason about layout *and* transcribe exhaustively in the same call.
+On the fixture above this recovers all ten fields in the correct order, including the one `query_image` never
+produced.
+
+Two details were load-bearing enough to test explicitly, both in `tests/test_layout.py`:
+
+- **A ruled divider line down the middle of a real gutter must not defeat detection.** A thin (≤3px) ink run
+  flanked by gutter on both sides is bridged and folded into the gutter, rather than being read as a second,
+  narrower column boundary. `tests/layout_two_column_ruled.png` produces the identical split to the unruled
+  version.
+- **A page heading spans the full width above the columns** and would otherwise mask a real gutter that only
+  starts below it — the top 15% of the image is excluded from gutter detection for exactly this reason.
+
+**Negative controls, held before this shipped:** a table (`tests/layout_table.png`) has its own column gaps, but
+every row carries ink in most columns, so there's no vertical strip blank across the whole body height — it is
+correctly *not* split, and Test 1 in the original comparison (a clean invoice table) already showed both `ocr`
+and `query_image` handle a proper table fine without this. A single wrapped paragraph
+(`tests/layout_paragraph.png`) and a stray content sliver near the edge are also correctly left unsplit. The
+approach generalizes past two columns without new code — `tests/layout_three_column.png` splits twice, at both
+gutters.
+
 ## Counting is a separate tool from detection, and it is still not solved
 
 `detect_objects`' region count was never a tally (see the `wing` and `sword blade` cases in
