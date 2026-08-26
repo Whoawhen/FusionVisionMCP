@@ -196,12 +196,44 @@ whole case table, negative controls included.
 
 ## `spatial_relations` measures; it does not judge
 
-`spatial_relations` (Florence-2 boxes → SAM2 masks → `geometry.py`) reports numbers and deliberately stops
+`spatial_relations` (Grounding DINO boxes → SAM2 masks → `geometry.py`) reports numbers and deliberately stops
 there. That split came out of testing, not taste: Moondream answered a plain "describe anything wrong in this
 image" with a flat `"None"` on six different images that all contained a real, human-visible defect, and closed
 yes/no questions gave the *same* answer across genuinely different images often enough that the answer was
 clearly a default rather than an observation. A small VLM does not reliably supply that judgement. The calling
 model does — and what it cannot do is measure, so that is what the tool provides.
+
+**Locating the named objects doesn't reliably use color to discriminate, and this was found the hard way.** A
+usage-quality pass (2026-08-26) built a synthetic scene with one red, one blue and one green circle and asked
+`spatial_relations` for `['red circle', 'blue circle', 'green circle']`. Every query returned the *same three
+boxes* — the detector (both Florence-2's grounding head and Grounding DINO were tested; both do this) found
+"circle" and largely ignored the color word. The relations computed from that were nonsense: "red circle" vs
+"blue circle" came back `overlapping` with `a_inside_b: 1.0`, because both labels pointed at the same physical
+region compared against itself.
+
+What made this fixable: the correctly-matching box scored highest for its own query, every time, in every test
+run (5/5 on the color case, plus the pre-existing size-disparity case in `spatial_containment.png`). Switching
+the detector from Florence-2's `detect_objects` (no per-box confidence available) to Grounding DINO (which
+already backs `count_objects` and does carry scores) and keeping only the single best-scoring match per
+requested name turned that ranking signal into a real filter. Verified end-to-end through a freshly spawned
+server on both fixtures: three distinct, correctly-colored boxes with clean `touching`/`separate` relations, and
+`b_inside_a: 1.0` on the containment case with no more self-comparison noise. Regression tests:
+`test_spatial_relations_discriminates_same_shaped_objects_by_color` and `test_spatial_relations_measures_containment`
+in `tests/test_server.py`, against `tests/spatial_touch_separate.png` and `tests/spatial_containment.png`.
+
+The real cost of this fix: `spatial_relations` now assumes **one instance per requested name**. A scene with two
+swords and you ask for `'sword'` twice gets you the same single best match twice, not two different swords —
+give them distinguishing names, or use `count_objects` for an actual tally. This wasn't a real regression so
+much as making an already-fuzzy assumption explicit: the tool never had a principled way to pair multiple
+same-label instances (it just returned everything and computed every pairwise relation), so this trades that
+loosely-defined behavior for one clear, documented rule.
+
+**A companion finding from the same pass turned out not to be a bug.** `score_aesthetics` scored a crisp flat
+vector-style graphic and a heavily blurred, noised version of it almost identically (4.19 vs 4.16). Re-run on an
+actual photograph (`tests/sample.jpg`) at four blur levels, the score dropped monotonically (5.23 → 4.40 → 4.08
+→ 3.95) — blur sensitivity works fine within the tool's already-documented scope ("rates photography, not fine
+art"). The flat-graphic test was invalid, not the tool; see the `score_aesthetics` section of
+`README_DETAILED.md` for the numbers. Recorded here so it isn't re-investigated as if it were still open.
 
 Two things follow for anyone extending this:
 

@@ -314,7 +314,8 @@ For a single image, call the named tool directly: its arguments are checked up f
 
 Measures how named objects sit relative to one another: whether they touch, how far apart they are, how much of
 one lies inside the other and how deeply, plus each object's elongation, straightness and end-to-end width
-profile. Florence-2 locates the objects, SAM2 segments them, and the geometry is computed from the masks.
+profile. Grounding DINO locates the objects (the single best-scoring match per name), SAM2 segments them, and
+the geometry is computed from the masks.
 
 This answers questions a bounding box cannot. Two boxes overlap as soon as one object is merely *in front of*
 another, so boxes cannot tell contact from occlusion; silhouettes can. It reports measurements rather than
@@ -357,6 +358,13 @@ Masks are decoded on a fixed 256×256 grid before being upscaled to the image, s
 start from: `detect_objects` returns nothing useful for vague classes, and can label the same region two
 different ways in an ambiguous pose, which the geometry then faithfully measures.
 
+Locating objects assumes one instance per name. Measured on a synthetic scene with one red, one blue and one
+green circle: asking for `red circle` / `blue circle` / `green circle` separately returned the *same three
+boxes* for every query — the detector found "circle" and did not reliably use the color word to discriminate.
+The correctly-matching box scored highest every time in that test, so taking only the best-scoring match per
+name resolves it, but this means several instances of one kind of thing need distinct names — `count_objects`
+is the right tool for a tally of one name instead.
+
 `straightness` reliably separates a straight rod from a curved one, but it does not distinguish a naturally
 curved object from an unnaturally bent one — on two branch-like staffs it scored 0.057 and 0.065, too close to
 threshold on. Treat it as a shape description, not a defect detector.
@@ -386,7 +394,13 @@ OCR never pays for it.
 > world-famous masterpiece still scored only 5.83 ("average"). The predictor is trained on human
 > ratings of photographs (LAION/SAC/AVA), so it has no calibrated sense of quality for paintings,
 > illustrations, or other non-photographic content — treat scores on that kind of image as noise,
-> not signal.
+> not signal. A flat vector-style graphic (a plain solid-color circle) falls in the same trap: a
+> crisp version and a heavily blurred, noised version of the same graphic scored 4.19 and 4.16 —
+> functionally identical, since there was almost no photographic detail there for blur to remove.
+> Re-run on an actual photograph (`tests/sample.jpg` at Gaussian blur σ = 0, 2, 6, 15) and the score
+> drops monotonically — 5.23 → 4.40 → 4.08 → 3.95 — confirming blur sensitivity works correctly
+> within the tool's documented scope. The first result was a test methodology problem, not a
+> defect: score on photographs, not flat graphics.
 
 ### critique_composition ✦
 

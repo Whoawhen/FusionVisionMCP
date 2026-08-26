@@ -566,18 +566,31 @@ def server(
         another, and for any question of contact, containment or clearance that a
         bounding box cannot answer — boxes overlap whenever one object is simply
         in front of another.
+
+        Takes the single best-scoring match per name, so this assumes one instance of
+        each named object. Asked for 'red circle'/'blue circle'/'green circle' on a
+        scene with one of each, the detector returned the same three boxes for every
+        query — color alone doesn't reliably discriminate same-shaped objects — but the
+        correctly-matching box scored highest every time, which is what this relies on.
+        For several instances of one kind of thing, give them distinguishing names, or
+        use `count_objects` for a tally instead.
         """
         app = ctx.request_context.lifespan_context
         with get_images(src) as images:
             image = images[0]
 
             located: list[dict[str, Any]] = []
-            for object_name in objects:
-                detected = app.processor.detect_objects([image], object_name)[0]
-                for index, box in enumerate(detected["bboxes"]):
-                    if len(located) >= _MAX_RELATED_OBJECTS:
-                        break
-                    located.append({"id": f"{object_name}#{index}", "label": object_name, "box": [int(v) for v in box]})
+            for call_index, object_name in enumerate(objects):
+                if len(located) >= _MAX_RELATED_OBJECTS:
+                    break
+                detected = app.counter.detect_objects([image], object_name)[0]
+                if not detected["bboxes"]:
+                    continue
+                best = max(range(len(detected["bboxes"])), key=lambda i: detected["scores"][i])
+                box = detected["bboxes"][best]
+                located.append(
+                    {"id": f"{object_name}#{call_index}", "label": object_name, "box": [int(v) for v in box]}
+                )
 
             if not located:
                 return {

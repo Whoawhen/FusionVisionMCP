@@ -23,6 +23,8 @@ from PIL import Image
 TEST_DIR = Path(__file__).resolve().parent
 SAMPLE_IMAGE_FILEPATH = str(TEST_DIR / "sample.jpg")
 SAMPLE_PDF_FILEPATH = str(TEST_DIR / "sample.pdf")
+SPATIAL_TOUCH_SEPARATE_FILEPATH = str(TEST_DIR / "spatial_touch_separate.png")
+SPATIAL_CONTAINMENT_FILEPATH = str(TEST_DIR / "spatial_containment.png")
 
 SERVER_PARAMS = StdioServerParameters(
     command="uv",
@@ -481,3 +483,57 @@ async def test_critique_composition_reports_note_when_subject_not_found(
 
     assert not res.is_error
     assert "note" in result
+
+
+@pytest.mark.anyio
+async def test_spatial_relations_discriminates_same_shaped_objects_by_color(
+    mcp_client_session: ClientSession,
+) -> None:
+    """Locating by color used to fail silently: asking for 'red circle'/'blue circle'/
+    'green circle' on a scene with one of each returned the same three boxes for every
+    query, so a caller comparing "red circle" to "blue circle" was really comparing one
+    object to itself. Taking the single best-scoring match per name fixed it -- this
+    pins the three distinct locations and the geometrically correct relations between them.
+    """
+    res = await mcp_client_session.call_tool(
+        "spatial_relations",
+        arguments={
+            "src": SPATIAL_TOUCH_SEPARATE_FILEPATH,
+            "objects": ["red circle", "blue circle", "green circle"],
+        },
+    )
+    data = json.loads("\n".join(cast(TextContent, c).text for c in res.content))
+
+    assert not res.is_error
+    assert len(data["objects"]) == 3
+    boxes = [tuple(obj["box"]) for obj in data["objects"]]
+    assert len(set(boxes)) == 3  # each color must land on its own, distinct box
+
+    by_pair = {frozenset((r["a"].split("#")[0], r["b"].split("#")[0])): r for r in data["relations"]}
+    red_blue = by_pair[frozenset(("red circle", "blue circle"))]
+    red_green = by_pair[frozenset(("red circle", "green circle"))]
+    blue_green = by_pair[frozenset(("blue circle", "green circle"))]
+
+    # Constructed to just touch: two circles of radius 60 with centres 120px apart.
+    assert red_blue["state"] in ("touching", "overlapping")
+    assert red_blue["gap"] < 10
+    # Constructed far apart on a 600px-wide canvas.
+    assert red_green["state"] == "separate"
+    assert red_green["gap"] > 100
+    assert blue_green["state"] == "separate"
+    assert blue_green["gap"] > 100
+
+
+@pytest.mark.anyio
+async def test_spatial_relations_measures_containment(mcp_client_session: ClientSession) -> None:
+    res = await mcp_client_session.call_tool(
+        "spatial_relations",
+        arguments={"src": SPATIAL_CONTAINMENT_FILEPATH, "objects": ["yellow circle", "purple circle"]},
+    )
+    data = json.loads("\n".join(cast(TextContent, c).text for c in res.content))
+
+    assert not res.is_error
+    assert len(data["objects"]) == 2
+    relation = data["relations"][0]
+    # The purple circle is constructed entirely inside the yellow one.
+    assert relation["b_inside_a"] > 0.9 or relation["a_inside_b"] > 0.9
