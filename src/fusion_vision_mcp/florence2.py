@@ -6,6 +6,7 @@
 #
 #  http://opensource.org/licenses/mit-license.php
 
+import json
 from enum import StrEnum
 from typing import Any
 
@@ -58,9 +59,19 @@ class Florence2:
         return self.generate_structured("<DENSE_REGION_CAPTION>", images)
 
     def generate(self, prompt: str, images: list[Image]) -> list[str]:
+        """Runs any Florence-2 task token and always returns text.
+
+        Most task tokens (`<CAPTION>` and its relatives) decode to a plain string, which
+        this strips and returns as-is. A structured task token (`<OD>`, `<REGION_PROPOSAL>`,
+        `<OCR_WITH_REGION>` and the like) decodes to a dict instead -- calling `.strip()` on
+        that crashed here until this branch was added, breaking exactly the raw task tokens
+        `process`'s own docstring names as examples. JSON-encoding it keeps the `list[str]`
+        contract `process` promises ("this returns raw text either way") for every task token,
+        not only the ones that happen to decode to a string.
+        """
         res = []
         for parsed in self._run(prompt, images):
-            res.append(parsed.strip())
+            res.append(parsed.strip() if isinstance(parsed, str) else json.dumps(parsed))
         return res
 
     def generate_structured(self, task: str, images: list[Image], text: str | None = None) -> list[dict[str, Any]]:

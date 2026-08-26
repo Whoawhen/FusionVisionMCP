@@ -412,6 +412,24 @@ async def test_process_pdf_from_web(mcp_client_session: ClientSession, static_fi
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize("prompt", ["<OD>", "<REGION_PROPOSAL>", "<OCR_WITH_REGION>"])
+async def test_process_handles_structured_task_tokens(mcp_client_session: ClientSession, prompt: str) -> None:
+    """These three are the exact examples process's own docstring names as valid uses, but a
+    structured task token decodes to a dict rather than a string, and calling `.strip()` on
+    that crashed here until `Florence2.generate` learned to JSON-encode a non-string result.
+    """
+    res = await mcp_client_session.call_tool(
+        "process",
+        arguments={"src": SAMPLE_IMAGE_FILEPATH, "prompt": prompt},
+    )
+    text = "\n".join(cast(TextContent, c).text for c in res.content)
+
+    assert not res.is_error
+    parsed = json.loads(text)
+    assert isinstance(parsed, dict)
+
+
+@pytest.mark.anyio
 async def test_score_aesthetics(mcp_client_session: ClientSession) -> None:
     res = await mcp_client_session.call_tool(
         "score_aesthetics",
