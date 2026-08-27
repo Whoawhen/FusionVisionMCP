@@ -39,6 +39,14 @@ meant finding the gaps against Claude's native vision one by one and closing the
 capability for most everyday CV tasks, and a few tools here (`spatial_relations`' touch/gap/containment
 measurement, `count_objects`' parallel-query instance counting) aren't things Claude's native vision does at all.
 
+The remaining gaps are structural, not tunable — a caption head that paraphrases text, a small VQA model that
+can't be trusted for open-ended judgment, a detector with no notion of what separates a spot from a petal, an
+aesthetic score trained on photographs alone. v0.6.0 doesn't close those (they're not closable locally), but adds
+opt-in parameters to four tools that surface the failure instead of hiding it — a cross-checkable text span next
+to a caption's guess, a consistency flag on a VQA answer, a second opinion plus a separability flag on an
+ambiguous count, a medium classification alongside an aesthetic score. See [README_DETAILED.md](README_DETAILED.md)
+for what's verified against each case.
+
 | Capability | How it's provided |
 |---|---|
 | OCR & document text | Florence-2's OCR head, or Moondream2 for stylized/logo text (see [routing notes](README_DETAILED.md)) |

@@ -25,6 +25,7 @@ SAMPLE_IMAGE_FILEPATH = str(TEST_DIR / "sample.jpg")
 SAMPLE_PDF_FILEPATH = str(TEST_DIR / "sample.pdf")
 SPATIAL_TOUCH_SEPARATE_FILEPATH = str(TEST_DIR / "spatial_touch_separate.png")
 SPATIAL_CONTAINMENT_FILEPATH = str(TEST_DIR / "spatial_containment.png")
+LAYOUT_TWO_COLUMN_FILEPATH = str(TEST_DIR / "layout_two_column.png")
 
 SERVER_PARAMS = StdioServerParameters(
     command="uv",
@@ -129,6 +130,27 @@ async def test_caption_pdf_from_web(mcp_client_session: ClientSession, static_fi
     assert len(text) > 0
     assert not res.is_error
 
+@pytest.mark.anyio
+async def test_caption_verify_text_returns_caption_and_text_regions(mcp_client_session: ClientSession) -> None:
+    """`verify_text=true` returns the caption plus verbatim OCR spans to cross-check it."""
+    res = await mcp_client_session.call_tool(
+        "caption",
+        arguments={"src": SAMPLE_IMAGE_FILEPATH, "verify_text": True},
+    )
+    pages = [json.loads(cast(TextContent, c).text) for c in res.content]
+
+    assert not res.is_error
+    assert len(pages) == 1
+    page = pages[0]
+    assert "caption" in page and "text_regions" in page
+    assert page["caption"]
+    # Each text region is a {text, box} with a 4-int box.
+    for region in page["text_regions"]:
+        assert "text" in region and "box" in region
+        assert len(region["box"]) == 4
+
+
+
 
 @pytest.mark.anyio
 async def test_ocr(mcp_client_session: ClientSession) -> None:
@@ -176,6 +198,43 @@ async def test_ocr_pdf_from_web(mcp_client_session: ClientSession, static_file_s
 
     assert len(text) > 0
     assert not res.is_error
+
+@pytest.mark.anyio
+async def test_ocr_with_regions_returns_text_and_boxes(mcp_client_session: ClientSession) -> None:
+    """`with_regions=true` returns each text span alongside its page-coordinate box."""
+    res = await mcp_client_session.call_tool(
+        "ocr",
+        arguments={"src": LAYOUT_TWO_COLUMN_FILEPATH, "with_regions": True},
+    )
+    pages = [json.loads(cast(TextContent, c).text) for c in res.content]
+
+    assert not res.is_error
+    assert len(pages) == 1
+    page = pages[0]
+    assert "text" in page and "text_regions" in page
+    assert len(page["text_regions"]) > 0
+    # Every region carries a non-empty text and a 4-int box in page coordinates.
+    for region in page["text_regions"]:
+        assert region["text"]
+        assert len(region["box"]) == 4
+        assert all(isinstance(v, int) for v in region["box"])
+    # The joined text is the concatenation of the per-region texts.
+    assert page["text"] == "\n".join(r["text"] for r in page["text_regions"])
+
+
+@pytest.mark.anyio
+async def test_ocr_with_regions_false_keeps_string_shape(mcp_client_session: ClientSession) -> None:
+    """`with_regions=false` (default) keeps the original list[str] return shape."""
+    res = await mcp_client_session.call_tool(
+        "ocr",
+        arguments={"src": LAYOUT_TWO_COLUMN_FILEPATH},
+    )
+    text = "\n".join(cast(TextContent, c).text for c in res.content)
+
+    assert not res.is_error
+    assert len(text) > 0
+
+
 
 
 @pytest.mark.anyio
@@ -280,6 +339,59 @@ async def test_count_objects_can_skip_the_silhouette_check(mcp_client_session: C
 
     assert not res.is_error
     assert "silhouette" not in counted
+
+@pytest.mark.anyio
+async def test_count_objects_adds_consensus_and_separability(mcp_client_session: ClientSession) -> None:
+    """`consensus=true` (default) adds a second-opinion count and a separability flag.
+
+    sample.jpg + "petal" is the canonical collapse case: count=1, by_distance=1,
+    by_radial=8, agreement=False.  The tool's own docstring names this as the
+    overlapping-petal example nothing local can count honestly, so separable
+    must be "no" here, not "yes".
+    """
+    res = await mcp_client_session.call_tool(
+        "count_objects",
+        arguments={"src": SAMPLE_IMAGE_FILEPATH, "object_name": "petal"},
+    )
+    counted = json.loads("\n".join(cast(TextContent, c).text for c in res.content))
+
+    assert not res.is_error
+    assert "consensus" in counted
+    assert "separable" in counted
+    assert counted["consensus"]["grounding_dino_count"] == counted["count"]
+    assert isinstance(counted["consensus"]["region_label_count"], int)
+    assert isinstance(counted["consensus"]["agree"], bool)
+
+    if counted["count"] == 1 and counted.get("silhouette") and counted["silhouette"].get("by_radial", 0) > 1:
+        # This is the canonical rosette collapse: distance says 1, radial says N,
+        # separable must reflect the ambiguity, not assert a clean count.
+        assert counted["separable"] == "no", (
+            f"Expected separable='no' on the rosette collapse case "
+            f"(count=1, by_radial={counted['silhouette'].get('by_radial')}), "
+            f"got '{counted['separable']}'"
+        )
+    assert counted["separable"] in ("yes", "no", "unknown")
+
+
+@pytest.mark.anyio
+async def test_count_objects_can_skip_consensus(mcp_client_session: ClientSession) -> None:
+    """`consensus=false` omits the second-opinion and separability fields."""
+    res = await mcp_client_session.call_tool(
+        "count_objects",
+        arguments={
+            "src": SAMPLE_IMAGE_FILEPATH,
+            "object_name": "petal",
+            "verify_silhouette": False,
+            "consensus": False,
+        },
+    )
+    counted = json.loads("\n".join(cast(TextContent, c).text for c in res.content))
+
+    assert not res.is_error
+    assert "consensus" not in counted
+    assert "separable" not in counted
+
+
 
 
 @pytest.mark.anyio
@@ -455,6 +567,69 @@ async def test_score_aesthetics_pdf(mcp_client_session: ClientSession) -> None:
     assert len(results) >= 1
     assert all("score" in item for item in results)
 
+@pytest.mark.anyio
+async def test_score_aesthetics_with_style_context(mcp_client_session: ClientSession) -> None:
+    """`style_context=true` adds the image's medium (from CLIP zero-shot) to the score."""
+    res = await mcp_client_session.call_tool(
+        "score_aesthetics",
+        arguments={"src": SAMPLE_IMAGE_FILEPATH, "style_context": True},
+    )
+    results = [json.loads(cast(TextContent, c).text) for c in res.content]
+
+    assert not res.is_error
+    assert len(results) == 1
+    assert "style" in results[0]
+    assert "style_distribution" in results[0]
+    assert len(results[0]["style_distribution"]) == 16
+
+
+@pytest.mark.anyio
+async def test_score_aesthetics_style_context_false_omits_style(mcp_client_session: ClientSession) -> None:
+    """`style_context=false` (default) keeps the original {score, rating} shape."""
+    res = await mcp_client_session.call_tool(
+        "score_aesthetics",
+        arguments={"src": SAMPLE_IMAGE_FILEPATH},
+    )
+    results = [json.loads(cast(TextContent, c).text) for c in res.content]
+
+    assert not res.is_error
+    assert "style" not in results[0]
+
+
+@pytest.mark.anyio
+async def test_query_image_check_consistency_returns_agreement_fields(
+    mcp_client_session: ClientSession,
+) -> None:
+    """`check_consistency=true` returns answer/control/consistent/confidence per image."""
+    res = await mcp_client_session.call_tool(
+        "query_image",
+        arguments={"src": SAMPLE_IMAGE_FILEPATH, "question": "What is in this image?", "check_consistency": True},
+    )
+    results = [json.loads(cast(TextContent, c).text) for c in res.content]
+
+    assert not res.is_error
+    assert len(results) == 1
+    r = results[0]
+    assert {"answer", "control_answer", "consistent", "confidence"} <= set(r.keys())
+    assert r["confidence"] in ("low", "normal")
+
+
+@pytest.mark.anyio
+async def test_query_image_check_consistency_false_keeps_string_shape(
+    mcp_client_session: ClientSession,
+) -> None:
+    """`check_consistency=false` (default) keeps the original list[str] return shape."""
+    res = await mcp_client_session.call_tool(
+        "query_image",
+        arguments={"src": SAMPLE_IMAGE_FILEPATH, "question": "What is in this image?"},
+    )
+    text = "\n".join(cast(TextContent, c).text for c in res.content)
+
+    assert not res.is_error
+    assert len(text) > 0
+
+
+
 
 @pytest.mark.anyio
 async def test_critique_composition(mcp_client_session: ClientSession) -> None:
@@ -555,3 +730,114 @@ async def test_spatial_relations_measures_containment(mcp_client_session: Client
     relation = data["relations"][0]
     # The purple circle is constructed entirely inside the yellow one.
     assert relation["b_inside_a"] > 0.9 or relation["a_inside_b"] > 0.9
+
+# ---------------------------------------------------------------------------
+# Unit tests for the consensus/agreement helpers.
+# These use documented fixture data directly, no model required.
+# ---------------------------------------------------------------------------
+
+from fusion_vision_mcp import _separability, _vqa_consistency  # noqa: E402
+
+
+class TestSeparability:
+    """Pins _separability against the exact geometry data from the documented failure cases."""
+
+    def test_rosette_collapse_returns_no(self) -> None:
+        """The documented flower case: count=1, lobes(by_distance)=1, by_radial=8, agreement=False.
+
+        By_distance found no saddle between overlapping petals (lobes=1); by_radial
+        correctly counted 8 lobes from the angular notch pattern. The estimator
+        disagreement is itself the signal the count is a structural collapse.
+        """
+        result = {
+            "count": 1,
+            "silhouette": {
+                "lobes": 1,
+                "by_radial": 8,
+                "agreement": False,
+            },
+        }
+        assert _separability(result) == "no"
+
+    def test_genuine_singleton_agreement_returns_yes(self) -> None:
+        """Count=1 and both estimators agree the outline is one lobe → "yes"."""
+        result = {
+            "count": 1,
+            "silhouette": {
+                "lobes": 1,
+                "by_radial": 1,
+                "agreement": True,
+            },
+        }
+        assert _separability(result) == "yes"
+
+    def test_agreed_multi_lobe_returns_no(self) -> None:
+        """Count=1 but both estimators agree on 4 lobes → "no" (collapsed)."""
+        result = {
+            "count": 1,
+            "silhouette": {
+                "lobes": 4,
+                "by_radial": 4,
+                "agreement": True,
+            },
+        }
+        assert _separability(result) == "no"
+
+    def test_multi_detection_returns_yes(self) -> None:
+        """Count>1 means the detector separated things → "yes" regardless of silhouette."""
+        assert _separability({"count": 5}) == "yes"
+
+    def test_no_silhouette_returns_unknown(self) -> None:
+        assert _separability({"count": 1}) == "unknown"
+
+    def test_shattered_returns_unknown(self) -> None:
+        result = {"count": 1, "silhouette": {"lobes": 1, "shattered": True}}
+        assert _separability(result) == "unknown"
+
+    def test_by_radial_zero_means_not_measured_trusts_by_distance(self) -> None:
+        """by_radial=0: a non-rosette shape — by_distance is the only signal."""
+        assert _separability({"count": 1, "silhouette": {"lobes": 1, "by_radial": 0, "agreement": False}}) == "yes"
+        assert _separability({"count": 1, "silhouette": {"lobes": 3, "by_radial": 0, "agreement": False}}) == "no"
+
+
+class TestVqaConsistency:
+    """Pins _vqa_consistency against the documented failure modes."""
+
+    def test_agreed_flat_default_returns_low(self) -> None:
+        """"None"/"None" — same default token on two phrasings → low confidence."""
+        r = _vqa_consistency("None", "None")
+        assert r["consistent"] is True
+        assert r["confidence"] == "low"
+
+    def test_different_flat_defaults_returns_low(self) -> None:
+        """"None"/"Nothing" — both are defaults but they disagree → low confidence."""
+        r = _vqa_consistency("None", "Nothing")
+        assert r["consistent"] is False
+        assert r["confidence"] == "low"
+
+    def test_contradictory_substantive_answers_returns_low(self) -> None:
+        """The documented "pette" probe case: one answer says something's wrong,
+        the control says nothing's wrong. Both substantive, both contradict.
+        Confidence must be "low" — the model is contradicting itself.
+        """
+        r = _vqa_consistency(
+            "The image is missing a centerpiece and there is no visible stem or base",
+            "Nothing is wrong with this image; it is a beautiful, symmetrical flower arrangement",
+        )
+        assert r["consistent"] is False
+        assert r["confidence"] == "low"
+
+    def test_agreed_substantive_answer_returns_normal(self) -> None:
+        """Substantive answers that genuinely agree → normal confidence."""
+        r = _vqa_consistency(
+            "a red car",
+            "I see a red car in the image",
+        )
+        assert r["consistent"] is True
+        assert r["confidence"] == "normal"
+
+    def test_agreed_semantic_opposite_defaults_returns_low(self) -> None:
+        """"Yes"/"No" are both flat defaults, and they disagree → low confidence."""
+        r = _vqa_consistency("Yes", "No")
+        assert r["consistent"] is False
+        assert r["confidence"] == "low"

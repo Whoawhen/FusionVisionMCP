@@ -250,6 +250,54 @@ Two things follow for anyone extending this:
 `geometry.py` is pure numpy/scipy and is unit-tested against synthetic masks in `tests/test_geometry.py`, so
 its behaviour can be checked without downloading a model.
 
+## v0.6.0: four tools got an opt-in flag that surfaces unreliability instead of hiding it
+
+Four gaps against Claude's native vision were tracked as open: `caption` misreading embedded text (this
+project's own banner logo came back "FusionVisionMP"), `query_image` on open-ended judgment (documented flat
+"None" on six images with real defects), `count_objects`/`detect_objects` on overlapping cases (the flower — see
+above), and `score_aesthetics`'s photography bias. None of these are fixable locally — a caption head that
+paraphrases can't be made to transcribe, a small VQA model can't be made to reason reliably, a detector with no
+notion of object identity can't separate a spot from a petal, and a CLIP head trained on photographs can't be
+retrained into a fine-art critic without new weights. What shipped instead, on all four existing tools with no
+new tools and no new models: an opt-in parameter that either cross-checks the unreliable output against a second
+signal, or surfaces the disagreement instead of masking it. Same philosophy as the "`spatial_relations` measures;
+it does not judge" section above — measure and flag, don't paper over.
+
+- **`caption(verify_text=true)`** also runs Florence-2's `<OCR_WITH_REGION>` head and returns verbatim
+  `text_regions` alongside the caption. Re-verified live against the actual `FusionVisionMCP-Dark.jpg` banner:
+  the caption still reads "FusionVisionMP" (the head itself is unchanged and still wrong), but `text_regions`
+  correctly returns `[{"text": "FusionVisionMCP", "box": [562, 211, 1493, 300]}]` in the same call. This closes
+  the gap of having to guess or make a second blind call, not the gap of the caption head misreading text.
+- **`query_image(check_consistency=true)`** asks a rephrased control question and returns
+  `{answer, control_answer, consistent, confidence}`.
+- **`count_objects(consensus=true)`** (default on) adds a `dense_region_caption`-based second opinion and a
+  `separable` flag reading `count` against the silhouette's `by_distance`/`by_radial`/`agreement` fields.
+- **`score_aesthetics`/`critique_composition`(`style_context=true`)** classifies the image's medium via
+  zero-shot CLIP (16 style prompts, reusing the already-loaded aesthetic backbone) and returns it alongside the
+  score, so a non-photographic result is read with the documented caveat instead of as an absolute verdict.
+
+**Both of the first two shipped once already wrong, and both were caught by testing against the specific
+documented case rather than a generic unit test.** `separable` originally read only `by_distance` (the
+silhouette's `lobes` field), so on the flower/petal case — the canonical example the flag exists to catch — it
+returned `separable: "yes"` sitting directly next to `consensus.agree: false` in the same response: two fields
+in one payload contradicting each other. The fix makes `by_radial` (the rosette-specific angular-harmonic
+estimator) and `agreement` load-bearing: `by_distance=1, by_radial=8, agreement=false` — a detector collapse the
+outline's angular structure still catches — is now the one case documented to return `"no"`. Separately,
+`_vqa_consistency` originally scored `confidence: "low"` only when both answers reduced to the *same* short
+default token (e.g. "None"/"None"); asked to "describe anything wrong" on `tests/sample.jpg`, one answer invented
+a missing centerpiece and the control answer said nothing was wrong — a direct, substantive self-contradiction —
+and the original logic scored that `"normal"`. Fixed so `confidence` is `"low"` whenever the two answers
+disagree, not only when they agree on a default. The lesson both cases share: a flag meant to catch a known
+failure mode has to be tested against that exact failure mode, not just checked for producing *a* valid-shaped
+value — the original `count_objects` test only asserted `separable in ("yes", "no", "unknown")`, which the buggy
+version also satisfied.
+
+**What this does and does not buy.** All four are opt-in (default `false` except `count_objects`'s `consensus`,
+which is cheap and on by default) and none of them make the underlying model more capable. They convert a
+silent wrong answer into a flagged one a calling agent can act on — decline to trust it, fall back to
+`spatial_relations` or its own reasoning, or ask the user. That is the ceiling for what a local model stack can
+do about a gap that is genuinely about semantic understanding rather than measurement.
+
 ## A note on where this lives
 
 This checkout used to live under OneDrive. `uv tool install` failed there with a hardlink error, and `uv run`/`uv sync` separately failed removing a `.dist-info/licenses` directory that OneDrive had turned into a cloud placeholder — neither error message mentions OneDrive. Moving the checkout to `C:\AI\MCP\FusionVisionMCP` (a plain local path, renamed from `C:\AI\MCP\mcp-florence2` on 2026-08-20) resolved both. Keep it out of any synced folder.

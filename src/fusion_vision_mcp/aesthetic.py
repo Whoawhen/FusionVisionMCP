@@ -106,6 +106,11 @@ class Aesthetic:
         self.model = CLIPModel.from_pretrained(model_id, dtype=self.torch_dtype).to(self.device)
         self.model.eval()
 
+        # CLIP's learned temperature. Standard zero-shot classification scales the cosine
+        # similarities by `logit_scale.exp()`; capturing it once here avoids re-reading the
+        # parameter on every `classify_style` call.
+        self._logit_scale: float = self.model.logit_scale.exp().item()
+
         self.head = _AestheticHead().to(self.device)
         self.head.load_state_dict(_load_head_state_dict())
         self.head.eval()
@@ -131,3 +136,71 @@ class Aesthetic:
             }
             for value in predictions
         ]
+
+    def classify_style(self, images: list[Image]) -> list[dict[str, Any]]:
+        """Zero-shot medium/genre classification, reusing the already-loaded CLIP backbone.
+
+        Encodes a fixed palette of style prompts ("a photograph", "an oil painting", ...)
+        and ranks them by cosine similarity to each image's embedding. No new weights —
+        this is the CLIP zero-shot classification the backbone already supports, kept on
+        the same `Aesthetic` instance so a `score_aesthetics`/`critique_composition`
+        call that also asks for style context pays for one backbone load, not two.
+
+        Returns one dict per image: `{style, distribution}` where `distribution` is a
+        sorted list of `{style, score}` (softmax-normalized probabilities). `style` is the
+        top-ranked prompt with its leading article stripped, e.g. "oil painting".
+        """
+        # "a photograph" is the medium the aesthetic head was trained on; the rest are the
+        # common alternatives a caller might want to read the score in the context of.
+        prompts = [
+            "a photograph",
+            "a digital photograph",
+            "an oil painting",
+            "a watercolor painting",
+            "an acrylic painting",
+            "a digital illustration",
+            "an anime drawing",
+            "a manga panel",
+            "a pencil sketch",
+            "an ink drawing",
+            "a charcoal drawing",
+            "a 3D render",
+            "a vector graphic",
+            "a pixel art image",
+            "a collage",
+            "a screenshot",
+        ]
+        with torch.no_grad():
+            image_inputs = self.processor(images=images, return_tensors="pt").to(self.device)
+            image_inputs["pixel_values"] = image_inputs["pixel_values"].to(self.torch_dtype)
+            image_features = self.model.get_image_features(**image_inputs)
+            image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+
+            text_inputs = self.processor(text=prompts, return_tensors="pt", padding=True).to(self.device)
+            text_features = self.model.get_text_features(**text_inputs)
+            text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+
+            # Cosine similarity (features are already unit-normalized) → softmax over styles.
+            # Cast to float32 so the softmax is stable under fp16.
+            logits = (image_features.float() @ text_features.float().T) * self._logit_scale
+            probs = torch.softmax(logits, dim=-1)
+
+        results = []
+        for row in probs:
+            ranked = sorted(zip(prompts, row.tolist()), key=lambda kv: kv[1], reverse=True)
+            top_style, _ = ranked[0]
+            # Strip the leading article ("a "/"an ") for a cleaner reported style.
+            style = top_style[2:] if top_style.startswith(("a ", "an ")) else top_style
+            results.append(
+                {
+                    "style": style,
+                    "distribution": [
+                        {
+                            "style": p[2:] if p.startswith(("a ", "an ")) else p,
+                            "score": round(float(s), 4),
+                        }
+                        for p, s in ranked
+                    ],
+                }
+            )
+        return results

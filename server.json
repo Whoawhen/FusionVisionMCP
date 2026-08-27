@@ -7,13 +7,13 @@
     "url": "https://github.com/Whoawhen/FusionVisionMCP",
     "source": "github"
   },
-  "version": "0.5.0",
+  "version": "0.6.0",
   "packages": [
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/Whoawhen/FusionVisionMCP/releases/download/v0.5.0/fusion-vision-mcp.mcpb",
+      "identifier": "https://github.com/Whoawhen/FusionVisionMCP/releases/download/v0.6.0/fusion-vision-mcp.mcpb",
       "fileSha256": "",
-      "version": "0.5.0",
+      "version": "0.6.0",
       "transport": {
         "type": "stdio"
       }

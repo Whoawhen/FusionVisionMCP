@@ -58,6 +58,19 @@ class Florence2:
     def dense_region_caption(self, images: list[Image]) -> list[dict[str, Any]]:
         return self.generate_structured("<DENSE_REGION_CAPTION>", images)
 
+    def ocr_with_regions(self, images: list[Image]) -> list[dict[str, Any]]:
+        """OCR with verbatim text *and* the box each text span occupies.
+
+        Florence-2's `<OCR_WITH_REGION>` head transcribes text faithfully (unlike the
+        caption head, which paraphrases it) and returns each span's four-point polygon.
+        Each result is normalized to an axis-aligned `bboxes`/`labels` shape so callers
+        don't have to know about quads: `quad_boxes` becomes `bboxes` as
+        `[min_x, min_y, max_x, max_y]`, kept alongside the original `quad_boxes` for
+        callers that need the polygon. One entry per input image.
+        """
+        structured = self.generate_structured("<OCR_WITH_REGION>", images)
+        return [_quad_regions_to_bboxes(region) for region in structured]
+
     def generate(self, prompt: str, images: list[Image]) -> list[str]:
         """Runs any Florence-2 task token and always returns text.
 
@@ -120,6 +133,25 @@ def _with_center_points(region: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _quad_regions_to_bboxes(region: dict[str, Any]) -> dict[str, Any]:
+    """Normalizes a Florence-2 `<OCR_WITH_REGION>` result into axis-aligned boxes.
+
+    The head returns `quad_boxes` (four-point polygons as
+    ``[x1, y1, x2, y2, x3, y3, x4, y4]``) and `labels` (the verbatim text per span).
+    Most callers want a simple bounding box, so each quad is collapsed to its
+    min/max extents and exposed as `bboxes`; the original `quad_boxes` are kept for
+    callers that need the polygon. `labels` is returned unchanged.
+    """
+    quad_boxes = region.get("quad_boxes", []) or []
+    labels = region.get("labels", []) or []
+    bboxes = []
+    for quad in quad_boxes:
+        xs = quad[0::2]
+        ys = quad[1::2]
+        bboxes.append([min(xs), min(ys), max(xs), max(ys)])
+    return {"quad_boxes": quad_boxes, "bboxes": bboxes, "labels": labels}
+
+
 class Florence2SP:
     model_id: str
     device: str | None
@@ -143,6 +175,10 @@ class Florence2SP:
     @subprocess
     def dense_region_caption(self, images: list[Image]) -> list[dict[str, Any]]:
         return Florence2(self.model_id, self.device).dense_region_caption(images)
+
+    @subprocess
+    def ocr_with_regions(self, images: list[Image]) -> list[dict[str, Any]]:
+        return Florence2(self.model_id, self.device).ocr_with_regions(images)
 
     @subprocess
     def generate(self, prompt: str, images: list[Image]) -> list[str]:

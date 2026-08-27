@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "fusion-vision-mcp",
   "display_name": "FusionVisionMCP",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "An MCP server fusing Florence-2, Moondream2, SAM2, Grounding DINO and CLIP for image captioning, OCR, object detection/grounding, instance counting, visual question answering, spatial measurement and aesthetic scoring",
   "author": {
     "name": "Whoawhen",
@@ -39,11 +39,11 @@
   "tools": [
     {
       "name": "ocr",
-      "description": "Transcribe dense printed text from an image or PDF. Use query_image instead for watermarks, logos and stylized text."
+      "description": "Transcribe dense printed text from an image or PDF. Set with_regions=true to also get the box each text span occupies. Use query_image instead for watermarks, logos and stylized text."
     },
     {
       "name": "caption",
-      "description": "Describe what an image shows, as one detailed prose caption of the whole scene."
+      "description": "Describe what an image shows, as one detailed prose caption of the whole scene. Set verify_text=true to also get verbatim OCR spans to cross-check any text the caption quotes."
     },
     {
       "name": "detect_objects",
@@ -55,11 +55,11 @@
     },
     {
       "name": "query_image",
-      "description": "Ask a free-form question about an image (visual question answering), backed by Moondream2."
+      "description": "Ask a free-form question about an image (visual question answering), backed by Moondream2. Set check_consistency=true to flag flat default answers ('None'/'Yes') that a small VLM emits without actually looking."
     },
     {
       "name": "count_objects",
-      "description": "Count how many instances of a named object an image contains, backed by Grounding DINO. Use this, not detect_objects, whenever the question is \"how many\"."
+      "description": "Count how many instances of a named object an image contains, backed by Grounding DINO. Use this, not detect_objects, whenever the question is \"how many\". Adds a consensus second-opinion count and a separability flag by default."
     },
     {
       "name": "batch_analyze_images",
@@ -71,7 +71,7 @@
     },
     {
       "name": "score_aesthetics",
-      "description": "Rate how aesthetically pleasing an image looks on a 1-10 scale, using the CLIP/LAION predictor."
+      "description": "Rate how aesthetically pleasing an image looks on a 1-10 scale, using the CLIP/LAION predictor. Set style_context=true to also classify the medium (photograph, oil painting, ...) so the photography-biased score is read in context."
     },
     {
       "name": "critique_composition",

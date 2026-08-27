@@ -130,6 +130,11 @@ Process an image file or URL using OCR to extract text.
 #### Arguments:
 
 - **src**: A file path or URL to the image file that needs to be processed.
+- **with_regions**: When `true`, return verbatim text *and* the box each span occupies (Florence-2's
+  `<OCR_WITH_REGION>` head), instead of flat strings. Output becomes one `{text, text_regions}` dict per page,
+  `text_regions` being `[{text, box}, ...]` in page coordinates — offset back out of any column crop, so a box
+  indexes directly into the original image. Defaults to `false`. Use this to point at a phrase, or to cross-check
+  text a `caption` call quoted (see below).
 
 ### caption 🔼
 
@@ -143,10 +148,21 @@ specific, and `ocr` to transcribe text rather than describe it. Returns one capt
 > mid-sentence, while `ocr` and `query_image` both read the identical image exactly right. When a specific
 > piece of text matters, confirm it with `ocr` (printed, document-style) or `query_image` (stylized, cursive,
 > low-contrast) rather than quoting the caption. Same routing principle as the OCR note above, one level up.
+>
+> **`verify_text=true` does this cross-check in the same call.** It runs the OCR-with-region head alongside
+> the caption and returns each verbatim span with its box, so a name the caption quoted can be checked without
+> a second round trip. Re-verified live on the same banner (v0.6.0): the caption still mis-transcribes it as
+> "FusionVisionMP" — this does not make Florence-2's caption head read correctly — but `text_regions` comes
+> back `[{"text": "FusionVisionMCP", "box": [562, 211, 1493, 300]}]`, the correct string, in the same response.
+> The gap this closes is having to make a guess or a blind second call; it does not close the gap of the
+> caption head misreading text in the first place.
 
 #### Arguments:
 
 - **src**: A file path or URL to the image file that needs to be processed.
+- **verify_text**: When `true`, also run the OCR-with-region head and return `text_regions` alongside the
+  caption for cross-checking. Defaults to `false`, which keeps the original `list[str]` return shape; `true`
+  returns one `{caption, text_regions}` dict per page.
 
 ### detect_objects ➕
 
@@ -187,6 +203,9 @@ estimate of how many parts it contains.
 - **object_name**: Name of the object to count, e.g. `person`, `petal`, `car`.
 - **verify_silhouette**: Run the outline measurement when only one region is found. Defaults to `true`; set it
   false to keep a run off the segmenter entirely.
+- **consensus**: When `true` (default), also tally how many `dense_region_caption` labels match `object_name` as
+  an independent second opinion from a different Florence-2 head, and add a `separable` flag. Cheap — reuses the
+  already-loaded Florence-2, no new model.
 
 #### Returns:
 
@@ -199,6 +218,17 @@ box that was segmented and the full `count_lobes` measurement of it.
 **`count` is never rewritten by the silhouette check.** The two numbers come from different methods and neither
 overrides the other: `count: 1` beside `silhouette.lobes: 8` means the detector could not separate the instances
 while the outline shows eight cores.
+
+**`consensus=true` adds `consensus: {grounding_dino_count, region_label_count, agree}` and `separable`.**
+`separable` reads `count` alongside the silhouette's two independent lobe estimators —
+`by_distance` (a distance-transform sweep) and `by_radial` (a rosette-specific angular harmonic) — rather than
+either alone: `"yes"` when the count is corroborated (`count > 1`, or a singleton both estimators agree is one
+lobe), `"no"` when the detector collapsed to one region but `by_radial` still found the angular notch pattern of
+several lobes, `"unknown"` when there isn't enough silhouette evidence either way. This closes a real gap in the
+first cut of this flag: it originally read `by_distance` alone and reported `separable: "yes"` on the flower case
+below — false confidence on exactly the case this is meant to catch. Verified live post-fix:
+`count_objects(object_name="petal")` on `tests/sample.jpg` now returns `by_distance: 1, by_radial: 8,
+agreement: false → separable: "no"`.
 
 #### Why this backend
 
@@ -262,7 +292,8 @@ controls.
 Two measurements explain why, and together they close the case: the flower's silhouette has **solidity 0.984**,
 so its outline is very nearly a smooth disc, and its **interior contrast is 0.87**, barely above a plain textured
 blob's 0.52. There is no outline evidence and no colour evidence. Ask `query_image` for a count in that situation
-and treat the answer as an estimate.
+and treat the answer as an estimate. With `consensus=true` (default), this exact case now reports
+`separable: "no"` instead of a bare, misleadingly clean `count: 1` — see above.
 
 **Everything that raises recall breaks the texture controls.** Four approaches were built and rejected —
 interior colour, tiled crops, visual exemplars, and lower thresholds — and each one turns a *single* ball covered
@@ -288,10 +319,29 @@ about.
 
 Ask a free-form question about an image (visual question answering). Backed by Moondream2.
 
+> **Not reliable for open-ended judgment.** Moondream2 is a small VLM, and is documented to answer
+> "describe anything wrong in this image" with a flat "None" on six different images that all had a real,
+> human-visible defect, and to give the same yes/no answer across genuinely different images — a default
+> response, not an observation. This is exactly why `spatial_relations` only measures and never judges: a
+> small VLM can't be trusted for that call the way frontier-model reasoning generally can.
+>
+> **`check_consistency=true` makes that visible.** The tool also asks a rephrased control question and
+> returns `{answer, control_answer, consistent, confidence}`. `confidence` is `"low"` in either of two
+> failure signatures: the two answers agree on a short default token ("None"/"None") — the model isn't
+> looking — or the two answers substantively *disagree* — the model is contradicting itself. Verified live
+> (v0.6.0) on `tests/sample.jpg` with "Describe anything wrong with this image.": the direct answer claimed
+> a missing centerpiece, the control answer said nothing was wrong, and the tool correctly returned
+> `consistent: false, confidence: "low"`. (An earlier build only flagged the agreed-default case and scored
+> this contradiction `"normal"` — fixed before release.) `confidence: "low"` means don't trust the answer
+> without independent confirmation.
+
 #### Arguments:
 
 - **src**: A file path or URL to the image file that needs to be processed.
 - **question**: A free-form question to ask about the image.
+- **check_consistency**: When `true`, also ask a rephrased control question and report agreement/confidence
+  as above. Defaults to `false`, which keeps the original `list[str]` return; `true` returns one
+  `{answer, control_answer, consistent, confidence}` dict per image.
 
 ### batch_analyze_images ➕
 
@@ -377,6 +427,12 @@ backbone plus the LAION "improved aesthetic predictor" head, trained on human ae
 #### Arguments:
 
 - **src**: A file path or URL to the image file that needs to be processed.
+- **style_context**: When `true`, also classify the image's medium (photograph, oil painting, digital
+  illustration, ...) using the already-loaded CLIP backbone in zero-shot mode, and add `style` +
+  `style_distribution` to the result. Defaults to `false`. Doesn't make the aesthetic head understand fine
+  art — it's still the same photography-trained score — but it tells you *that* the score is for a
+  non-photographic medium, so it's read with the caveat below rather than as an absolute verdict. Verified
+  live: a vector-graphic test fixture classifies as `"vector graphic"` (59%) rather than `"photograph"` (4%).
 
 #### Returns:
 
@@ -421,6 +477,8 @@ model in the stack combines localization, framing, and a quality judgment into o
   center).
 - **low_score_threshold**: Aesthetic score below which Moondream2 is asked to explain why. Defaults
   to `5.0`.
+- **style_context**: Same as `score_aesthetics`'s argument of the same name — adds `style` and
+  `style_distribution` to the result. Defaults to `false`.
 
 #### Returns:
 

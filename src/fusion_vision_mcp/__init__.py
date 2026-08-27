@@ -117,6 +117,15 @@ class Processor(Protocol):
         """Generates a caption for every salient region in the image, with bounding boxes."""
         ...
 
+    def ocr_with_regions(self, images: list[Image]) -> list[dict[str, Any]]:
+        """OCR returning verbatim text plus the box each span occupies.
+
+        Unlike `ocr` (which returns flat strings), this preserves *where* each text
+        span is, so a caller can locate a phrase or cross-check text a caption quoted.
+        Returns `{quad_boxes, bboxes, labels}` per image; `bboxes` are axis-aligned.
+        """
+        ...
+
     def generate(self, prompt: str, images: list[Image]) -> list[str]:
         """Generates text responses for the given images based on a custom prompt.
 
@@ -168,6 +177,15 @@ class AestheticScorer(Protocol):
 
     def score(self, images: list[Image]) -> list[dict[str, Any]]:
         """Returns a {"score": float, "rating": str} dict per image."""
+        ...
+
+    def classify_style(self, images: list[Image]) -> list[dict[str, Any]]:
+        """Zero-shot medium/genre classification reusing the CLIP backbone.
+
+        Returns a `{style, distribution}` dict per image; `style` is the top-ranked
+        medium (e.g. "photograph", "oil painting") and `distribution` is a sorted
+        list of `{style, score}` probabilities.
+        """
         ...
 
 
@@ -327,7 +345,23 @@ def server(
     ]
 
     @mcp.tool()
-    def ocr(ctx: Context[AppContext], src: ImagePath) -> list[str]:
+    def ocr(
+        ctx: Context[AppContext],
+        src: ImagePath,
+        with_regions: Annotated[
+            bool,
+            Field(
+                description=(
+                    "When true, return verbatim text *and* the box each text span occupies "
+                    "(via Florence-2's OCR-with-region head), instead of flat strings. Each "
+                    "page becomes a dict with `text_regions` ({text, box}[], box=[x1,y1,x2,y2] "
+                    "in page coordinates, already offset back out of any column crop) and the "
+                    "joined `text`. Use this when you need to know *where* a phrase is, or to "
+                    "cross-check text a `caption` quoted."
+                )
+            ),
+        ] = False,
+    ) -> list[Any]:
         """Process an image file or URL using OCR to extract text.
 
         Best for dense, printed, document-style text (receipts, scanned pages,
@@ -341,21 +375,80 @@ def server(
         resume) is detected automatically: each column is OCR'd separately and
         joined in reading order, so fields from different columns don't get
         interleaved the way naive raster-order OCR would interleave them.
+
+        Set `with_regions=true` to also get the location of every text span.
+        The output then becomes one dict per page with `text` (the joined
+        transcription, as returned when `with_regions=false`) and `text_regions`
+        (`[{text, box}, ...]` in page coordinates — boxes are offset back out of
+        any column crop, so they index directly into the original image). This is
+        the right choice when you need to point at a phrase, or to confirm a
+        name/brand a `caption` quoted against what the OCR head actually read.
         """
         processor = ctx.request_context.lifespan_context.processor
         with get_images(src) as images:
             per_page_columns = [layout.split_columns(image) for image in images]
-            flat_texts = processor.ocr([crop for columns in per_page_columns for crop in columns])
 
-            results = []
-            i = 0
-            for columns in per_page_columns:
-                results.append("\n".join(flat_texts[i : i + len(columns)]))
-                i += len(columns)
-            return results
+            if not with_regions:
+                flat_texts = processor.ocr([crop for columns in per_page_columns for crop in columns])
+                results = []
+                i = 0
+                for columns in per_page_columns:
+                    results.append("\n".join(flat_texts[i : i + len(columns)]))
+                    i += len(columns)
+                return results
+
+            # with_regions: each column crop is OCR'd with its boxes, then the boxes are
+            # offset back into page coordinates so a caller can index into the original image.
+            # PIL's cropped Image exposes no crop-origin attribute, so the column x-offsets
+            # are reconstructed from the same split points `split_columns` crops at.
+            page_results: list[dict[str, Any]] = []
+            for image, columns in zip(images, per_page_columns, strict=True):
+                splits = layout.find_column_splits(image)
+                bounds = [0, *splits, image.width]
+                # `split_columns` crops at (bounds[i], 0, bounds[i+1], image.height).
+                column_offsets = [(bounds[i], 0) for i in range(len(bounds) - 1)]
+                regioned = processor.ocr_with_regions(columns)
+                text_regions: list[dict[str, Any]] = []
+                page_texts: list[str] = []
+                for crop, crop_result, (offset_x, offset_y) in zip(
+                    columns, regioned, column_offsets, strict=True
+                ):
+                    for text, box in zip(crop_result.get("labels", []), crop_result.get("bboxes", [])):
+                        x1, y1, x2, y2 = box
+                        text_regions.append(
+                            {
+                                "text": text,
+                                "box": [
+                                    int(x1 + offset_x),
+                                    int(y1 + offset_y),
+                                    int(x2 + offset_x),
+                                    int(y2 + offset_y),
+                                ],
+                            }
+                        )
+                        page_texts.append(text)
+                page_results.append({"text": "\n".join(page_texts), "text_regions": text_regions})
+            return page_results
 
     @mcp.tool()
-    def caption(ctx: Context[AppContext], src: ImagePath) -> list[str]:
+    def caption(
+        ctx: Context[AppContext],
+        src: ImagePath,
+        verify_text: Annotated[
+            bool,
+            Field(
+                description=(
+                    "When true, also run Florence-2's OCR-with-region head and return, alongside "
+                    "the caption, the verbatim text spans it read (`text_regions`: {text, box}[]). "
+                    "The caption head paraphrases text and misspells names/brands (it rendered this "
+                    "project's own 'FusionVisionMCP' logo as 'FusionVisionMP'); the OCR head "
+                    "transcribes verbatim, so any text the caption quotes can be confirmed against "
+                    "`text_regions` before being repeated as fact. Default false keeps the original "
+                    "list[str] return shape; true returns one dict per page ({caption, text_regions})."
+                )
+            ),
+        ] = False,
+    ) -> list[Any]:
         """Describe what an image shows, as one detailed prose caption.
 
         The default choice for "what is this a picture of". Returns a single
@@ -373,9 +466,31 @@ def server(
         `ocr` and `query_image` read the same image exactly. When a specific piece
         of text matters, confirm it with `ocr` (printed, document-style) or
         `query_image` (stylized, cursive, low-contrast) rather than quoting this.
+
+        Set `verify_text=true` to have this confirmation done for you: the tool
+        also runs the OCR-with-region head and returns each verbatim text span
+        alongside its box, so a name the caption quoted can be checked against
+        what was actually read without a second call. The return shape becomes
+        one dict per page (`{caption, text_regions}`) when this is set.
         """
+        app = ctx.request_context.lifespan_context
         with get_images(src) as images:
-            return ctx.request_context.lifespan_context.processor.caption(images, CaptionLevel.MORE_DETAILED)
+            captions = app.processor.caption(images, CaptionLevel.MORE_DETAILED)
+            if not verify_text:
+                return captions
+
+            # Cross-check: the caption head paraphrases/mispells text; the OCR-with-region
+            # head transcribes it verbatim. Run both and surface the verbatim spans so a
+            # caller can confirm any name/brand the caption quoted before repeating it.
+            regioned = app.processor.ocr_with_regions(images)
+            results = []
+            for caption_text, page_regions in zip(captions, regioned, strict=True):
+                text_regions = [
+                    {"text": text, "box": [int(v) for v in box]}
+                    for text, box in zip(page_regions.get("labels", []), page_regions.get("bboxes", []))
+                ]
+                results.append({"caption": caption_text, "text_regions": text_regions})
+            return results
 
     @mcp.tool()
     def detect_objects(ctx: Context[AppContext], src: ImagePath, object_name: ObjectName) -> list[dict[str, Any]]:
@@ -421,16 +536,57 @@ def server(
         ctx: Context[AppContext],
         src: ImagePath,
         question: Annotated[str, Field(description="A free-form question to ask about the image.")],
-    ) -> list[str]:
+        check_consistency: Annotated[
+            bool,
+            Field(
+                description=(
+                    "When true, also ask a rephrased control question and report whether the "
+                    "two answers agree, flagging short default-looking answers ('None', 'Yes', "
+                    "'No', 'Nothing', ...) as low confidence. Moondream2 is a small VLM that "
+                    "answers open-ended judgment questions ('describe anything wrong') with a "
+                    "flat 'None' on images that all had real visible defects -- this layer makes "
+                    "that default-answer behavior visible instead of presenting it as reliable. "
+                    "Default false keeps the original list[str] return; true returns one "
+                    "{answer, control_answer, consistent, confidence} dict per image."
+                )
+            ),
+        ] = False,
+    ) -> list[Any]:
         """Ask a free-form question about an image (visual question answering).
 
         This is the right tool for reading photo watermarks, logos, signage,
         or any cursive/stylized/low-contrast text — ask e.g. "What does the
         text/watermark say, exactly?". The `ocr` tool misreads that kind of
         text confidently; prefer this one for it instead.
+
+        Moondream2 is a small model and is documented to answer open-ended judgment
+        questions ("describe anything wrong in this image") with a flat "None" on
+        images that all had real visible defects, and to give the same yes/no answer
+        across genuinely different images -- a default response, not a real
+        observation. Set `check_consistency=true` to make that visible: the tool also
+        asks a rephrased control question and returns, per image,
+        `{answer, control_answer, consistent, confidence}`. `confidence` is `"low"`
+        when both answers are short default-looking strings that agree -- the
+        signature of a flat default rather than a genuine observation -- and
+        `"normal"` otherwise. A `low` result on a judgment question means you should
+        not trust the answer without independent confirmation (e.g. `spatial_relations`
+        for a contact/containment question, or your own reading of the image).
         """
+        app = ctx.request_context.lifespan_context
         with get_images(src) as images:
-            return ctx.request_context.lifespan_context.vqa.query(images, question)
+            if not check_consistency:
+                return app.vqa.query(images, question)
+
+            # A rephrasing a genuinely-looking model answers with the same substance,
+            # but a model defaulting to a flat answer returns the same short default to.
+            control_question = f"Looking carefully at this image, answer precisely: {question}"
+            answers = app.vqa.query(images, question)
+            control_answers = app.vqa.query(images, control_question)
+
+            results = []
+            for answer, control_answer in zip(answers, control_answers, strict=True):
+                results.append(_vqa_consistency(answer, control_answer))
+            return results
 
     @mcp.tool()
     def count_objects(
@@ -443,6 +599,18 @@ def server(
                 description=(
                     "When the detector finds only one region, segment it and measure how many "
                     "repeated lobes its outline has. Costs one SAM2 load on the first such call."
+                )
+            ),
+        ] = True,
+        consensus: Annotated[
+            bool,
+            Field(
+                description=(
+                    "When true (default), also tally how many `dense_region_caption` labels match "
+                    "the object name as an independent second opinion, and report a `separable` "
+                    "flag. The dense region captioner is a different Florence-2 head than Grounding "
+                    "DINO, so agreement between the two is real evidence and disagreement is a "
+                    "visible warning. Cheap -- uses the already-loaded Florence-2, no new model."
                 )
             ),
         ] = True,
@@ -487,13 +655,35 @@ def server(
         separate the instances while the outline shows eight cores. `agreement: true`
         means a second, independent estimator matched it; `shattered` or `clipped`
         mean the number should not be used at all.
+
+        Set `consensus=true` (the default) for two extra fields that surface
+        structural ambiguity instead of hiding it:
+
+        - `consensus`: `{grounding_dino_count, region_label_count, agree}` -- a second
+          count from Florence-2's dense region captioner (a different head), which
+          tally how many region labels contain the object name. Agreement is real
+          evidence; disagreement is a warning.
+        - `separable`: `"yes"` if the count is a real tally (the detector separated
+          instances, or a single region the silhouette confirms is one lobe), `"no"`
+          if the detector collapsed while the outline shows several lobes (the
+          overlapping-petal case: nothing local can count it honestly), `"unknown"`
+          when there's no silhouette check to confirm either way. Read `count` with
+          this in mind: a `count: 1` with `separable: "no"` is a collapse, not a tally.
         """
         app = ctx.request_context.lifespan_context
         with get_images(src) as images:
             results = app.counter.detect_objects(images, object_name)
-            if verify_silhouette:
-                for image, result in zip(images, results, strict=True):
+            for image, result in zip(images, results, strict=True):
+                if verify_silhouette:
                     _add_silhouette(app, image, result)
+                if consensus:
+                    region_label_count = _region_label_consensus(app.processor, image, object_name)
+                    result["consensus"] = {
+                        "grounding_dino_count": result.get("count"),
+                        "region_label_count": region_label_count,
+                        "agree": result.get("count") == region_label_count,
+                    }
+                    result["separable"] = _separability(result)
             return results
 
     @mcp.tool()
@@ -618,7 +808,24 @@ def server(
             }
 
     @mcp.tool()
-    def score_aesthetics(ctx: Context[AppContext], src: ImagePath) -> list[dict[str, Any]]:
+    def score_aesthetics(
+        ctx: Context[AppContext],
+        src: ImagePath,
+        style_context: Annotated[
+            bool,
+            Field(
+                description=(
+                    "When true, also classify the image's medium/genre (photograph, oil "
+                    "painting, digital illustration, ...) using the already-loaded CLIP "
+                    "backbone, and return it alongside the score. The aesthetic head was "
+                    "trained on photographs, so a non-photographic medium is the context the "
+                    "score must be read in -- an oil painting scoring ~5.8 is not 'wrong'. "
+                    "Default false keeps the original {score, rating} shape; true adds {style, "
+                    "style_distribution} to each result."
+                )
+            ),
+        ] = False,
+    ) -> list[dict[str, Any]]:
         """Rate how aesthetically pleasing an image looks, independent of its content.
 
         Uses a CLIP-based predictor trained on human aesthetic ratings (the LAION
@@ -637,9 +844,25 @@ def server(
         them. Use it to compare like with like — several shots of the same subject,
         or successive edits of one image — and do not read a single absolute score
         as a verdict on quality.
+
+        Set `style_context=true` to also get the medium the score is being read in.
+        The CLIP backbone (already loaded for scoring) classifies the image as a
+        photograph, oil painting, digital illustration, etc., and that `style` plus
+        its `style_distribution` are added to each result. This is the local-model
+        answer to the photography bias: it doesn't make the head understand fine art,
+        but it tells you *that* the score is for a non-photographic medium, so you
+        read it with the documented caveat instead of as an absolute verdict.
         """
+        app = ctx.request_context.lifespan_context
         with get_images(src) as images:
-            return ctx.request_context.lifespan_context.aesthetic.score(images)
+            results = app.aesthetic.score(images)
+            if not style_context:
+                return results
+            styles = app.aesthetic.classify_style(images)
+            for result, style in zip(results, styles, strict=True):
+                result["style"] = style["style"]
+                result["style_distribution"] = style["distribution"]
+            return results
 
     @mcp.tool()
     def critique_composition(
@@ -652,6 +875,18 @@ def server(
         low_score_threshold: Annotated[
             float, Field(description="Below this aesthetic score, ask Moondream2 to explain why.")
         ] = 5.0,
+        style_context: Annotated[
+            bool,
+            Field(
+                description=(
+                    "When true, also classify the image's medium/genre (photograph, oil "
+                    "painting, ...) using the already-loaded CLIP backbone and add it to the "
+                    "result as `style` and `style_distribution`. The aesthetic head was trained "
+                    "on photographs, so a non-photographic medium is the context the score is "
+                    "read in. Default false omits the classification."
+                )
+            ),
+        ] = False,
     ) -> dict[str, Any]:
         """Critique an image's composition: framing, and, for low-scoring images, why it looks off.
 
@@ -672,6 +907,11 @@ def server(
         no single region is the subject. If nothing can be located, returns a
         soft-failure shape (image size, aesthetic score, and a "note") rather than
         raising. Only the first page of a PDF is assessed.
+
+        Set `style_context=true` to also get the image's medium (`style` plus
+        `style_distribution`), so the aesthetic score is read in the context of its
+        medium — the documented photography bias means a non-photographic medium
+        should not be judged by the raw score.
         """
         app = ctx.request_context.lifespan_context
         with get_images(src) as images:
@@ -685,20 +925,30 @@ def server(
                 box = _pick_primary_subject(app.processor.dense_region_caption([image])[0], (image.width, image.height))
 
             aesthetics = app.aesthetic.score([image])[0]
+            style: dict[str, Any] | None = None
+            if style_context:
+                style = app.aesthetic.classify_style([image])[0]
 
             if box is None:
-                return {
+                result: dict[str, Any] = {
                     "image_size": [image.width, image.height],
                     "aesthetics": aesthetics,
                     "note": "Could not locate a subject to assess framing for.",
                 }
+                if style is not None:
+                    result["style"] = style["style"]
+                    result["style_distribution"] = style["distribution"]
+                return result
 
-            result: dict[str, Any] = {
+            result = {
                 "image_size": [image.width, image.height],
                 "subject_box": box,
                 "aesthetics": aesthetics,
                 "framing": geometry.rule_of_thirds(box, (image.width, image.height)),
             }
+            if style is not None:
+                result["style"] = style["style"]
+                result["style_distribution"] = style["distribution"]
             if aesthetics["score"] < low_score_threshold:
                 result["critique"] = app.vqa.query(
                     [image], "Critique this photo's composition and framing in 2 concise sentences."
@@ -757,6 +1007,137 @@ def _add_silhouette(app: AppContext, image: Image, result: dict[str, Any]) -> No
     if not masks:
         return
     result["silhouette"] = {"box": box, **geometry.count_lobes(masks[0])}
+
+
+def _region_label_consensus(processor: Processor, image: Image, object_name: str) -> int:
+    """Second-opinion count: how many `dense_region_caption` labels match the object.
+
+    Florence-2's dense region captioner emits a label per salient region ("a red car",
+    "a person", "a yellow flower"). Tallying labels that contain the object name is an
+    independent estimate of the instance count -- it comes from a different head than
+    Grounding DINO, so agreement between the two is real evidence and disagreement is
+    a visible warning. Returns 0 when the captioner finds nothing matching.
+    """
+    regions = processor.dense_region_caption([image])[0]
+    needle = object_name.strip().lower()
+    count = 0
+    for label in regions.get("labels", []):
+        if needle and needle in str(label).lower():
+            count += 1
+    return count
+
+
+def _separability(result: dict[str, Any]) -> str:
+    """Surfaces whether the reported `count` is a real tally or a structural collapse.
+
+    ``"yes"`` -- the detector separated the instances (count > 1), or a single region
+    whose silhouette both estimators (by_distance and the rosette-specific by_radial)
+    agree is one lobe.
+    ``"no"`` -- the detector collapsed while the silhouette's evidence indicates
+    multiple lobes, or both estimators agree the count is > 1.
+    ``"unknown"`` -- no silhouette check available, bad data (shattered/clipped), or
+    the estimators disagree on a genuinely ambiguous shape with no strong signal either
+    way (neither found multiple lobes).
+    """
+    count = result.get("count")
+    if count is None:
+        return "unknown"
+    if count > 1:
+        return "yes"
+    # count == 1: only a silhouette block can tell a real singleton from a collapse.
+    silhouette = result.get("silhouette")
+    if not silhouette:
+        return "unknown"
+    if silhouette.get("shattered") or silhouette.get("clipped"):
+        return "unknown"
+
+    by_distance: int | None = silhouette.get("lobes")            # alias set by count_lobes
+    by_radial: int = silhouette.get("by_radial") or 0            # rosette estimator, 0 = not measured
+    agreement: bool = bool(silhouette.get("agreement"))
+
+    if by_distance is None:
+        return "unknown"
+
+    # by_radial == 0: the rosette estimator was not applicable (not a rosette shape),
+    # so by_distance is the only signal the geometry module can provide.
+    if by_radial <= 0:
+        return "yes" if by_distance <= 1 else "no"
+
+    # by_radial > 0: the rosette estimator was applicable. Agreement is the key signal.
+    if agreement:
+        # Both estimators agree — the agreed count is trustworthy.
+        return "yes" if by_distance <= 1 else "no"
+
+    # Disagreement between the two estimators.
+    # by_radial > 1 with by_distance == 1 is the canonical rosette collapse:
+    # the distance estimator found no saddle (overlapping petals form one blob),
+    # while the radial estimator caught the angular notch pattern (lobes < convex hull).
+    # The documented flower case: by_distance=1, by_radial=8 → "no".
+    if by_radial > 1:
+        return "no"
+    return "unknown"
+
+
+# Short answers Moondream2 emits as a flat default regardless of the image -- the
+# documented failure mode where it answers "None" to "describe anything wrong" on
+# images that all had real visible defects. Seeing one of these agreed upon by two
+# differently-phrased questions is the signature of a default, not an observation.
+_DEFAULT_ANSWERS: Final[frozenset[str]] = frozenset(
+    {"none", "nothing", "yes", "no", "n/a", "na", "i don't know", "unknown", "not sure", ""}
+)
+
+
+def _vqa_consistency(answer: str, control_answer: str) -> dict[str, Any]:
+    """Compares an answer to its control-question answer and flags unreliable responses.
+
+    `consistent` is true when the two answers agree -- exact (case/punctuation-stripped)
+    match for short answers, or one containing the other for longer ones.
+
+    `confidence` is `"low"` in two failure modes:
+
+    1. *Agreed flat default* -- both answers reduce to a known default token ("none",
+       "yes", "nothing", ...) and they agree: the model produced the same short answer
+       to two differently-phrased questions without looking at the image. This is the
+       documented signature from the six-image probe where Moondream answered "None"
+       to "describe anything wrong" on images with real visible defects.
+
+    2. *Self-contradiction* -- the two answers substantively disagree. One says
+       something's wrong, the other says nothing's wrong, or they give opposite
+       factual claims about the same image. A model contradicting itself across two
+       rephrased questions is weaker evidence than either answer taken alone.
+       (The documented "pette" probe: one answer said "missing a centerpiece" and the
+       control said "Nothing is wrong" -- both substantive, both contradicting.)
+
+    ``"normal"`` only when the answers are substantive AND not flat defaults AND
+    they agree: real observations the consistency layer can confirm.
+    """
+    a = _normalize_answer(answer)
+    c = _normalize_answer(control_answer)
+
+    if a and c:
+        consistent = a == c or a in c or c in a
+    else:
+        consistent = a == c
+
+    both_default = a in _DEFAULT_ANSWERS and c in _DEFAULT_ANSWERS
+
+    # "normal" only when the answers are substantive AND they agree.
+    # Everything else is signal for a caller to distrust:
+    #   - agreed flat defaults (both_default and consistent)  →  model is not looking
+    #   - disagreement  (not consistent)                      →  model is contradicting itself
+    confidence = "normal" if (consistent and not both_default) else "low"
+
+    return {
+        "answer": answer,
+        "control_answer": control_answer,
+        "consistent": consistent,
+        "confidence": confidence,
+    }
+
+
+def _normalize_answer(text: str) -> str:
+    """Lowercases, strips punctuation/whitespace, for default-token comparison."""
+    return text.strip().lower().rstrip(".?!,;:")
 
 
 def _dispatch(app: AppContext, operation: str, images: list[Image], *, question: str, object_name: str) -> Any:
