@@ -75,7 +75,7 @@
     },
     {
       "name": "critique_composition",
-      "description": "Critique an image's framing against the rule of thirds and explain, for low-scoring shots, what looks off."
+      "description": "Critique an image's framing against the rule of thirds and explain, for low-scoring shots, what looks off. Set style_context=true to also classify the medium so the photography-biased score is read in context."
     },
     {
       "name": "process",
