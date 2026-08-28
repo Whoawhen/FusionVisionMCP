@@ -410,9 +410,7 @@ def server(
                 regioned = processor.ocr_with_regions(columns)
                 text_regions: list[dict[str, Any]] = []
                 page_texts: list[str] = []
-                for crop, crop_result, (offset_x, offset_y) in zip(
-                    columns, regioned, column_offsets, strict=True
-                ):
+                for crop, crop_result, (offset_x, offset_y) in zip(columns, regioned, column_offsets, strict=True):
                     for text, box in zip(crop_result.get("labels", []), crop_result.get("bboxes", [])):
                         x1, y1, x2, y2 = box
                         text_regions.append(
@@ -1051,8 +1049,8 @@ def _separability(result: dict[str, Any]) -> str:
     if silhouette.get("shattered") or silhouette.get("clipped"):
         return "unknown"
 
-    by_distance: int | None = silhouette.get("lobes")            # alias set by count_lobes
-    by_radial: int = silhouette.get("by_radial") or 0            # rosette estimator, 0 = not measured
+    by_distance: int | None = silhouette.get("lobes")  # alias set by count_lobes
+    by_radial: int = silhouette.get("by_radial") or 0  # rosette estimator, 0 = not measured
     agreement: bool = bool(silhouette.get("agreement"))
 
     if by_distance is None:

@@ -130,6 +130,7 @@ async def test_caption_pdf_from_web(mcp_client_session: ClientSession, static_fi
     assert len(text) > 0
     assert not res.is_error
 
+
 @pytest.mark.anyio
 async def test_caption_verify_text_returns_caption_and_text_regions(mcp_client_session: ClientSession) -> None:
     """`verify_text=true` returns the caption plus verbatim OCR spans to cross-check it."""
@@ -148,8 +149,6 @@ async def test_caption_verify_text_returns_caption_and_text_regions(mcp_client_s
     for region in page["text_regions"]:
         assert "text" in region and "box" in region
         assert len(region["box"]) == 4
-
-
 
 
 @pytest.mark.anyio
@@ -199,6 +198,7 @@ async def test_ocr_pdf_from_web(mcp_client_session: ClientSession, static_file_s
     assert len(text) > 0
     assert not res.is_error
 
+
 @pytest.mark.anyio
 async def test_ocr_with_regions_returns_text_and_boxes(mcp_client_session: ClientSession) -> None:
     """`with_regions=true` returns each text span alongside its page-coordinate box."""
@@ -233,8 +233,6 @@ async def test_ocr_with_regions_false_keeps_string_shape(mcp_client_session: Cli
 
     assert not res.is_error
     assert len(text) > 0
-
-
 
 
 @pytest.mark.anyio
@@ -340,6 +338,7 @@ async def test_count_objects_can_skip_the_silhouette_check(mcp_client_session: C
     assert not res.is_error
     assert "silhouette" not in counted
 
+
 @pytest.mark.anyio
 async def test_count_objects_adds_consensus_and_separability(mcp_client_session: ClientSession) -> None:
     """`consensus=true` (default) adds a second-opinion count and a separability flag.
@@ -390,8 +389,6 @@ async def test_count_objects_can_skip_consensus(mcp_client_session: ClientSessio
     assert not res.is_error
     assert "consensus" not in counted
     assert "separable" not in counted
-
-
 
 
 @pytest.mark.anyio
@@ -567,6 +564,7 @@ async def test_score_aesthetics_pdf(mcp_client_session: ClientSession) -> None:
     assert len(results) >= 1
     assert all("score" in item for item in results)
 
+
 @pytest.mark.anyio
 async def test_score_aesthetics_with_style_context(mcp_client_session: ClientSession) -> None:
     """`style_context=true` adds the image's medium (from CLIP zero-shot) to the score."""
@@ -627,8 +625,6 @@ async def test_query_image_check_consistency_false_keeps_string_shape(
 
     assert not res.is_error
     assert len(text) > 0
-
-
 
 
 @pytest.mark.anyio
@@ -731,12 +727,13 @@ async def test_spatial_relations_measures_containment(mcp_client_session: Client
     # The purple circle is constructed entirely inside the yellow one.
     assert relation["b_inside_a"] > 0.9 or relation["a_inside_b"] > 0.9
 
+
 # ---------------------------------------------------------------------------
 # Unit tests for the consensus/agreement helpers.
 # These use documented fixture data directly, no model required.
 # ---------------------------------------------------------------------------
 
-from fusion_vision_mcp import _separability, _vqa_consistency  # noqa: E402
+from fusion_vision_mcp import _separability, _vqa_consistency
 
 
 class TestSeparability:
@@ -804,13 +801,13 @@ class TestVqaConsistency:
     """Pins _vqa_consistency against the documented failure modes."""
 
     def test_agreed_flat_default_returns_low(self) -> None:
-        """"None"/"None" — same default token on two phrasings → low confidence."""
+        """ "None"/"None" — same default token on two phrasings → low confidence."""
         r = _vqa_consistency("None", "None")
         assert r["consistent"] is True
         assert r["confidence"] == "low"
 
     def test_different_flat_defaults_returns_low(self) -> None:
-        """"None"/"Nothing" — both are defaults but they disagree → low confidence."""
+        """ "None"/"Nothing" — both are defaults but they disagree → low confidence."""
         r = _vqa_consistency("None", "Nothing")
         assert r["consistent"] is False
         assert r["confidence"] == "low"
@@ -837,7 +834,7 @@ class TestVqaConsistency:
         assert r["confidence"] == "normal"
 
     def test_agreed_semantic_opposite_defaults_returns_low(self) -> None:
-        """"Yes"/"No" are both flat defaults, and they disagree → low confidence."""
+        """ "Yes"/"No" are both flat defaults, and they disagree → low confidence."""
         r = _vqa_consistency("Yes", "No")
         assert r["consistent"] is False
         assert r["confidence"] == "low"

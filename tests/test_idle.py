@@ -58,11 +58,14 @@ def test_releases_after_timeout() -> None:
 
 def test_use_postpones_the_release() -> None:
     Counter.builds = 0
-    cache = IdleReleased(Counter, timeout=0.3, name="counter")
+    # A wide margin between the sleep and the timeout (not just a large timeout alone)
+    # matters here: on a loaded CI runner, a 0.2s gap was tight enough to flake when
+    # scheduling jitter delayed this thread past the release timer firing.
+    cache = IdleReleased(Counter, timeout=2.0, name="counter")
 
     first = cache.get()
     for _ in range(4):
-        time.sleep(0.1)
+        time.sleep(0.3)
         # Each call restarts the countdown, so the object should survive well past
         # the timeout as long as requests keep arriving.
         assert cache.get() is first
