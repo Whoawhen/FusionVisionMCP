@@ -31,7 +31,13 @@ column splits on a single short paragraph — with only two real text lines land
 the analyzed page body, word-gaps coincidentally lined up closely enough to look like
 column boundaries. `find_column_splits` now counts independent text lines first and
 skips splitting when there are too few (2) for that alignment to mean anything,
-while every existing multi-line column fixture (5+ lines) is unaffected.
+while every existing multi-line column fixture (5+ lines) is unaffected. This fixes
+the scrambling, not small-text transcription accuracy in general: re-verified through
+the real MCP server on the same fixture, the output now comes back in the correct
+order with nothing interleaved, but Florence-2's OCR head still drops two words,
+duplicates one, and merges two across punctuation at this font size, against the
+fixture's known-exact source string — an ordinary, separate small-text limit this
+fix doesn't touch.
 
 ### Containment recovers from an occlusion hole, without swallowing a real one
 
@@ -84,6 +90,18 @@ tested against the occlusion fixture: both the old and new threshold returned ze
 detections, identical. Lowering the threshold never reached the actual bug, because
 the drop happens in the group-envelope filter *after* threshold filtering — see
 above for the fix that actually worked, at the unchanged default threshold.
+
+### Verification: re-checked through the real MCP protocol, not just direct-Python
+
+Everything above was first verified by importing the underlying modules directly —
+faster to iterate on, but it skips the request-parsing layer a real client actually
+goes through. All six fixes were re-run against the real fixtures a second time
+through the actual `fusion-vision-mcp` server (a fresh subprocess, spawned exactly
+the way `tests/test_server.py` does, over the real MCP stdio protocol), and every
+one reproduced its direct-Python result exactly. The `size` cross-check needed a
+harder question phrasing to reproduce end-to-end — the first phrasing tried got a
+confident, correct answer from Moondream2 on its own, so the low-confidence gate
+correctly never routed to it; a phrasing that tripped a self-contradiction did.
 
 ## v0.7.0 · 2026-08-27
 

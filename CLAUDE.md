@@ -98,6 +98,29 @@ and `query_image` handle a proper table fine without this. A single wrapped para
 approach generalizes past two columns without new code — `tests/layout_three_column.png` splits twice, at both
 gutters.
 
+**v0.7.1 found a second false-positive mode, and it was misdiagnosed at first.** A dense, small (11pt) single
+paragraph came back scrambled into out-of-order word fragments, and a "Second Vision Pass" comparison against
+Claude's native vision (2026-08-26) filed this as a Florence-2 *legibility* problem at small text scale.
+Direct testing disproved that: calling Florence-2's OCR head on the un-upscaled original text, bypassing this
+module entirely, reads it correctly. The real cause is the gutter detector above, misfiring on this specific
+input: with only two of the paragraph's three lines landing inside the analyzed page body (the heading-exclusion
+band at the top absorbs part of the first line), word-gaps in those two lines coincidentally lined up closely
+enough to pass the gutter test, producing six spurious splits and slicing the paragraph into fragments as narrow
+as 26px. Fixed by counting independent text lines first (`layout._count_line_bands`) and refusing to split when
+there are more than one but fewer than three — too few for that kind of coincidental alignment to mean anything
+real. Every existing multi-column fixture (five-plus lines) clears this floor easily; `layout_small_text_paragraph.png`
+(committed from the exact fixture that exposed the bug) is the regression test.
+
+**That fix eliminates the scrambling, but does not make Florence-2's OCR head perfect at small text.** Verified
+end-to-end through the real MCP server (fresh subprocess, real protocol call, not a direct-Python import) on the
+same fixture: the transcription now comes back in the correct order with no interleaving, but it still drops two
+words ("font", "pixel"), duplicates one ("wide"), and merges two words across punctuation where a space should be
+("scale,independent", "directlycheckable") against the fixture's known-exact source string. That is ordinary
+small-text transcription error — a pre-existing, separate limitation of Florence-2's OCR head that this fix was
+never intended to solve and does not claim to. Don't read "no longer scrambled" as "verbatim at small scale";
+for text this small, a caller that needs the exact wording should still treat the output as approximate rather
+than confirmed.
+
 ## Counting is a separate tool from detection, and it is still not solved
 
 `detect_objects`' region count was never a tally (see the `wing` and `sword blade` cases in

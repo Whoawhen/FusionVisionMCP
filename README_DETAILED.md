@@ -134,6 +134,13 @@ Process an image file or URL using OCR to extract text.
 > boundaries, producing six spurious splits. `find_column_splits` now counts independent text lines first and
 > skips splitting when there are too few (fewer than three) for that kind of alignment to mean anything real —
 > every existing multi-column fixture (five or more lines) clears this floor easily and is unaffected.
+>
+> **This fixes the scrambling, not small-text accuracy in general.** Verified live through the real MCP server
+> on the same fixture: the transcription now comes back in the correct order with nothing interleaved, but
+> Florence-2's OCR head still drops a couple of words, duplicates one, and merges two across punctuation at this
+> font size, against the fixture's known-exact source string. That's an ordinary, separate small-text
+> transcription limit this fix doesn't touch — treat verbatim output at small text scale as approximate, not
+> confirmed, until it's been checked.
 
 #### Arguments:
 
