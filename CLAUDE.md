@@ -39,9 +39,15 @@ uv run --with pytest --with anyio pytest tests -q
 ## Remotes
 
 `origin` is this fork (`Whoawhen/FusionVisionMCP`, public, renamed from `warrens951/mcp-florence2` on 2026-08-20 —
-both the repo name and the GitHub account username changed that day); `upstream` is `jkawamoto/mcp-florence2`.
-Feature work happens on branches off `main`, which tracks `upstream/main` — keep `main` itself a clean mirror of
-upstream so a PR can be opened from a branch without carrying unrelated history.
+both the repo name and the GitHub account username changed that day); `upstream` is `jkawamoto/mcp-florence2`,
+kept only for reference. `main` no longer tracks `upstream/main` as a clean mirror — that convention existed to
+keep a PR back to upstream possible, but by 2026-08-27 the two projects had diverged too far for it to mean
+anything (11 tools across five local models here vs. upstream's original three tools on Florence-2 alone; the
+`mcp_florence2` package was deleted outright early on, replaced by this repo's own `fusion_vision_mcp` — see
+below). Commit directly to `main` as needed; there's no longer a reason to keep its history free of
+fork-specific commits. Attribution to the original author is retained regardless, via the MIT copyright header in
+`florence2.py` and the `authors` list in `pyproject.toml`, since this fork's `Florence2` wrapper class still
+descends from his original implementation even though it's since grown well past it.
 
 ## Two OCR paths — pick by text type, don't default to `ocr`
 
