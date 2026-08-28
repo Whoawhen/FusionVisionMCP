@@ -41,11 +41,14 @@ measurement, `count_objects`' parallel-query instance counting) aren't things Cl
 
 The remaining gaps are structural, not tunable — a caption head that paraphrases text, a small VQA model that
 can't be trusted for open-ended judgment, a detector with no notion of what separates a spot from a petal, an
-aesthetic score trained on photographs alone. v0.6.0 doesn't close those (they're not closable locally), but adds
-opt-in parameters to four tools that surface the failure instead of hiding it — a cross-checkable text span next
-to a caption's guess, a consistency flag on a VQA answer, a second opinion plus a separability flag on an
-ambiguous count, a medium classification alongside an aesthetic score. See [README_DETAILED.md](README_DETAILED.md)
-for what's verified against each case.
+aesthetic score trained on photographs alone. Neither v0.6.0 nor v0.7.0 closes those (they're not closable
+locally). v0.6.0 added opt-in parameters to four tools that surface the failure instead of hiding it — a
+cross-checkable text span next to a caption's guess, a consistency flag on a VQA answer, a second opinion plus a
+separability flag on an ambiguous count, a medium classification alongside an aesthetic score. v0.7.0 turns each
+of those flags into an actionable result by combining tools already in the project, no new models: the caption
+gets an auto-corrected copy, a collapsed count gets an outline-based estimate, a low-confidence VQA answer routes
+to the measurement that actually answers the question, and the aesthetic score gains a calibrated like-with-like
+comparison mode. See [README_DETAILED.md](README_DETAILED.md) for what's verified against each case.
 
 | Capability | How it's provided |
 |---|---|
@@ -64,14 +67,14 @@ for what's verified against each case.
 | Tool | Model(s) | Description |
 |---|---|---|
 | `ocr` | Florence-2 | Transcribe dense, printed, document-style text from an image or PDF. |
-| `caption` | Florence-2 | Describe what an image shows as one detailed prose caption of the whole scene. |
+| `caption` | Florence-2 | Describe what an image shows as one detailed prose caption of the whole scene. `verify_text=true` also corrects close text misses against a verbatim OCR pass. |
 | `detect_objects` | Florence-2 | Locate a named object, returning bounding boxes, center points and labels. |
 | `dense_region_caption` | Florence-2 | Caption every salient region of an image at once, without naming objects first. |
-| `query_image` | Moondream2 | Ask a free-form question about an image (visual question answering). |
-| `count_objects` | Grounding DINO | Count how many instances of a named object an image contains. Use this, not `detect_objects`, for "how many" questions. |
+| `query_image` | Moondream2 | Ask a free-form question about an image (visual question answering). `check_consistency=true` routes a low-confidence answer to the measurement that actually answers it, when one applies. |
+| `count_objects` | Grounding DINO | Count how many instances of a named object an image contains. Use this, not `detect_objects`, for "how many" questions. On a collapse, adds an actionable outline estimate. |
 | `spatial_relations` | Florence-2 + SAM2 | Measure contact, gaps, containment depth and shape between two named objects. |
-| `score_aesthetics` | CLIP + LAION | Rate how aesthetically pleasing an image looks on a 1-10 scale. |
-| `critique_composition` | Florence-2 + CLIP/LAION + Moondream2 | Check framing against the rule of thirds; for low-scoring shots, explain what looks off. |
+| `score_aesthetics` | CLIP + LAION | Rate how aesthetically pleasing an image looks on a 1-10 scale. `compare_with` switches to a calibrated like-with-like comparison against a reference image. |
+| `critique_composition` | Florence-2 + CLIP/LAION + Moondream2 | Check framing against the rule of thirds; for low-scoring shots, explain what looks off. Also supports `compare_with`. |
 | `batch_analyze_images` | (routes to any tool above) | Run one operation across many images in a single call, isolating failures per image. |
 | `process` | Florence-2 | Run a raw Florence-2 task token for tasks the named tools don't cover. |
 

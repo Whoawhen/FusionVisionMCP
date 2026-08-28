@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "fusion-vision-mcp",
   "display_name": "FusionVisionMCP",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "An MCP server fusing Florence-2, Moondream2, SAM2, Grounding DINO and CLIP for image captioning, OCR, object detection/grounding, instance counting, visual question answering, spatial measurement and aesthetic scoring",
   "author": {
     "name": "Whoawhen",
@@ -43,7 +43,7 @@
     },
     {
       "name": "caption",
-      "description": "Describe what an image shows, as one detailed prose caption of the whole scene. Set verify_text=true to also get verbatim OCR spans to cross-check any text the caption quotes."
+      "description": "Describe what an image shows, as one detailed prose caption of the whole scene. Set verify_text=true to also run OCR and return verbatim text spans, a corrections list of the close misses, and a caption_corrected copy with the verbatim OCR text substituted in."
     },
     {
       "name": "detect_objects",
@@ -55,11 +55,11 @@
     },
     {
       "name": "query_image",
-      "description": "Ask a free-form question about an image (visual question answering), backed by Moondream2. Set check_consistency=true to flag flat default answers ('None'/'Yes') that a small VLM emits without actually looking."
+      "description": "Ask a free-form question about an image (visual question answering), backed by Moondream2. Set check_consistency=true to flag flat default answers ('None'/'Yes') that a small VLM emits without actually looking; on a low-confidence answer it also routes to the measurement that answers the question (spatial_relations/count_objects/ocr) as cross_check when one applies."
     },
     {
       "name": "count_objects",
-      "description": "Count how many instances of a named object an image contains, backed by Grounding DINO. Use this, not detect_objects, whenever the question is \"how many\". Adds a consensus second-opinion count and a separability flag by default."
+      "description": "Count how many instances of a named object an image contains, backed by Grounding DINO. Use this, not detect_objects, whenever the question is \"how many\". Adds a consensus second-opinion count and a separability flag by default; on a collapse, adds an actionable outline estimate (and an optional vqa_estimate)."
     },
     {
       "name": "batch_analyze_images",
@@ -71,11 +71,11 @@
     },
     {
       "name": "score_aesthetics",
-      "description": "Rate how aesthetically pleasing an image looks on a 1-10 scale, using the CLIP/LAION predictor. Set style_context=true to also classify the medium (photograph, oil painting, ...) so the photography-biased score is read in context."
+      "description": "Rate how aesthetically pleasing an image looks on a 1-10 scale, using the CLIP/LAION predictor. Set style_context=true to also classify the medium (photograph, oil painting, ...) so the photography-biased score is read in context. Set compare_with to a reference image for a calibrated like-with-like comparison (delta + preferred) instead of a single bias-affected absolute score."
     },
     {
       "name": "critique_composition",
-      "description": "Critique an image's framing against the rule of thirds and explain, for low-scoring shots, what looks off. Set style_context=true to also classify the medium so the photography-biased score is read in context."
+      "description": "Critique an image's framing against the rule of thirds and explain, for low-scoring shots, what looks off. Set style_context=true to also classify the medium so the photography-biased score is read in context. Set compare_with to critique two images and report which is preferred."
     },
     {
       "name": "process",

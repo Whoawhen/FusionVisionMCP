@@ -156,13 +156,27 @@ specific, and `ocr` to transcribe text rather than describe it. Returns one capt
 > back `[{"text": "FusionVisionMCP", "box": [562, 211, 1493, 300]}]`, the correct string, in the same response.
 > The gap this closes is having to make a guess or a blind second call; it does not close the gap of the
 > caption head misreading text in the first place.
+>
+> **v0.7.0: `verify_text=true` now also corrects the close misses.** New pure-Python `textmatch.py` extracts
+> candidate tokens from the caption (quoted strings, CamelCase, all-caps runs, capitalized words ≥5 chars),
+> fuzzy-matches each against a verbatim OCR span (difflib ratio in `[0.6, 1.0)` — below that they're unrelated,
+> at `1.0` the caption already got it right), and substitutes the verbatim text into a `caption_corrected`
+> copy. Every substitution is listed in `corrections` (`quoted_in_caption`, `verbatim_from_ocr`, `box`,
+> `similarity`) so it's auditable rather than silent. Re-verified live on the same banner: `caption` still
+> says "FusionVisionMP" — the head itself is unfixed — but `caption_corrected` now reads "...reads
+> FusionVisionMCP." and `corrections` records the one substitution at similarity 0.97. Negative controls:
+> a caption with no misses, or no OCR spans at all, returns an empty `corrections` list and
+> `caption_corrected == caption` unchanged. Limit: correction is best-effort and only fires for
+> high-similarity same-word matches — it does not attempt to correct paraphrased or dropped text, only close
+> misses of something the caption did quote.
 
 #### Arguments:
 
 - **src**: A file path or URL to the image file that needs to be processed.
-- **verify_text**: When `true`, also run the OCR-with-region head and return `text_regions` alongside the
-  caption for cross-checking. Defaults to `false`, which keeps the original `list[str]` return shape; `true`
-  returns one `{caption, text_regions}` dict per page.
+- **verify_text**: When `true`, also run the OCR-with-region head and return `text_regions`, a `corrections`
+  list of the close misses it fixed, and a `caption_corrected` copy with the verbatim OCR text substituted in.
+  Defaults to `false`, which keeps the original `list[str]` return shape; `true` returns one
+  `{caption, text_regions, corrections, caption_corrected}` dict per page.
 
 ### detect_objects ➕
 
@@ -206,6 +220,9 @@ estimate of how many parts it contains.
 - **consensus**: When `true` (default), also tally how many `dense_region_caption` labels match `object_name` as
   an independent second opinion from a different Florence-2 head, and add a `separable` flag. Cheap — reuses the
   already-loaded Florence-2, no new model.
+- **vqa_estimate**: When `true` and the detector has collapsed overlapping instances (`separable == "no"`), also
+  ask Moondream2 "how many `object_name`?" and attach its answer as `estimates.vqa` — a judgment estimate,
+  clearly marked, not a tally. Defaults to `false` so a session that never asks keeps Moondream unloaded.
 
 #### Returns:
 
@@ -229,6 +246,16 @@ first cut of this flag: it originally read `by_distance` alone and reported `sep
 below — false confidence on exactly the case this is meant to catch. Verified live post-fix:
 `count_objects(object_name="petal")` on `tests/sample.jpg` now returns `by_distance: 1, by_radial: 8,
 agreement: false → separable: "no"`.
+
+**v0.7.0: a collapse with a readable outline now surfaces an actionable estimate.** When `separable == "no"`
+but the outline still carries the lobe pattern (`silhouette.by_radial > 1`), an `estimates` block is added:
+`estimates.outline` is that outline count (a *measurement* — angular notches in the silhouette — not a
+judgment, so it stays within "measure, don't judge") with a `basis` string explaining where the number came
+from. **`count` is never overwritten** — `estimates` is added alongside it, never in place of it. With
+`vqa_estimate=true`, a Moondream2 "how many `object_name`?" judgment is added as `estimates.vqa`
+(`{value, raw, note}`), off by default so a session that never opts in keeps Moondream unloaded. Re-verified
+live on the flower: `separable: "no"`, `estimates.outline: 8`, `count` still `1`. Limit: both numbers are
+estimates, not tallies — the detector could not separate the instances, so treat either accordingly.
 
 #### Why this backend
 
@@ -334,14 +361,28 @@ Ask a free-form question about an image (visual question answering). Backed by M
 > `consistent: false, confidence: "low"`. (An earlier build only flagged the agreed-default case and scored
 > this contradiction `"normal"` — fixed before release.) `confidence: "low"` means don't trust the answer
 > without independent confirmation.
+>
+> **v0.7.0: a low-confidence answer now routes to the measurement that answers the question, when one
+> applies.** New pure-Python `question.py` classifies the question's wording into `spatial` (contact/gap/
+> containment — touch, inside, overlap, behind, next to, ...), `count` ("how many"), or `ocr` (text/watermark/
+> logo wording), and best-effort parses the object names it needs. On a low-confidence answer, the matching
+> measurement runs — `spatial_relations` for `spatial`, `count_objects` for `count`, `ocr` for `ocr` — and is
+> attached as `cross_check`. **It never guesses**: `names_for` returns `None` (cross-check omitted) when the
+> category has no measurable fallback, or when the required object names can't be parsed from the wording —
+> `spatial` needs two names, `count` needs one. Re-verified live: "does the hand touch the shield" routes to
+> `spatial_relations` and attaches its relation; "describe the mood of this image" has no measurable fallback
+> and gets no `cross_check` at all. Known limit: the spatial pattern matches "does/is X touch Y" phrasing but
+> not "are X and Y touching" — that case falls through to `None` (omitted) rather than misrouting, but it does
+> mean some natural phrasings of a two-object question currently get no cross-check.
 
 #### Arguments:
 
 - **src**: A file path or URL to the image file that needs to be processed.
 - **question**: A free-form question to ask about the image.
 - **check_consistency**: When `true`, also ask a rephrased control question and report agreement/confidence
-  as above. Defaults to `false`, which keeps the original `list[str]` return; `true` returns one
-  `{answer, control_answer, consistent, confidence}` dict per image.
+  as above; on a low-confidence answer, also attach `cross_check` when a measurable fallback applies (see
+  above). Defaults to `false`, which keeps the original `list[str]` return; `true` returns one
+  `{answer, control_answer, consistent, confidence, cross_check?}` dict per image.
 
 ### batch_analyze_images ➕
 
@@ -433,6 +474,8 @@ backbone plus the LAION "improved aesthetic predictor" head, trained on human ae
   art — it's still the same photography-trained score — but it tells you *that* the score is for a
   non-photographic medium, so it's read with the caveat below rather than as an absolute verdict. Verified
   live: a vector-graphic test fixture classifies as `"vector graphic"` (59%) rather than `"photograph"` (4%).
+- **compare_with**: Path or URL of a reference image. When set, switches to relative mode — see below.
+  Defaults to `None` (absolute scoring).
 
 #### Returns:
 
@@ -457,6 +500,16 @@ OCR never pays for it.
 > drops monotonically — 5.23 → 4.40 → 4.08 → 3.95 — confirming blur sensitivity works correctly
 > within the tool's documented scope. The first result was a test methodology problem, not a
 > defect: score on photographs, not flat graphics.
+>
+> **v0.7.0: `compare_with` routes to the predictor's actual calibrated use — like-with-like comparison —
+> instead of a single absolute number.** Set it to a reference image and both are scored; the result becomes
+> `{image, reference, delta, preferred}` per page, where `preferred` is `"image"` / `"reference"` / `"tie"`
+> (tie when `|delta| < 0.05`, since a smaller gap is noise, not a real preference). With `style_context=true`,
+> both images are classified and a `cross_medium_warning` is added when the media differ — comparing a
+> photograph against a painting is out of the predictor's calibrated scope even in relative mode. Re-verified
+> live: the same image compared against itself returns `delta: 0`, `preferred: "tie"`. This does not
+> recalibrate the absolute score — an oil painting still lands around 5.8 on its own — the relative delta is
+> the actionable output, and only within a shared medium.
 
 ### critique_composition ✦
 
@@ -479,6 +532,11 @@ model in the stack combines localization, framing, and a quality judgment into o
   to `5.0`.
 - **style_context**: Same as `score_aesthetics`'s argument of the same name — adds `style` and
   `style_distribution` to the result. Defaults to `false`.
+- **compare_with**: Path or URL of a reference image. When set, both the image and the reference are
+  critiqued and the result becomes `{image, reference, delta, preferred}` (plus `cross_medium_warning` when
+  `style_context=true` and the media differ) — same like-with-like framing as `score_aesthetics`'
+  `compare_with`. The reference is critiqued without a `target_subject` (auto-detected). Defaults to `None`
+  (single-image critique).
 
 #### Returns:
 

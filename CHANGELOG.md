@@ -1,5 +1,64 @@
 # Changelog
 
+## v0.7.0 · 2026-08-27
+
+v0.6.0 surfaced four deficiencies by *flagging* them; v0.7.0 turns each flag into an
+*actionable result* by combining tools already in the project. No new models — each
+new path reuses the lazily-loaded stack and adds the second signal v0.6.0 only
+exposed. Every feature keeps its negative control and an honest "limit" sentence.
+
+### `caption` — corrects the close misses, not just surfaces them
+
+`verify_text=true` already ran the OCR-with-region head and returned the verbatim
+spans; v0.7.0 also corrects the caption: each token the caption quoted that is
+close to (but not identical to) a verbatim OCR span is substituted with the verbatim
+text in a `caption_corrected` copy, and every change is listed in `corrections`
+(quoted-in-caption, verbatim-from-ocr, box, similarity). Pure-Python
+`textmatch.py` over the two Florence-2 heads' outputs — no new model. Re-verified on
+the banner: the caption still says "FusionVisionMP", but `caption_corrected` now
+carries "FusionVisionMCP" and `corrections` records the substitution. Limit: the
+substitution is best-effort and only fires for high-similarity same-word matches;
+the raw `corrections` list is always present so a caller can audit every change.
+
+### `count_objects` — adds an actionable outline estimate on collapse
+
+When `separable` is `"no"` (the detector collapsed overlapping instances) but the
+outline still carries the lobe pattern (`silhouette.by_radial > 1`), an `estimates`
+block now reports that outline count as a number — a *measurement* (angular
+notches), not a judgment, so it stays within "measure, don't judge". `count` is
+never overwritten. New opt-in `vqa_estimate=true` also asks Moondream2 "how many
+<name>?" and attaches that judgment as `estimates.vqa` (clearly marked, not a
+tally), off by default so a session that never asks keeps Moondream unloaded.
+Re-verified on the flower: `separable: "no"`, `estimates.outline: 8` with `count`
+still 1. Limit: it's an estimate, not a tally — the detector could not separate the
+instances, so treat any number here accordingly.
+
+### `query_image` — routes a low-confidence answer to the measurement that answers it
+
+`check_consistency=true` already flagged flat default answers; v0.7.0 then routes
+the unreliable VQA judgment to the measurement that actually answers the question
+when one applies: `spatial_relations` for a contact/containment question,
+`count_objects` for "how many", `ocr` for a text-reading question, attached as
+`cross_check`. New pure-Python `question.py` classifies the wording and best-effort
+parses the object names; the cross-check is **omitted** (not guessed) when no
+measurement applies or the names can't be parsed to the required arity. Re-verified:
+"does the hand touch the shield" routes to `spatial_relations`; "describe the mood"
+produces no cross-check. Limit: routing is best-effort; a low-confidence answer with
+no measurable fallback still has no `cross_check`.
+
+### `score_aesthetics` / `critique_composition` — calibrated relative comparison
+
+The predictor's documented valid use is like-with-like comparison, so v0.7.0 routes
+callers there instead of a single bias-affected absolute number. New `compare_with`
+parameter: both images are scored/critiqued and the result carries the per-image
+scores, the `delta`, and `preferred` (`"image"`/`"reference"`/`"tie"`, tie when
+|delta| < 0.05). With `style_context=true`, both media are classified and a
+`cross_medium_warning` is added when they differ (cross-medium comparison is out of
+calibrated scope). Re-verified: identical image vs itself → `delta: 0`,
+`preferred: "tie"`. Limit: the absolute score is not recalibrated — an oil painting
+still lands around 5.8; the relative delta is the actionable output, and only
+within a shared medium.
+
 ## v0.6.0 · 2026-08-26
 
 Four opt-in parameters, added to four existing tools, closing measured gaps against Claude's native

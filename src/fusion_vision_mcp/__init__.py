@@ -8,6 +8,7 @@
 import importlib.metadata
 import math
 import os
+import re
 from collections.abc import AsyncIterator, Iterator
 from contextlib import ExitStack, asynccontextmanager, closing, contextmanager
 from dataclasses import dataclass
@@ -25,7 +26,7 @@ from PIL.Image import open as open_image
 from pydantic import Field
 from pypdfium2 import PdfDocument
 
-from fusion_vision_mcp import geometry, layout
+from fusion_vision_mcp import geometry, layout, question, textmatch
 from fusion_vision_mcp.aesthetic import DEFAULT_AESTHETIC_MODEL, Aesthetic
 from fusion_vision_mcp.florence2 import CaptionLevel, Florence2, Florence2SP
 from fusion_vision_mcp.grounding_dino import DEFAULT_GROUNDING_DINO_MODEL, GroundingDino
@@ -437,12 +438,14 @@ def server(
             Field(
                 description=(
                     "When true, also run Florence-2's OCR-with-region head and return, alongside "
-                    "the caption, the verbatim text spans it read (`text_regions`: {text, box}[]). "
-                    "The caption head paraphrases text and misspells names/brands (it rendered this "
-                    "project's own 'FusionVisionMCP' logo as 'FusionVisionMP'); the OCR head "
-                    "transcribes verbatim, so any text the caption quotes can be confirmed against "
-                    "`text_regions` before being repeated as fact. Default false keeps the original "
-                    "list[str] return shape; true returns one dict per page ({caption, text_regions})."
+                    "the caption, the verbatim text spans it read (`text_regions`: {text, box}[]), "
+                    "a `corrections` list of the close misses it fixed, and a `caption_corrected` "
+                    "copy with each verbatim OCR span substituted in. The caption head paraphrases "
+                    "text and misspells names/brands (it rendered this project's own 'FusionVisionMCP' "
+                    "logo as 'FusionVisionMP'); the OCR head transcribes verbatim, so any text the "
+                    "caption quotes can be confirmed against `text_regions` and the corrected caption "
+                    "used directly. Default false keeps the original list[str] return shape; true "
+                    "returns one dict per page ({caption, text_regions, corrections, caption_corrected})."
                 )
             ),
         ] = False,
@@ -468,8 +471,17 @@ def server(
         Set `verify_text=true` to have this confirmation done for you: the tool
         also runs the OCR-with-region head and returns each verbatim text span
         alongside its box, so a name the caption quoted can be checked against
-        what was actually read without a second call. The return shape becomes
-        one dict per page (`{caption, text_regions}`) when this is set.
+        what was actually read without a second call. It then goes further and
+        corrects the close misses: any caption token that is similar to (but
+        not identical to) a verbatim OCR span is substituted with the verbatim
+        text in a `caption_corrected` copy, and every such change is listed in
+        `corrections` (with the quoted-in-caption token, the verbatim OCR text,
+        the box and the similarity) so the substitution is auditable. The
+        return shape becomes one dict per page
+        (`{caption, text_regions, corrections, caption_corrected}`) when this
+        is set. The correction is best-effort and only fires for high-similarity
+        same-word matches; the raw `corrections` list is always present so a
+        caller can audit or reject any change.
         """
         app = ctx.request_context.lifespan_context
         with get_images(src) as images:
@@ -480,6 +492,9 @@ def server(
             # Cross-check: the caption head paraphrases/mispells text; the OCR-with-region
             # head transcribes it verbatim. Run both and surface the verbatim spans so a
             # caller can confirm any name/brand the caption quoted before repeating it.
+            # Go one step further than v0.6.0's raw spans: correct the close misses by
+            # substituting each verbatim OCR span into a corrected copy of the caption,
+            # and report each substitution so every change is auditable.
             regioned = app.processor.ocr_with_regions(images)
             results = []
             for caption_text, page_regions in zip(captions, regioned, strict=True):
@@ -487,7 +502,15 @@ def server(
                     {"text": text, "box": [int(v) for v in box]}
                     for text, box in zip(page_regions.get("labels", []), page_regions.get("bboxes", []))
                 ]
-                results.append({"caption": caption_text, "text_regions": text_regions})
+                corrections, caption_corrected = textmatch.correct_text(caption_text, text_regions)
+                results.append(
+                    {
+                        "caption": caption_text,
+                        "text_regions": text_regions,
+                        "corrections": [c.as_dict() for c in corrections],
+                        "caption_corrected": caption_corrected,
+                    }
+                )
             return results
 
     @mcp.tool()
@@ -544,8 +567,12 @@ def server(
                     "answers open-ended judgment questions ('describe anything wrong') with a "
                     "flat 'None' on images that all had real visible defects -- this layer makes "
                     "that default-answer behavior visible instead of presenting it as reliable. "
-                    "Default false keeps the original list[str] return; true returns one "
-                    "{answer, control_answer, consistent, confidence} dict per image."
+                    "On a low-confidence answer it also routes to the measurement that actually "
+                    "answers the question when one applies (spatial_relations for a "
+                    "contact/containment question, count_objects for 'how many', ocr for a "
+                    "text-reading question) and attaches it as `cross_check`. Default false keeps "
+                    "the original list[str] return; true returns one "
+                    "{answer, control_answer, consistent, confidence, cross_check?} dict per image."
                 )
             ),
         ] = False,
@@ -567,8 +594,15 @@ def server(
         when both answers are short default-looking strings that agree -- the
         signature of a flat default rather than a genuine observation -- and
         `"normal"` otherwise. A `low` result on a judgment question means you should
-        not trust the answer without independent confirmation (e.g. `spatial_relations`
-        for a contact/containment question, or your own reading of the image).
+        not trust the answer without independent confirmation. When the answer is
+        low-confidence, the tool also tries to route to the measurement that
+        actually answers the question: it classifies the question's wording and,
+        if a measurable category applies and the object names parse from the
+        wording, runs that tool's measurement (`spatial_relations` for a
+        contact/containment question, `count_objects` for "how many", `ocr` for a
+        text-reading question) and attaches it as `cross_check`. The cross-check is
+        omitted when no measurement applies or the names can't be parsed -- it
+        never guesses.
         """
         app = ctx.request_context.lifespan_context
         with get_images(src) as images:
@@ -582,8 +616,18 @@ def server(
             control_answers = app.vqa.query(images, control_question)
 
             results = []
-            for answer, control_answer in zip(answers, control_answers, strict=True):
-                results.append(_vqa_consistency(answer, control_answer))
+            for image, answer, control_answer in zip(images, answers, control_answers, strict=True):
+                entry = _vqa_consistency(answer, control_answer)
+                # When the VQA judgment is unreliable, route to the measurement that
+                # actually answers the question (measure, don't judge): classify the
+                # question's wording and, if a measurable category applies and the
+                # object names parse, run that tool's measurement and attach it. The
+                # cross-check is omitted (not guessed) when no measurement applies.
+                if entry["confidence"] == "low":
+                    cross = _vqa_cross_check(app, image, question)
+                    if cross is not None:
+                        entry["cross_check"] = cross
+                results.append(entry)
             return results
 
     @mcp.tool()
@@ -612,6 +656,17 @@ def server(
                 )
             ),
         ] = True,
+        vqa_estimate: Annotated[
+            bool,
+            Field(
+                description=(
+                    "When true and the detector has collapsed overlapping instances (separable is "
+                    "'no'), also ask Moondream2 'how many <name>?' and attach its answer as "
+                    "estimates.vqa -- a judgment estimate, clearly marked, not a tally. Off by "
+                    "default so a session that never asks keeps Moondream unloaded."
+                )
+            ),
+        ] = False,
     ) -> list[dict[str, Any]]:
         """Count how many instances of a named object an image contains.
 
@@ -667,6 +722,17 @@ def server(
           overlapping-petal case: nothing local can count it honestly), `"unknown"`
           when there's no silhouette check to confirm either way. Read `count` with
           this in mind: a `count: 1` with `separable: "no"` is a collapse, not a tally.
+
+        When `separable` is `"no"` but the outline still carries the lobe pattern
+        (`silhouette.by_radial > 1`), an `estimates` block is added reporting that
+        outline count as an actionable number -- it's a *measurement* (angular
+        notches in the silhouette), not a judgment, so it stays within "measure,
+        don't judge". `count` is never overwritten; `estimates.outline` is the
+        number the outline supports, with a `basis` string saying so. Set
+        `vqa_estimate=true` to also ask Moondream2 "how many <name>?" and attach
+        that judgment as `estimates.vqa` (clearly marked as an estimate, not a
+        tally). Both are estimates: the detector could not separate the instances,
+        so treat any number here accordingly.
         """
         app = ctx.request_context.lifespan_context
         with get_images(src) as images:
@@ -682,6 +748,32 @@ def server(
                         "agree": result.get("count") == region_label_count,
                     }
                     result["separable"] = _separability(result)
+
+                # When the detector collapsed overlapping instances but the outline
+                # still carries the lobe pattern (by_radial > 1), surface that pattern
+                # as an actionable estimate instead of only flagging the collapse. The
+                # outline count is a *measurement* (angular notches), not a judgment, so
+                # it stays within "measure, don't judge". `count` is never overwritten.
+                if result.get("separable") == "no":
+                    silhouette = result.get("silhouette") or {}
+                    by_radial = silhouette.get("by_radial", 0)
+                    if isinstance(by_radial, (int, float)) and by_radial > 1:
+                        estimates: dict[str, Any] = {
+                            "outline": int(by_radial),
+                            "basis": (
+                                "outline rosette (angular notches); the detector collapsed "
+                                "overlapping instances, but the outline still carries the lobe "
+                                "pattern"
+                            ),
+                        }
+                        if vqa_estimate:
+                            vqa_answer = app.vqa.query([image], f"How many {object_name}? Answer with one number.")[0]
+                            estimates["vqa"] = {
+                                "value": _first_int(vqa_answer),
+                                "raw": vqa_answer,
+                                "note": "a Moondream2 judgment estimate, not a tally",
+                            }
+                        result["estimates"] = estimates
             return results
 
     @mcp.tool()
@@ -823,6 +915,23 @@ def server(
                 )
             ),
         ] = False,
+        compare_with: Annotated[
+            os.PathLike[str] | str | None,
+            Field(
+                description=(
+                    "Path or URL of a reference image to compare against. The predictor's "
+                    "documented valid use is like-with-like comparison (edits of one image, or "
+                    "several shots of one subject), so this routes you there instead of a single "
+                    "bias-affected absolute number: both images are scored and the result carries "
+                    "the per-image scores, the `delta`, and `preferred` ('image'/'reference'/'tie', "
+                    "tie when |delta| < 0.05). With style_context=true, both media are classified "
+                    "and a `cross_medium_warning` is added when they differ (cross-medium "
+                    "comparison is out of calibrated scope). Each image page is compared to the "
+                    "first page of the reference. Omit (default) for the original single-image "
+                    "scoring shape."
+                )
+            ),
+        ] = None,
     ) -> list[dict[str, Any]]:
         """Rate how aesthetically pleasing an image looks, independent of its content.
 
@@ -850,17 +959,36 @@ def server(
         answer to the photography bias: it doesn't make the head understand fine art,
         but it tells you *that* the score is for a non-photographic medium, so you
         read it with the documented caveat instead of as an absolute verdict.
+
+        Set `compare_with` to a reference image to switch to relative mode: both
+        images are scored and the result becomes one entry per image page carrying
+        `{image, reference, delta, preferred}`, with `preferred` being `"image"` /
+        `"reference"` / `"tie"` (tie when |delta| < 0.05). This is the predictor's
+        calibrated use -- like-with-like comparison -- so it sidesteps the absolute
+        photography bias that makes a single score misleading across media. With
+        `style_context=true`, both media are classified and a `cross_medium_warning`
+        is added when they differ (cross-medium comparison is out of calibrated
+        scope). The absolute score is not recalibrated; the relative delta is the
+        actionable output.
         """
         app = ctx.request_context.lifespan_context
         with get_images(src) as images:
-            results = app.aesthetic.score(images)
-            if not style_context:
+            if compare_with is None:
+                results = app.aesthetic.score(images)
+                if not style_context:
+                    return results
+                styles = app.aesthetic.classify_style(images)
+                for result, style in zip(results, styles, strict=True):
+                    result["style"] = style["style"]
+                    result["style_distribution"] = style["distribution"]
                 return results
-            styles = app.aesthetic.classify_style(images)
-            for result, style in zip(results, styles, strict=True):
-                result["style"] = style["style"]
-                result["style_distribution"] = style["distribution"]
-            return results
+
+            # Relative mode: the predictor's documented valid use is like-with-like
+            # comparison, so route callers there instead of a single bias-affected
+            # absolute number. Score both, report the delta and which is preferred;
+            # with style_context, warn when the two media differ.
+            with get_images(compare_with) as ref_images:
+                return _aesthetic_comparison(app, images, ref_images, style_context)
 
     @mcp.tool()
     def critique_composition(
@@ -885,6 +1013,18 @@ def server(
                 )
             ),
         ] = False,
+        compare_with: Annotated[
+            os.PathLike[str] | str | None,
+            Field(
+                description=(
+                    "Path or URL of a reference image to compare against. When set, both the "
+                    "image and the reference are critiqued and the result becomes "
+                    "{image, reference, delta, preferred} (plus cross_medium_warning when "
+                    "style_context=true and the media differ). Same like-with-like framing as "
+                    "score_aesthetics' compare_with. Omit (default) for the single-image critique."
+                )
+            ),
+        ] = None,
     ) -> dict[str, Any]:
         """Critique an image's composition: framing, and, for low-scoring images, why it looks off.
 
@@ -910,48 +1050,56 @@ def server(
         `style_distribution`), so the aesthetic score is read in the context of its
         medium — the documented photography bias means a non-photographic medium
         should not be judged by the raw score.
+
+        Set `compare_with` to a reference image to switch to relative mode: both
+        images are critiqued and the result becomes
+        `{image, reference, delta, preferred}` (tie when |delta| < 0.05), plus a
+        `cross_medium_warning` when `style_context=true` and the two media differ.
+        Same like-with-like framing as `score_aesthetics`' `compare_with`; the
+        absolute score is not recalibrated, the relative delta is.
         """
         app = ctx.request_context.lifespan_context
         with get_images(src) as images:
             image = images[0]
+            if compare_with is None:
+                return _critique_one(app, image, target_subject, low_score_threshold, style_context)
 
-            box: list[int] | None
-            if target_subject:
-                detected = app.processor.detect_objects([image], target_subject)[0]
-                box = [int(v) for v in detected["bboxes"][0]] if detected["bboxes"] else None
-            else:
-                box = _pick_primary_subject(app.processor.dense_region_caption([image])[0], (image.width, image.height))
-
-            aesthetics = app.aesthetic.score([image])[0]
-            style: dict[str, Any] | None = None
-            if style_context:
-                style = app.aesthetic.classify_style([image])[0]
-
-            if box is None:
-                result: dict[str, Any] = {
-                    "image_size": [image.width, image.height],
-                    "aesthetics": aesthetics,
-                    "note": "Could not locate a subject to assess framing for.",
+            # Relative mode: critique both the image and the reference, then report
+            # the per-image critiques, the aesthetic delta, and which is preferred --
+            # the same like-with-like framing as score_aesthetics' compare_with. The
+            # reference's images must stay open while they are critiqued, so the
+            # comparison runs inside the reference's context manager.
+            with get_images(compare_with) as ref_images:
+                ref = ref_images[0]
+                img_result = _critique_one(app, image, target_subject, low_score_threshold, style_context)
+                ref_result = _critique_one(app, ref, "", low_score_threshold, style_context)
+                img_score = img_result.get("aesthetics", {}).get("score")
+                ref_score = ref_result.get("aesthetics", {}).get("score")
+                delta: float | None = None
+                preferred = "tie"
+                if img_score is not None and ref_score is not None:
+                    delta = round(img_score - ref_score, 4)
+                    if delta > _COMPARE_TIE:
+                        preferred = "image"
+                    elif delta < -_COMPARE_TIE:
+                        preferred = "reference"
+                comparison: dict[str, Any] = {
+                    "image": img_result,
+                    "reference": ref_result,
+                    "delta": delta,
+                    "preferred": preferred,
                 }
-                if style is not None:
-                    result["style"] = style["style"]
-                    result["style_distribution"] = style["distribution"]
-                return result
-
-            result = {
-                "image_size": [image.width, image.height],
-                "subject_box": box,
-                "aesthetics": aesthetics,
-                "framing": geometry.rule_of_thirds(box, (image.width, image.height)),
-            }
-            if style is not None:
-                result["style"] = style["style"]
-                result["style_distribution"] = style["distribution"]
-            if aesthetics["score"] < low_score_threshold:
-                result["critique"] = app.vqa.query(
-                    [image], "Critique this photo's composition and framing in 2 concise sentences."
-                )[0]
-            return result
+                if (
+                    style_context
+                    and img_result.get("style") is not None
+                    and ref_result.get("style") is not None
+                    and img_result.get("style") != ref_result.get("style")
+                ):
+                    comparison["cross_medium_warning"] = (
+                        "the image and reference are different media; the score is calibrated "
+                        "for like-with-like comparison, so this delta is out of scope"
+                    )
+                return comparison
 
     @mcp.tool()
     def process(ctx: Context[AppContext], src: ImagePath, prompt: CustomPrompt) -> list[str]:
@@ -1136,6 +1284,186 @@ def _vqa_consistency(answer: str, control_answer: str) -> dict[str, Any]:
 def _normalize_answer(text: str) -> str:
     """Lowercases, strips punctuation/whitespace, for default-token comparison."""
     return text.strip().lower().rstrip(".?!,;:")
+
+
+def _first_int(text: str) -> int | None:
+    """First integer appearing in a string, or None (Moondream may answer in prose)."""
+    match = re.search(r"-?\d+", text)
+    return int(match.group(0)) if match else None
+
+
+def _vqa_cross_check(app: AppContext, image: Image, question_text: str) -> dict[str, Any] | None:
+    """Route an unreliable VQA answer to the measurement that answers it.
+
+    Classifies the question's wording and, when a measurable category applies and
+    the object names can be parsed from that wording, runs the matching tool's
+    underlying measurement and returns its result:
+
+    - ``spatial`` -> ``spatial_relations`` (detect + segment both objects, measure
+      their relation -- contact, gap, containment).
+    - ``count`` -> ``count_objects`` (detect + count, with a separability flag).
+    - ``ocr`` -> ``ocr`` (verbatim transcription, a second opinion from a different
+      Florence-2 head).
+
+    Returns None -- meaning "omit the cross-check" -- when no measurable category
+    applies or the names can't be parsed to the required arity. It never guesses an
+    object name, so a low-confidence "describe the mood" (no measurement) produces
+    no cross-check rather than a fabricated one.
+    """
+    category = question.classify(question_text)
+    if category is None:
+        return None
+    names = question.names_for(category, question_text)
+    if names is None:
+        return None
+
+    if category == question.SPATIAL:
+        return _spatial_measurement(app, image, cast(list[str], names))
+    if category == question.COUNT:
+        result = app.counter.detect_objects([image], names[0])[0]
+        return {
+            "tool": "count_objects",
+            "object": names[0],
+            "count": result.get("count"),
+            "separable": _separability(result),
+        }
+    if category == question.OCR:
+        return {"tool": "ocr", "text": app.processor.ocr([image])[0]}
+    return None
+
+
+def _spatial_measurement(app: AppContext, image: Image, names: list[str]) -> dict[str, Any] | None:
+    """Detect and segment two named objects and measure their relation.
+
+    Mirrors ``spatial_relations`` for the two-object case: detect each name, keep
+    the best-scoring box, segment both, and return ``geometry.relation`` between
+    the two masks. Returns None when fewer than two objects could be located, so the
+    cross-check is omitted rather than reporting a half-measurement.
+    """
+    located: list[dict[str, Any]] = []
+    boxes: list[list[int]] = []
+    for call_index, object_name in enumerate(names):
+        if len(located) >= _MAX_RELATED_OBJECTS:
+            break
+        detected = app.counter.detect_objects([image], object_name)[0]
+        if not detected["bboxes"]:
+            continue
+        best = max(range(len(detected["bboxes"])), key=lambda i: detected["scores"][i])
+        box = [int(v) for v in detected["bboxes"][best]]
+        located.append({"label": object_name, "box": box})
+        boxes.append(box)
+    if len(located) < 2:
+        return None
+
+    masks = app.segmenter.segment(image, boxes)
+    return {
+        "tool": "spatial_relations",
+        "objects": [obj["label"] for obj in located],
+        "relation": geometry.relation(masks[0], masks[1]),
+    }
+
+
+#: Below this absolute delta, two scores are a tie (noise, not a preference).
+_COMPARE_TIE: Final[float] = 0.05
+
+
+def _aesthetic_comparison(
+    app: AppContext, images: list[Image], ref_images: list[Image], style_context: bool
+) -> list[dict[str, Any]]:
+    """Score an image against a reference and report the relative preference.
+
+    The predictor's documented valid use is like-with-like comparison, so this
+    routes the caller to a calibrated relative answer instead of a single
+    bias-affected absolute number. Each image page is compared to the first page of
+    the reference. With ``style_context``, both media are classified and a
+    ``cross_medium_warning`` is added when they differ (cross-medium comparison is
+    out of calibrated scope). The absolute scores are not recalibrated.
+    """
+    img_scores = app.aesthetic.score(images)
+    ref_score = app.aesthetic.score(ref_images)[0]
+
+    img_styles = app.aesthetic.classify_style(images) if style_context else [None] * len(images)
+    ref_style = app.aesthetic.classify_style(ref_images)[0] if style_context else None
+
+    out: list[dict[str, Any]] = []
+    for img, ist in zip(img_scores, img_styles, strict=True):
+        delta = round(img["score"] - ref_score["score"], 4)
+        if delta > _COMPARE_TIE:
+            preferred = "image"
+        elif delta < -_COMPARE_TIE:
+            preferred = "reference"
+        else:
+            preferred = "tie"
+
+        entry: dict[str, Any] = {
+            "image": img,
+            "reference": ref_score,
+            "delta": delta,
+            "preferred": preferred,
+        }
+        if style_context and ist is not None and ref_style is not None:
+            img["style"] = ist["style"]
+            img["style_distribution"] = ist["distribution"]
+            ref_score["style"] = ref_style["style"]
+            ref_score["style_distribution"] = ref_style["distribution"]
+            if ist["style"] != ref_style["style"]:
+                entry["cross_medium_warning"] = (
+                    "the image and reference are different media; the score is calibrated "
+                    "for like-with-like comparison, so this delta is out of scope"
+                )
+        out.append(entry)
+    return out
+
+
+def _critique_one(
+    app: AppContext,
+    image: Image,
+    target_subject: str,
+    low_score_threshold: float,
+    style_context: bool,
+) -> dict[str, Any]:
+    """Single-image composition critique -- the body of `critique_composition`.
+
+    Extracted so `critique_composition`'s relative mode can run it for both the
+    image and the reference. See that tool's docstring for the return shape.
+    """
+    box: list[int] | None
+    if target_subject:
+        detected = app.processor.detect_objects([image], target_subject)[0]
+        box = [int(v) for v in detected["bboxes"][0]] if detected["bboxes"] else None
+    else:
+        box = _pick_primary_subject(app.processor.dense_region_caption([image])[0], (image.width, image.height))
+
+    aesthetics = app.aesthetic.score([image])[0]
+    style: dict[str, Any] | None = None
+    if style_context:
+        style = app.aesthetic.classify_style([image])[0]
+
+    if box is None:
+        result: dict[str, Any] = {
+            "image_size": [image.width, image.height],
+            "aesthetics": aesthetics,
+            "note": "Could not locate a subject to assess framing for.",
+        }
+        if style is not None:
+            result["style"] = style["style"]
+            result["style_distribution"] = style["distribution"]
+        return result
+
+    result = {
+        "image_size": [image.width, image.height],
+        "subject_box": box,
+        "aesthetics": aesthetics,
+        "framing": geometry.rule_of_thirds(box, (image.width, image.height)),
+    }
+    if style is not None:
+        result["style"] = style["style"]
+        result["style_distribution"] = style["distribution"]
+    if aesthetics["score"] < low_score_threshold:
+        result["critique"] = app.vqa.query(
+            [image], "Critique this photo's composition and framing in 2 concise sentences."
+        )[0]
+    return result
 
 
 def _dispatch(app: AppContext, operation: str, images: list[Image], *, question: str, object_name: str) -> Any:

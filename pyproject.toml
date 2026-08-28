@@ -4,7 +4,7 @@ requires = [ "hatchling" ]
 
 [project]
 name = "fusion-vision-mcp"
-version = "0.6.0"
+version = "0.7.0"
 description = """\
     FusionVisionMCP: an MCP server fusing Florence-2, Moondream2, SAM2, Grounding DINO and CLIP for captioning, OCR, \
     object detection/grounding, instance counting, visual question answering, spatial measurement and aesthetic scoring\
@@ -77,7 +77,7 @@ overrides = [ { module = [
 ], ignore_missing_imports = true } ]
 
 [tool.bumpversion]
-current_version = "0.6.0"
+current_version = "0.7.0"
 commit = true
 files = [
     { replace = 'version = "{new_version}"', filename = "pyproject.toml", search = 'version = "{current_version}"' },

@@ -729,6 +729,107 @@ async def test_spatial_relations_measures_containment(mcp_client_session: Client
 
 
 # ---------------------------------------------------------------------------
+# v0.7.0 "combine, don't just surface" feature tests.
+# ---------------------------------------------------------------------------
+
+#: The project's own banner -- the documented caption-misread case ("FusionVisionMP").
+BANNER_IMAGE_FILEPATH = str(TEST_DIR.parent / "FusionVisionMCP-Dark.jpg")
+
+
+@pytest.mark.anyio
+async def test_caption_verify_text_returns_corrections_and_corrected_caption(
+    mcp_client_session: ClientSession,
+) -> None:
+    """`verify_text=true` now also returns `corrections` and `caption_corrected`."""
+    res = await mcp_client_session.call_tool(
+        "caption",
+        arguments={"src": BANNER_IMAGE_FILEPATH, "verify_text": True},
+    )
+    results = [json.loads(cast(TextContent, c).text) for c in res.content]
+
+    assert not res.is_error
+    assert len(results) == 1
+    data = results[0]
+    # The v0.6.0 fields are still present ...
+    assert "caption" in data
+    assert "text_regions" in data
+    # ... and v0.7.0 adds the actionable correction layer.
+    assert "corrections" in data
+    assert "caption_corrected" in data
+    assert isinstance(data["corrections"], list)
+    assert isinstance(data["caption_corrected"], str)
+    # Each correction (if any) is auditable: it names both the misspelt token and
+    # the verbatim OCR source it was replaced with.
+    for correction in data["corrections"]:
+        assert "quoted_in_caption" in correction
+        assert "verbatim_from_ocr" in correction
+        assert "box" in correction
+        assert "similarity" in correction
+
+
+@pytest.mark.anyio
+async def test_count_objects_adds_estimates_on_collapse(mcp_client_session: ClientSession) -> None:
+    """The documented flower: separable 'no' and an actionable outline estimate."""
+    res = await mcp_client_session.call_tool(
+        "count_objects",
+        arguments={"src": SAMPLE_IMAGE_FILEPATH, "object_name": "petal"},
+    )
+    results = [json.loads(cast(TextContent, c).text) for c in res.content]
+
+    assert not res.is_error
+    counted = results[0]
+    assert counted["separable"] == "no"
+    # v0.7.0: when the outline still carries the lobe pattern, surface it as an
+    # estimate rather than only flagging the collapse. `count` is never overwritten.
+    assert "estimates" in counted
+    assert isinstance(counted["estimates"]["outline"], int)
+    assert counted["estimates"]["outline"] > 1
+    assert "basis" in counted["estimates"]
+    assert "estimates" not in counted or counted["count"] == 1
+
+
+@pytest.mark.anyio
+async def test_score_aesthetics_compare_with_returns_relative_shape(
+    mcp_client_session: ClientSession,
+) -> None:
+    """compare_with scores both and reports delta + preferred (identical image -> tie)."""
+    res = await mcp_client_session.call_tool(
+        "score_aesthetics",
+        arguments={"src": SAMPLE_IMAGE_FILEPATH, "compare_with": SAMPLE_IMAGE_FILEPATH},
+    )
+    results = [json.loads(cast(TextContent, c).text) for c in res.content]
+
+    assert not res.is_error
+    assert len(results) == 1
+    data = results[0]
+    assert set(data.keys()) >= {"image", "reference", "delta", "preferred"}
+    # The same image scored against itself: delta ~ 0 -> tie.
+    assert abs(data["delta"]) < 0.05
+    assert data["preferred"] == "tie"
+    assert "score" in data["image"]
+    assert "score" in data["reference"]
+
+
+@pytest.mark.anyio
+async def test_critique_composition_compare_with_returns_both(
+    mcp_client_session: ClientSession,
+) -> None:
+    """critique_composition compare_with critiques both and reports delta + preferred."""
+    res = await mcp_client_session.call_tool(
+        "critique_composition",
+        arguments={"src": SAMPLE_IMAGE_FILEPATH, "compare_with": SAMPLE_IMAGE_FILEPATH},
+    )
+    data = json.loads("\n".join(cast(TextContent, c).text for c in res.content))
+
+    assert not res.is_error
+    assert set(data.keys()) >= {"image", "reference", "delta", "preferred"}
+    assert "aesthetics" in data["image"]
+    assert "aesthetics" in data["reference"]
+    assert abs(data["delta"]) < 0.05
+    assert data["preferred"] == "tie"
+
+
+# ---------------------------------------------------------------------------
 # Unit tests for the consensus/agreement helpers.
 # These use documented fixture data directly, no model required.
 # ---------------------------------------------------------------------------
