@@ -155,3 +155,18 @@ def test_three_column_fixture_splits_twice() -> None:
     image = Image.open(TEST_DIR / "layout_three_column.png")
     splits = find_column_splits(image)
     assert len(splits) == 2
+
+
+def test_small_text_single_paragraph_is_not_split() -> None:
+    """The measured false positive: sparse small text, not a real column boundary.
+
+    An 11pt three-line paragraph on a 900px canvas: with only two of its lines
+    falling in the body (the heading-exclusion band absorbs part of the first),
+    word-gaps happened to line up closely enough across those two lines to pass
+    the gutter test, producing six spurious splits and scrambling the OCR output
+    into word fragments. This is a coincidence-of-few-lines problem, not a font
+    legibility problem -- the fix is refusing to split when there are too few
+    independent lines for the alignment to mean anything, not upscaling the image.
+    """
+    image = Image.open(TEST_DIR / "layout_small_text_paragraph.png")
+    assert find_column_splits(image) == []

@@ -96,6 +96,33 @@ def test_a_mask_overlapping_only_at_the_rim_is_shallow() -> None:
     assert shallow_result["embed_depth"] < deep_result["embed_depth"] / 3
 
 
+def test_an_occlusion_hole_is_filled_before_measuring_containment() -> None:
+    """The measured segmentation artifact: SAM2 segments a container with a bite
+    taken out of it exactly where the occluding object sits, so the two masks
+    barely overlap unless the hole is filled first."""
+    hole_here = disc(100, 100, 20)
+    container_with_bite = disc(100, 100, 60) & ~hole_here
+    occluding_object = hole_here
+
+    result = geometry.relation(occluding_object, container_with_bite)
+    assert result["a_inside_b"] == pytest.approx(1.0)
+
+
+def test_a_large_ring_hole_is_not_filled() -> None:
+    """A hole large enough to be real structure (a washer, a ring) is left alone.
+
+    Something sitting in a genuine ring's hole is not enclosed by material the
+    way an occluded object is enclosed by its container -- this is the accepted
+    limit of the occlusion-hole fix above, not a case it claims to solve.
+    """
+    outer, inner = 60, 40  # hole area / filled area = (40/60)^2 ~= 0.44, above the 0.3 floor
+    real_ring = disc(100, 100, outer) & ~disc(100, 100, inner)
+    something_in_the_hole = disc(100, 100, 20)
+
+    result = geometry.relation(something_in_the_hole, real_ring)
+    assert result["a_inside_b"] < 0.5
+
+
 def test_elongation_separates_a_bar_from_a_square() -> None:
     assert geometry.elongation(rect(10, 95, 190, 105)) > 8
     assert geometry.elongation(rect(80, 80, 120, 120)) == pytest.approx(1.0, abs=0.15)

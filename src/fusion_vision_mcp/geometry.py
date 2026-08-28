@@ -55,6 +55,52 @@ _END_BAND: Final[float] = 0.08
 #: reporting a "gap" that is really just resampling error.
 _TOUCH_TOLERANCE_PX: Final[float] = 2.0
 
+#: A hole in a mask, as a fraction of its own filled area, gets filled before any
+#: containment measurement below this floor -- above it, the hole is left alone.
+#:
+#: When one object sits on top of or inside another, SAM2 commonly segments the
+#: *background* object with a hole exactly where the foreground object occludes
+#: it (a circle sitting inside a square gets segmented as a square with a
+#: circle-shaped bite out of it) -- correct segmentation, but it makes the
+#: occluded object measure as barely overlapping its container instead of fully
+#: contained. Filling that hole before comparing recovers the intended answer.
+#:
+#: The same operation is wrong for an object that is a hole by design -- a ring,
+#: a washer, a picture frame -- where something genuinely sitting in the hole is
+#: not enclosed by material the way an occluded object is. Nothing in a mask's
+#: geometry alone can tell the two apart with certainty, so this is a judgement
+#: call, sized the same way `count_lobes`' hole-fill floor is: an occlusion notch
+#: from one moderately-sized foreground object is a minority of the container's
+#: own area, while a ring's hole is typically a large fraction of it (a washer
+#: with its hole at half the outer radius is already 25%; most practical rings
+#: run higher). 0.3 sits between the two: generous enough to recover a real
+#: occlusion hole, conservative enough that a genuine ring's hole is left as
+#: real structure rather than papered over. See `test_geometry.py` for both
+#: the occlusion case this exists to fix and the ring case it deliberately does
+#: not touch.
+_MAX_FILLED_RELATION_HOLE_FRACTION: Final[float] = 0.3
+
+
+def _fill_small_holes(mask: Mask, max_fraction: float) -> Mask:
+    """Fills holes in `mask` that are individually below `max_fraction` of its filled area.
+
+    Unlike `scipy.ndimage.binary_fill_holes`, which fills every hole regardless of
+    size, this leaves a hole alone once it is large enough to plausibly be real
+    structure rather than an occlusion notch or segmentation gap.
+    """
+    filled = binary_fill_holes(mask)
+    if filled is None or not filled.any():
+        return mask
+    holes, count = label(filled & ~mask)
+    if not count:
+        return mask
+    total = int(filled.sum())
+    areas = np.bincount(holes.ravel())[1:]
+    small = np.flatnonzero(areas < max_fraction * total) + 1
+    if not small.size:
+        return mask
+    return mask | np.isin(holes, small)
+
 
 def _principal_frame(mask: Mask) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
     """Project a mask's pixels onto its own long and short axes.
@@ -174,7 +220,16 @@ def relation(a: Mask, b: Mask) -> dict[str, Any]:
     shield's rim overlaps it shallowly, while a hand fused into the middle of the
     shield face overlaps it deeply. Depth is what separates the two cases; the
     overlap fraction alone does not.
+
+    Small holes in either mask are filled before any of this is measured -- see
+    `_fill_small_holes` -- so an object segmented with a bite taken out of it by
+    something occluding it (a container with the shape of what's inside it
+    missing from its own mask) measures as containing that thing rather than
+    barely overlapping it. A hole large enough to plausibly be real structure
+    (a ring, a frame) is left alone.
     """
+    a = _fill_small_holes(a, _MAX_FILLED_RELATION_HOLE_FRACTION)
+    b = _fill_small_holes(b, _MAX_FILLED_RELATION_HOLE_FRACTION)
     area_a, area_b = int(a.sum()), int(b.sum())
     if area_a == 0 or area_b == 0:
         return {

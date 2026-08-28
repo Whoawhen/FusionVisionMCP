@@ -1,5 +1,90 @@
 # Changelog
 
+## v0.7.1 · 2026-08-28
+
+Fixes for six of the seven gaps documented in the "Second Vision Pass" comparison
+against Claude's native vision. Each was root-caused rather than patched at the
+symptom, verified against the exact fixture that exposed it, and checked against
+this project's existing benchmark/test fixtures for regressions before shipping.
+
+### Occluded objects recovered at the *default* threshold — no manual tuning needed
+
+A ~60%-occluded rectangle went from 0 detections to the correct one, at Grounding
+DINO's existing default `threshold=0.15`. The actual bug was not threshold at all:
+`grounding_dino.py`'s group-envelope filter (built to drop a box drawn around a
+*group* of separate instances, e.g. all eight petals of a flower) was misreading the
+correct high-confidence box as an envelope around several looser, lower-confidence
+*duplicate* detections of that same partially-hidden object, and dropping the one
+real detection. Fixed by requiring a candidate envelope's "members" to have low
+mutual overlap with each other before it's dropped — real group members barely
+overlap; duplicate re-detections of one object overlap heavily (measured at IoU
+~0.8 here). Re-verified against every ring/row/grid case in `benchmarks/fixtures.py`:
+identical envelope decisions on all nine, zero regressions.
+
+### Small-text OCR scrambling — the real cause was column-detection, not legibility
+
+The small-text fixture that motivated this fix was previously misdiagnosed (in the
+"Second Vision Pass" writeup) as a Florence-2 glyph-legibility problem. It is not:
+Florence-2 reads the original, un-upscaled text correctly on its own. The actual bug
+is in `layout.py`'s automatic column-gutter detector, which misfired six spurious
+column splits on a single short paragraph — with only two real text lines landing in
+the analyzed page body, word-gaps coincidentally lined up closely enough to look like
+column boundaries. `find_column_splits` now counts independent text lines first and
+skips splitting when there are too few (2) for that alignment to mean anything,
+while every existing multi-line column fixture (5+ lines) is unaffected.
+
+### Containment recovers from an occlusion hole, without swallowing a real one
+
+`geometry.relation` now fills a hole in either mask before measuring containment —
+but only when the hole is a minority (<30%) of the mask's own area. SAM2 commonly
+segments a container object with a hole exactly where something in front of it
+occludes it (a circle sitting on a square gets segmented as a square with a
+circle-shaped bite missing), which previously measured as barely overlapping
+instead of contained. Unlike a blind fill, a hole large enough to plausibly be real
+structure — a ring, a washer, a picture frame — is left alone; both the target case
+and a ring-shaped negative control are now regression tests in `test_geometry.py`.
+
+### Clip-art counting: Florence-2 gets both measured cases exactly right
+
+`count_objects(clip_art=true)` routes counting through Florence-2's grounding head
+instead of Grounding DINO, whose training distribution is real photographs and can
+over-detect on flat vector art (measured: 6 instead of 2 trees on a clip-art scene,
+plus a spurious 4th house past the true 3). Florence-2 gets both exactly right on
+the same scene. `count_objects(threshold=...)` also now exposes Grounding DINO's
+box-confidence floor directly, for a visually cluttered scene with distractor
+shapes near the target — a manual lever (raising it can just as easily drop real
+instances on a normal scene), not an automatic fix.
+
+### Blank-canvas false detection, without breaking a genuine full-frame match
+
+Florence-2's grounding head confidently draws a box around the entire canvas when
+nothing matches the query. `Florence2.detect_objects` gained an opt-in
+`exclude_full_frame` parameter that drops any box covering >=98% of the frame —
+opt-in specifically because the same shape is also the *correct* answer when the
+object genuinely fills the frame (a close-up of wood, asked for "wood"); shipping
+this as the unconditional default would have silently broken that case. Wired into
+`count_objects(clip_art=true)`, where a false full-frame catch-all would otherwise
+inflate a count.
+
+### `query_image`'s low-confidence routing now covers "largest/smallest" questions
+
+`question.py` gained a `SIZE` category (alongside the existing spatial/count/OCR
+ones) for "which is the largest/smallest <name>" wording. When `check_consistency`
+flags a low-confidence judgment answer in that shape, the cross-check now detects
+every instance of the named object and resolves the extremum by bounding-box area,
+returning its coordinates — a measurement, not a repeated guess. Verified on a
+four-circle fixture with two size pairs: correctly resolved both the largest and
+the smallest instance by measured area.
+
+### Not fixed: occlusion thresholding as originally proposed did not work
+
+An externally-authored first attempt at these fixes proposed lowering Grounding
+DINO's box-confidence threshold from 0.15 to 0.05 for `spatial_relations`. Directly
+tested against the occlusion fixture: both the old and new threshold returned zero
+detections, identical. Lowering the threshold never reached the actual bug, because
+the drop happens in the group-envelope filter *after* threshold filtering — see
+above for the fix that actually worked, at the unchanged default threshold.
+
 ## v0.7.0 · 2026-08-27
 
 v0.6.0 surfaced four deficiencies by *flagging* them; v0.7.0 turns each flag into an

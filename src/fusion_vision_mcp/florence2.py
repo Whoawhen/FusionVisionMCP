@@ -51,9 +51,48 @@ class Florence2:
     def caption(self, images: list[Image], level: CaptionLevel = CaptionLevel.NORMAL) -> list[str]:
         return self.generate(str(level.value), images)
 
-    def detect_objects(self, images: list[Image], object_name: str) -> list[dict[str, Any]]:
+    def detect_objects(
+        self, images: list[Image], object_name: str, exclude_full_frame: bool = False
+    ) -> list[dict[str, Any]]:
+        """Locates instances of the named object, returning bounding boxes, center points and labels.
+
+        `exclude_full_frame`, off by default, drops any box covering almost the
+        entire image (>=98% of its area). Florence-2's grounding head confidently
+        returns exactly that box on a canvas with nothing matching the query
+        (a blank image asked for any noun), so this recovers the empty-result
+        answer for a caller that specifically expects to distinguish "found
+        nothing" from "found one instance". Left off by default because the same
+        shape is also the *correct* answer when the named object genuinely fills
+        the frame (a close-up photo of wood queried for "wood") -- unconditionally
+        dropping it would silently turn that legitimate detection into nothing
+        found, which is worse than the blank-canvas false positive this exists to
+        fix.
+        """
         grounded = self.generate_structured("<CAPTION_TO_PHRASE_GROUNDING>", images, text=object_name)
-        return [_with_center_points(region) for region in grounded]
+
+        results = []
+        for img, region in zip(images, grounded, strict=True):
+            bboxes = region.get("bboxes", [])
+            labels = region.get("labels", [])
+
+            if not exclude_full_frame:
+                results.append(_with_center_points({"bboxes": bboxes, "labels": labels}))
+                continue
+
+            img_area = img.width * img.height
+            filtered_bboxes = []
+            filtered_labels = []
+            for box, label in zip(bboxes, labels, strict=True):
+                x1, y1, x2, y2 = box
+                box_area = max(x2 - x1, 0) * max(y2 - y1, 0)
+                if img_area > 0 and box_area / img_area >= 0.98:
+                    continue
+                filtered_bboxes.append(box)
+                filtered_labels.append(label)
+
+            results.append(_with_center_points({"bboxes": filtered_bboxes, "labels": filtered_labels}))
+
+        return results
 
     def dense_region_caption(self, images: list[Image]) -> list[dict[str, Any]]:
         return self.generate_structured("<DENSE_REGION_CAPTION>", images)
@@ -169,8 +208,10 @@ class Florence2SP:
         return Florence2(self.model_id, self.device).caption(images, level)
 
     @subprocess
-    def detect_objects(self, images: list[Image], object_name: str) -> list[dict[str, Any]]:
-        return Florence2(self.model_id, self.device).detect_objects(images, object_name)
+    def detect_objects(
+        self, images: list[Image], object_name: str, exclude_full_frame: bool = False
+    ) -> list[dict[str, Any]]:
+        return Florence2(self.model_id, self.device).detect_objects(images, object_name, exclude_full_frame)
 
     @subprocess
     def dense_region_caption(self, images: list[Image]) -> list[dict[str, Any]]:

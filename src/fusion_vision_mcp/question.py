@@ -16,6 +16,7 @@ import re
 SPATIAL = "spatial"  # -> spatial_relations (contact/gap/containment)
 COUNT = "count"  # -> count_objects
 OCR = "ocr"  # -> ocr (verbatim transcription)
+SIZE = "size"  # -> detect_objects (largest/smallest)
 
 _COUNT_KEYWORDS = ("how many", "count the", "number of", "a total of", "total number")
 _SPATIAL_KEYWORDS = (
@@ -49,6 +50,11 @@ _OCR_KEYWORDS = (
     "read",
     "spell",
     "transcribe",
+)
+_SIZE_KEYWORDS = (
+    "largest",
+    "biggest",
+    "smallest",
 )
 
 # Words that are not object names even when capitalized at the start of a question.
@@ -115,6 +121,14 @@ _COUNT_PATTERN: re.Pattern[str] = re.compile(
     r"(?:how many|number of|count the|total number of)\s+(.+?)[\?\.]?\s*$",
     re.IGNORECASE,
 )
+_SIZE_PATTERN_1: re.Pattern[str] = re.compile(
+    r"(?:which|what)\s+(?:is the\s+|are the\s+)?(?:largest|biggest|smallest)\s+(.+?)[\?\.]?\s*$",
+    re.IGNORECASE,
+)
+_SIZE_PATTERN_2: re.Pattern[str] = re.compile(
+    r"(?:which|what)\s+(.+?)\s+(?:is the\s+|are the\s+)?(?:largest|biggest|smallest)[\?\.]?\s*$",
+    re.IGNORECASE,
+)
 
 
 def classify(question: str) -> str | None:
@@ -130,6 +144,8 @@ def classify(question: str) -> str | None:
         return SPATIAL
     if any(k in q for k in _OCR_KEYWORDS):
         return OCR
+    if any(k in q for k in _SIZE_KEYWORDS):
+        return SIZE
     return None
 
 
@@ -225,7 +241,16 @@ def names_for(category: str, question: str) -> list[str] | None:
         names = _raw_names(question)
         return names[:1] if names else None
 
+    if category == SIZE:
+        match = _SIZE_PATTERN_1.search(question) or _SIZE_PATTERN_2.search(question)
+        if match:
+            noun = _strip_quotes(_trim_count_noun(match.group(1)))
+            if noun and noun not in _STOPWORDS and noun.split()[0] not in _STOPWORDS:
+                return [noun]
+        names = _raw_names(question)
+        return names[:1] if names else None
+
     return None
 
 
-__all__ = ["COUNT", "OCR", "SPATIAL", "classify", "names_for"]
+__all__ = ["COUNT", "OCR", "SIZE", "SPATIAL", "classify", "names_for"]

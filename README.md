@@ -48,7 +48,12 @@ separability flag on an ambiguous count, a medium classification alongside an ae
 of those flags into an actionable result by combining tools already in the project, no new models: the caption
 gets an auto-corrected copy, a collapsed count gets an outline-based estimate, a low-confidence VQA answer routes
 to the measurement that actually answers the question, and the aesthetic score gains a calibrated like-with-like
-comparison mode. See [README_DETAILED.md](README_DETAILED.md) for what's verified against each case.
+comparison mode. v0.7.1 fixed six further gaps that a second head-to-head pass against Claude's native vision
+turned up (a partially-occluded object recovered at the detector's *existing* default threshold, a segmentation
+occlusion hole no longer defeats containment, a false column split on sparse small text, clip-art counting, a
+blank-canvas false detection, and a "which is largest/smallest" VQA question routed to a real measurement) — each
+root-caused against the exact fixture that exposed it, not patched at the symptom. See
+[README_DETAILED.md](README_DETAILED.md) for what's verified against each case.
 
 | Capability | How it's provided |
 |---|---|

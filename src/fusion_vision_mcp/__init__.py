@@ -9,7 +9,7 @@ import importlib.metadata
 import math
 import os
 import re
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Iterator, Sequence
 from contextlib import ExitStack, asynccontextmanager, closing, contextmanager
 from dataclasses import dataclass
 from functools import partial
@@ -29,7 +29,7 @@ from pypdfium2 import PdfDocument
 from fusion_vision_mcp import geometry, layout, question, textmatch
 from fusion_vision_mcp.aesthetic import DEFAULT_AESTHETIC_MODEL, Aesthetic
 from fusion_vision_mcp.florence2 import CaptionLevel, Florence2, Florence2SP
-from fusion_vision_mcp.grounding_dino import DEFAULT_GROUNDING_DINO_MODEL, GroundingDino
+from fusion_vision_mcp.grounding_dino import DEFAULT_BOX_THRESHOLD, DEFAULT_GROUNDING_DINO_MODEL, GroundingDino
 from fusion_vision_mcp.idle import IdleProxy, IdleReleased
 from fusion_vision_mcp.moondream import DEFAULT_MOONDREAM_MODEL, DEFAULT_MOONDREAM_REVISION, Moondream
 from fusion_vision_mcp.sam2 import DEFAULT_SAM2_MODEL, MASK_DECODE_RESOLUTION, Sam2
@@ -110,7 +110,9 @@ class Processor(Protocol):
         """
         ...
 
-    def detect_objects(self, images: list[Image], object_name: str) -> list[dict[str, Any]]:
+    def detect_objects(
+        self, images: list[Image], object_name: str, exclude_full_frame: bool = False
+    ) -> list[dict[str, Any]]:
         """Locates instances of the named object, returning bounding boxes, center points and labels."""
         ...
 
@@ -160,7 +162,9 @@ class VqaProcessor(Protocol):
 class InstanceDetector(Protocol):
     """Represents a protocol for open-vocabulary detection that tallies instances."""
 
-    def detect_objects(self, images: list[Image], object_name: str) -> list[dict[str, Any]]:
+    def detect_objects(
+        self, images: list[Image], object_name: str, threshold: float = DEFAULT_BOX_THRESHOLD
+    ) -> list[dict[str, Any]]:
         """Locates every instance of the named object, with a count and per-box scores."""
         ...
 
@@ -600,9 +604,12 @@ def server(
         if a measurable category applies and the object names parse from the
         wording, runs that tool's measurement (`spatial_relations` for a
         contact/containment question, `count_objects` for "how many", `ocr` for a
-        text-reading question) and attaches it as `cross_check`. The cross-check is
-        omitted when no measurement applies or the names can't be parsed -- it
-        never guesses.
+        text-reading question, `detect_objects` for "which is largest/smallest")
+        and attaches it as `cross_check`. The "largest/smallest" case detects every
+        instance of the named object and picks the extremum by bounding-box area,
+        returning its box -- so "which circle is biggest" resolves to coordinates,
+        not a repeated guess. The cross-check is omitted when no measurement
+        applies or the names can't be parsed -- it never guesses.
         """
         app = ctx.request_context.lifespan_context
         with get_images(src) as images:
@@ -667,6 +674,37 @@ def server(
                 )
             ),
         ] = False,
+        threshold: Annotated[
+            float,
+            Field(
+                description=(
+                    "Box confidence floor passed to Grounding DINO (default 0.15, the value "
+                    "measured against benchmarks/ to hold every negative control -- see CLAUDE.md). "
+                    "Raise it for a visually cluttered scene with distractor shapes near the target: "
+                    "on one measured case (a target star among 18 muted-color distractors) the "
+                    "default threshold counted every distractor, while 0.5 separated the true "
+                    "target (score 0.90) from all of them (scores 0.19-0.32) for an exact count. "
+                    "This is a manual lever, not automatic -- raising it blindly on a normal scene "
+                    "can just as easily drop real instances, so use it once you suspect clutter, "
+                    "not by default."
+                )
+            ),
+        ] = DEFAULT_BOX_THRESHOLD,
+        clip_art: Annotated[
+            bool,
+            Field(
+                description=(
+                    "When true, count with Florence-2's grounding head instead of Grounding DINO. "
+                    "Grounding DINO's training distribution is real photographs; on flat vector "
+                    "art and iconography it can over-detect (measured on a mixed clip-art scene: "
+                    "6 instead of 2 trees, and a spurious 4th house past the true 3). Florence-2 got "
+                    "both exactly right on the same scene. Try it when the image is clip art / flat "
+                    "vector style and the default count looks wrong; `scores` are unavailable on "
+                    "this path (Florence-2's grounding head carries no per-box confidence) and "
+                    "`group_boxes_dropped` is not applicable."
+                )
+            ),
+        ] = False,
     ) -> list[dict[str, Any]]:
         """Count how many instances of a named object an image contains.
 
@@ -712,7 +750,7 @@ def server(
         Set `consensus=true` (the default) for two extra fields that surface
         structural ambiguity instead of hiding it:
 
-        - `consensus`: `{grounding_dino_count, region_label_count, agree}` -- a second
+        - `consensus`: `{detector_count, region_label_count, agree}` -- a second
           count from Florence-2's dense region captioner (a different head), which
           tally how many region labels contain the object name. Agreement is real
           evidence; disagreement is a warning.
@@ -736,14 +774,31 @@ def server(
         """
         app = ctx.request_context.lifespan_context
         with get_images(src) as images:
-            results = app.counter.detect_objects(images, object_name)
+            if clip_art:
+                # Florence-2's grounding head, not Grounding DINO -- no per-box
+                # confidence exists on this path, and no group-envelope concept either.
+                detected = app.processor.detect_objects(images, object_name, exclude_full_frame=True)
+                results = [
+                    {
+                        "count": len(d.get("bboxes", [])),
+                        "bboxes": d.get("bboxes", []),
+                        "points": d.get("points", []),
+                        "labels": d.get("labels", []),
+                        "scores": None,
+                        "group_boxes_dropped": None,
+                        "detector": "florence2",
+                    }
+                    for d in detected
+                ]
+            else:
+                results = app.counter.detect_objects(images, object_name, threshold=threshold)
             for image, result in zip(images, results, strict=True):
                 if verify_silhouette:
                     _add_silhouette(app, image, result)
                 if consensus:
                     region_label_count = _region_label_consensus(app.processor, image, object_name)
                     result["consensus"] = {
-                        "grounding_dino_count": result.get("count"),
+                        "detector_count": result.get("count"),
                         "region_label_count": region_label_count,
                         "agree": result.get("count") == region_label_count,
                     }
@@ -1329,7 +1384,41 @@ def _vqa_cross_check(app: AppContext, image: Image, question_text: str) -> dict[
         }
     if category == question.OCR:
         return {"tool": "ocr", "text": app.processor.ocr([image])[0]}
+    if category == question.SIZE:
+        return _size_measurement(app, image, names[0], question_text)
     return None
+
+
+def _box_area(box: Sequence[float]) -> float:
+    x1, y1, x2, y2 = box
+    return max(0.0, x2 - x1) * max(0.0, y2 - y1)
+
+
+def _size_measurement(app: AppContext, image: Image, object_name: str, question_text: str) -> dict[str, Any] | None:
+    """Resolve a "which is largest/smallest <name>" judgment by comparing detected boxes.
+
+    Detects every instance of the named object and picks the extremum by bounding-box
+    area -- a measurement, not a guess. Returns None (omit the cross-check) when
+    nothing was detected, the same "never guess" rule the other categories follow.
+    """
+    detected = app.counter.detect_objects([image], object_name)[0]
+    bboxes = detected.get("bboxes") or []
+    if not bboxes:
+        return None
+
+    want_smallest = "smallest" in question_text.lower()
+    best_index = (min if want_smallest else max)(range(len(bboxes)), key=lambda i: _box_area(bboxes[i]))
+    scores = detected.get("scores")
+
+    return {
+        "tool": "detect_objects",
+        "object": object_name,
+        "extremum": "smallest" if want_smallest else "largest",
+        "box": [int(v) for v in bboxes[best_index]],
+        "area": _box_area(bboxes[best_index]),
+        "instances_compared": len(bboxes),
+        "score": scores[best_index] if scores else None,
+    }
 
 
 def _spatial_measurement(app: AppContext, image: Image, names: list[str]) -> dict[str, Any] | None:

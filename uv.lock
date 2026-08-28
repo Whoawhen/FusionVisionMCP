@@ -423,7 +423,7 @@ wheels = [
 
 [[package]]
 name = "fusion-vision-mcp"
-version = "0.7.0"
+version = "0.7.1"
 source = { editable = "." }
 dependencies = [
     { name = "dill" },

@@ -60,6 +60,29 @@ def test_a_row_of_separate_instances_has_no_envelope() -> None:
     assert envelope_indices(boxes) == set()
 
 
+def test_a_single_occluded_object_is_not_treated_as_a_group_envelope() -> None:
+    """The measured occlusion bug: duplicate re-detections of ONE object, not a group.
+
+    Exact boxes/scores measured on a rectangle ~60% hidden behind another shape,
+    queried at the default threshold=0.15: the correct tight box (score 0.66) plus
+    three looser, lower-confidence boxes describing the same object at wider
+    extents. The old containment-only test misread the tight box (and the second
+    box) as an envelope around a "group" of the looser ones and dropped both real
+    detections, taking the count to zero even though the tight box scored well
+    above threshold. What must survive is the tight box -- the correct detection --
+    not being classified as an envelope; the two loosest, most redundant boxes
+    (which mostly duplicate each other, mean pairwise IoU ~0.8) are still fair
+    game to drop.
+    """
+    tight = [148.6, 148.3, 398.6, 351.6]  # score 0.66, the correct box
+    loose_a = [319.1, 98.4, 581.8, 360.9]  # score 0.33
+    loose_b = [148.7, 98.9, 582.2, 359.7]  # score 0.27
+    loose_c = [148.3, 144.9, 579.4, 356.6]  # score 0.19
+
+    envelopes = envelope_indices([tight, loose_a, loose_b, loose_c])
+    assert 0 not in envelopes
+
+
 def test_prompts_are_lowercased_and_period_terminated() -> None:
     """Grounding DINO expects this exact shape; a bare noun silently matches worse."""
     assert as_prompt("Petal") == "petal."

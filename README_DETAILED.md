@@ -126,6 +126,14 @@ Process an image file or URL using OCR to extract text.
 > real gutter doesn't defeat this, and a page's own title/heading can't mask a gutter that starts below it. A
 > table's column gaps don't trigger a false split — see `src/fusion_vision_mcp/layout.py` and `CLAUDE.md` for
 > the measured case that motivated this and the negative controls it holds.
+>
+> **v0.7.1: a short paragraph of small text no longer gets false column splits.** A dense, small-font single
+> paragraph was previously scrambled into word fragments — not a legibility problem (Florence-2 reads the
+> original text correctly on its own), but a column-detector false positive: with only two real text lines
+> landing in the analyzed page body, word-gaps coincidentally lined up closely enough to look like column
+> boundaries, producing six spurious splits. `find_column_splits` now counts independent text lines first and
+> skips splitting when there are too few (fewer than three) for that kind of alignment to mean anything real —
+> every existing multi-column fixture (five or more lines) clears this floor easily and is unaffected.
 
 #### Arguments:
 
@@ -223,6 +231,17 @@ estimate of how many parts it contains.
 - **vqa_estimate**: When `true` and the detector has collapsed overlapping instances (`separable == "no"`), also
   ask Moondream2 "how many `object_name`?" and attach its answer as `estimates.vqa` — a judgment estimate,
   clearly marked, not a tally. Defaults to `false` so a session that never asks keeps Moondream unloaded.
+- **threshold**: Grounding DINO's box-confidence floor. Defaults to `0.15` (see [Why this
+  backend](#why-this-backend) below). A manual lever for a visually cluttered scene with distractor shapes near
+  the target — measured on a scene with a target star among 18 muted-color distractors, `0.5` separated the true
+  target (score 0.90) from every distractor (0.19–0.32) for an exact count. Raising it is not automatic or safe
+  by default: on an ordinary scene it can just as easily drop real instances, so reach for it once clutter is
+  suspected, not as a first move.
+- **clip_art**: When `true`, counts with Florence-2's grounding head instead of Grounding DINO. Grounding DINO's
+  training distribution is real photographs, and it can over-detect on flat vector art/iconography — measured on
+  a mixed clip-art scene, 6 instead of 2 trees and a spurious 4th house past the true 3. Florence-2 got both
+  exactly right on the same scene. `scores` are unavailable on this path (Florence-2's grounding head carries no
+  per-box confidence) and `group_boxes_dropped` does not apply.
 
 #### Returns:
 
@@ -236,7 +255,7 @@ box that was segmented and the full `count_lobes` measurement of it.
 overrides the other: `count: 1` beside `silhouette.lobes: 8` means the detector could not separate the instances
 while the outline shows eight cores.
 
-**`consensus=true` adds `consensus: {grounding_dino_count, region_label_count, agree}` and `separable`.**
+**`consensus=true` adds `consensus: {detector_count, region_label_count, agree}` and `separable`.**
 `separable` reads `count` alongside the silhouette's two independent lobe estimators —
 `by_distance` (a distance-transform sweep) and `by_radial` (a rosette-specific angular harmonic) — rather than
 either alone: `"yes"` when the count is corroborated (`count > 1`, or a singleton both estimators agree is one
@@ -374,6 +393,13 @@ Ask a free-form question about an image (visual question answering). Backed by M
 > and gets no `cross_check` at all. Known limit: the spatial pattern matches "does/is X touch Y" phrasing but
 > not "are X and Y touching" — that case falls through to `None` (omitted) rather than misrouting, but it does
 > mean some natural phrasings of a two-object question currently get no cross-check.
+>
+> **v0.7.1: a `size` category resolves "which is largest/smallest" to coordinates.** "which circle is the
+> biggest" (or "smallest") now classifies to `size`, detects every instance of the named object, and picks the
+> extremum by bounding-box area — a measurement, not a repeated judgment call. `cross_check` becomes
+> `{tool: "detect_objects", object, extremum, box, area, instances_compared, score}`. Verified on a four-circle
+> fixture with two deliberately different-sized pairs: correctly resolved the largest and the smallest instance
+> by measured area in both directions.
 
 #### Arguments:
 
@@ -459,6 +485,27 @@ is the right tool for a tally of one name instead.
 `straightness` reliably separates a straight rod from a curved one, but it does not distinguish a naturally
 curved object from an unnaturally bent one — on two branch-like staffs it scored 0.057 and 0.065, too close to
 threshold on. Treat it as a shape description, not a defect detector.
+
+**v0.7.1: a partially-occluded object is now found at the detector's default threshold.** A rectangle ~60%
+hidden behind another shape previously came back with zero detections even though the correct box scored 0.66,
+well above the 0.15 default. The cause was not threshold — lowering it never reached the actual bug, which is
+in Grounding DINO's group-envelope filter (built to drop a box drawn around a *group* of separate instances,
+e.g. all eight petals of a flower). It was misreading the correct high-confidence box as an envelope around
+several looser, lower-confidence *duplicate* detections of that same object, and dropping the one real
+detection. Fixed in `grounding_dino.py` by requiring a candidate envelope's members to have low mutual overlap
+with each other before it's dropped — real group members barely overlap; duplicate re-detections of one object
+overlap heavily (measured at IoU ~0.8 here). Re-verified against every ring/row/grid case in
+`benchmarks/fixtures.py`: identical envelope decisions on all nine, no regressions.
+
+**v0.7.1: containment recovers from a segmentation occlusion hole, without swallowing a real one.**
+`geometry.relation` fills a hole in either mask before measuring containment, but only when it's a minority
+(<30%) of that mask's own area. SAM2 commonly segments a container with a hole exactly where something in
+front of it occludes it (a circle sitting on a square segments as a square with a circle-shaped bite missing),
+which previously measured as barely overlapping instead of contained. A hole large enough to plausibly be real
+structure — a ring, a washer — is deliberately left alone; something genuinely sitting in a real ring's hole is
+not enclosed by material the way an occluded object is, and there is no way to tell the two apart from mask
+geometry alone once the hole gets large. Both the target case and a ring-shaped negative control are regression
+tests in `test_geometry.py`.
 
 ### score_aesthetics ➕
 

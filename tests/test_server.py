@@ -357,7 +357,7 @@ async def test_count_objects_adds_consensus_and_separability(mcp_client_session:
     assert not res.is_error
     assert "consensus" in counted
     assert "separable" in counted
-    assert counted["consensus"]["grounding_dino_count"] == counted["count"]
+    assert counted["consensus"]["detector_count"] == counted["count"]
     assert isinstance(counted["consensus"]["region_label_count"], int)
     assert isinstance(counted["consensus"]["agree"], bool)
 

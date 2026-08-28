@@ -62,6 +62,48 @@ _TOP_BAND_FRAC: Final[float] = 0.15
 #: ordinary page margins are not column boundaries.
 _EDGE_MARGIN_FRAC: Final[float] = 0.1
 
+#: A row counts as a text line (rather than inter-line gap or noise) when its ink
+#: density is above this fraction of the image width.
+_LINE_ROW_DENSITY_FRAC: Final[float] = 0.005
+
+#: Splitting is skipped when the body has more than one text line but fewer than
+#: this many. A single short paragraph of small text can have word-gaps that,
+#: by chance, line up across its few lines closely enough to pass the gutter
+#: test above -- measured on an 11pt three-line paragraph, whose two lines
+#: falling within the body (the heading-exclusion band above absorbs part of
+#: the first) produced six spurious splits, none of them real column
+#: boundaries. With three or more independent lines, the same coincidence
+#: becomes implausible -- every real multi-line fixture this module is tested
+#: against (five and seven-line forms) clears this floor easily. A single
+#: contiguous ink region (no internal line gaps at all, `_count_line_bands`
+#: returns 1) is exempt: there is only one line, so there is nothing for word
+#: gaps to coincidentally align across, and this is also what every
+#: single-block synthetic test in `test_layout.py` looks like.
+_MIN_LINES_FOR_SPLIT: Final[int] = 3
+
+
+def _count_line_bands(body: NDArray[np.uint8]) -> int:
+    """Counts contiguous ink-bearing row runs (text lines) in a page body.
+
+    A thin ruled divider running down a real gutter contributes at most a
+    couple of ink pixels to any row it crosses, which stays under the density
+    floor here -- a fully blank inter-line row does not gain a false line
+    just because a rule line passes through it.
+    """
+    ink = body < _INK_THRESHOLD
+    density = ink.sum(axis=1)
+    has_text = density > max(1, int(_LINE_ROW_DENSITY_FRAC * body.shape[1]))
+
+    bands = 0
+    in_band = False
+    for row_has_text in has_text:
+        if row_has_text and not in_band:
+            bands += 1
+            in_band = True
+        elif not row_has_text:
+            in_band = False
+    return bands
+
 
 def _close_thin_ink(is_gap: NDArray[np.bool_]) -> NDArray[np.bool_]:
     """Bridges thin ink runs (e.g. a ruled divider line) flanked by gutter on both sides."""
@@ -96,6 +138,10 @@ def find_column_splits(image: Image) -> list[int]:
     arr = np.asarray(image.convert("L"))
     height, width = arr.shape
     body = arr[int(height * _TOP_BAND_FRAC) :, :]
+
+    line_bands = _count_line_bands(body)
+    if 1 < line_bands < _MIN_LINES_FOR_SPLIT:
+        return []
 
     ink = body < _INK_THRESHOLD
     density = ink.sum(axis=0)
