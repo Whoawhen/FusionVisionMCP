@@ -1,0 +1,4645 @@
+[
+  {
+    "name": "coco_dog_1_000000017029",
+    "file_name": "000000017029.jpg",
+    "image_id": 17029,
+    "width": 640,
+    "height": 640,
+    "primary_category": "dog",
+    "count": 1,
+    "tier": "low",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000017029.jpg",
+    "flickr_url": "http://farm8.staticflickr.com/7304/8746020648_f1e2075b86_z.jpg",
+    "all_categories": [
+      "dog",
+      "car",
+      "frisbee"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          154.84,
+          105.81,
+          250.32,
+          436.13
+        ],
+        "norm_xyxy": [
+          0.2419375,
+          0.165328125,
+          0.6330625,
+          0.84678125
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.165328125,
+          0.2419375,
+          0.84678125,
+          0.6330625
+        ],
+        "area": 40990.855599999995
+      }
+    ]
+  },
+  {
+    "name": "coco_cat_1_000000134882",
+    "file_name": "000000134882.jpg",
+    "image_id": 134882,
+    "width": 640,
+    "height": 639,
+    "primary_category": "cat",
+    "count": 1,
+    "tier": "low",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000134882.jpg",
+    "flickr_url": "http://farm9.staticflickr.com/8249/8643440732_42cbe68c0f_z.jpg",
+    "all_categories": [
+      "cat",
+      "bed",
+      "laptop",
+      "book",
+      "teddy bear"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          272.61,
+          328.52,
+          151.71,
+          64.61
+        ],
+        "norm_xyxy": [
+          0.42595312500000004,
+          0.5141158059467918,
+          0.663,
+          0.615226917057903
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.5141158059467918,
+          0.42595312500000004,
+          0.615226917057903,
+          0.663
+        ],
+        "area": 7454.70715
+      }
+    ]
+  },
+  {
+    "name": "coco_bicycle_1_000000374545",
+    "file_name": "000000374545.jpg",
+    "image_id": 374545,
+    "width": 549,
+    "height": 640,
+    "primary_category": "bicycle",
+    "count": 1,
+    "tier": "low",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000374545.jpg",
+    "flickr_url": "http://farm1.staticflickr.com/184/451764136_e652115475_z.jpg",
+    "all_categories": [
+      "person",
+      "bicycle",
+      "kite"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          471.42,
+          590.92,
+          34.87,
+          32.18
+        ],
+        "norm_xyxy": [
+          0.858688524590164,
+          0.9233125,
+          0.9222040072859745,
+          0.9735937499999998
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.9233125,
+          0.858688524590164,
+          0.9735937499999998,
+          0.9222040072859745
+        ],
+        "area": 297.0013000000009
+      }
+    ]
+  },
+  {
+    "name": "coco_airplane_1_000000134886",
+    "file_name": "000000134886.jpg",
+    "image_id": 134886,
+    "width": 640,
+    "height": 480,
+    "primary_category": "airplane",
+    "count": 1,
+    "tier": "low",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000134886.jpg",
+    "flickr_url": "http://farm5.staticflickr.com/4128/5048434632_d18999fce8_z.jpg",
+    "all_categories": [
+      "car",
+      "airplane",
+      "person"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          139.86,
+          182.65,
+          228.08,
+          68.46
+        ],
+        "norm_xyxy": [
+          0.21853125,
+          0.38052083333333336,
+          0.5749062500000001,
+          0.5231458333333333
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.38052083333333336,
+          0.21853125,
+          0.5231458333333333,
+          0.5749062500000001
+        ],
+        "area": 7300.216799999999
+      }
+    ]
+  },
+  {
+    "name": "coco_bus_1_000000303818",
+    "file_name": "000000303818.jpg",
+    "image_id": 303818,
+    "width": 480,
+    "height": 640,
+    "primary_category": "bus",
+    "count": 1,
+    "tier": "low",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000303818.jpg",
+    "flickr_url": "http://farm8.staticflickr.com/7296/9604033757_c21f78484e_z.jpg",
+    "all_categories": [
+      "bus",
+      "backpack",
+      "car",
+      "person",
+      "handbag"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          312.83,
+          66.01,
+          167.17,
+          245.38
+        ],
+        "norm_xyxy": [
+          0.6517291666666666,
+          0.10314062500000001,
+          1.0,
+          0.486546875
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.10314062500000001,
+          0.6517291666666666,
+          0.486546875,
+          1.0
+        ],
+        "area": 30754.692199999998
+      }
+    ]
+  },
+  {
+    "name": "coco_horse_1_000000045070",
+    "file_name": "000000045070.jpg",
+    "image_id": 45070,
+    "width": 640,
+    "height": 596,
+    "primary_category": "horse",
+    "count": 1,
+    "tier": "low",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000045070.jpg",
+    "flickr_url": "http://farm4.staticflickr.com/3819/9272204163_a30ebf1d58_z.jpg",
+    "all_categories": [
+      "horse",
+      "person"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          0.0,
+          437.87,
+          640.0,
+          151.87
+        ],
+        "norm_xyxy": [
+          0.0,
+          0.7346812080536913,
+          1.0,
+          0.989496644295302
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.7346812080536913,
+          0.0,
+          0.989496644295302,
+          1.0
+        ],
+        "area": 81167.28890000001
+      }
+    ]
+  },
+  {
+    "name": "coco_pizza_1_000000232489",
+    "file_name": "000000232489.jpg",
+    "image_id": 232489,
+    "width": 640,
+    "height": 640,
+    "primary_category": "pizza",
+    "count": 1,
+    "tier": "low",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000232489.jpg",
+    "flickr_url": "http://farm8.staticflickr.com/7239/7163918053_22e5ab1e70_z.jpg",
+    "all_categories": [
+      "pizza"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          0.0,
+          37.49,
+          627.06,
+          581.03
+        ],
+        "norm_xyxy": [
+          0.0,
+          0.058578125,
+          0.9797812499999999,
+          0.9664375
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.058578125,
+          0.0,
+          0.9664375,
+          0.9797812499999999
+        ],
+        "area": 197853.99229999995
+      }
+    ]
+  },
+  {
+    "name": "coco_bear_1_000000000285",
+    "file_name": "000000000285.jpg",
+    "image_id": 285,
+    "width": 586,
+    "height": 640,
+    "primary_category": "bear",
+    "count": 1,
+    "tier": "low",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000000285.jpg",
+    "flickr_url": "http://farm8.staticflickr.com/7434/9138147604_c6225224b8_z.jpg",
+    "all_categories": [
+      "bear"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          1.43,
+          68.81,
+          584.57,
+          563.94
+        ],
+        "norm_xyxy": [
+          0.002440273037542662,
+          0.107515625,
+          1.0,
+          0.988671875
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.107515625,
+          0.002440273037542662,
+          0.988671875,
+          1.0
+        ],
+        "area": 275709.8110500001
+      }
+    ]
+  },
+  {
+    "name": "coco_couch_1_000000509824",
+    "file_name": "000000509824.jpg",
+    "image_id": 509824,
+    "width": 640,
+    "height": 640,
+    "primary_category": "couch",
+    "count": 1,
+    "tier": "low",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000509824.jpg",
+    "flickr_url": "http://farm9.staticflickr.com/8321/7918999676_9a3971bdcf_z.jpg",
+    "all_categories": [
+      "couch",
+      "bowl",
+      "vase",
+      "book"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          16.45,
+          292.04,
+          605.73,
+          238.46
+        ],
+        "norm_xyxy": [
+          0.025703125,
+          0.4563125,
+          0.97215625,
+          0.82890625
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.4563125,
+          0.025703125,
+          0.82890625,
+          0.97215625
+        ],
+        "area": 132025.17404999997
+      }
+    ]
+  },
+  {
+    "name": "coco_laptop_2_000000363840",
+    "file_name": "000000363840.jpg",
+    "image_id": 363840,
+    "width": 640,
+    "height": 480,
+    "primary_category": "laptop",
+    "count": 2,
+    "tier": "low",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000363840.jpg",
+    "flickr_url": "http://farm3.staticflickr.com/2797/4256603007_6fbbea22de_z.jpg",
+    "all_categories": [
+      "tv",
+      "chair",
+      "laptop",
+      "mouse",
+      "keyboard",
+      "handbag",
+      "bottle",
+      "person"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          274.59,
+          84.86,
+          244.33,
+          269.19
+        ],
+        "norm_xyxy": [
+          0.42904687499999994,
+          0.17679166666666665,
+          0.8108124999999999,
+          0.7376041666666667
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.17679166666666665,
+          0.42904687499999994,
+          0.7376041666666667,
+          0.8108124999999999
+        ],
+        "area": 46198.553550000004
+      },
+      {
+        "pixel_xywh": [
+          0.0,
+          91.69,
+          195.24,
+          216.8
+        ],
+        "norm_xyxy": [
+          0.0,
+          0.19102083333333333,
+          0.3050625,
+          0.6426875
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.19102083333333333,
+          0.0,
+          0.6426875,
+          0.3050625
+        ],
+        "area": 24160.345999999998
+      }
+    ]
+  },
+  {
+    "name": "coco_zebra_4_000000218424",
+    "file_name": "000000218424.jpg",
+    "image_id": 218424,
+    "width": 640,
+    "height": 480,
+    "primary_category": "zebra",
+    "count": 4,
+    "tier": "med",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000218424.jpg",
+    "flickr_url": "http://farm4.staticflickr.com/3058/5699138741_9ed119dea1_z.jpg",
+    "all_categories": [
+      "zebra"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          95.15,
+          138.05,
+          219.36,
+          280.62
+        ],
+        "norm_xyxy": [
+          0.148671875,
+          0.2876041666666667,
+          0.491421875,
+          0.8722291666666667
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.2876041666666667,
+          0.148671875,
+          0.8722291666666667,
+          0.491421875
+        ],
+        "area": 29045.55245000001
+      },
+      {
+        "pixel_xywh": [
+          232.96,
+          122.17,
+          201.53,
+          264.38
+        ],
+        "norm_xyxy": [
+          0.364,
+          0.25452083333333336,
+          0.678890625,
+          0.8053125
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.25452083333333336,
+          0.364,
+          0.8053125,
+          0.678890625
+        ],
+        "area": 18974.36899999999
+      },
+      {
+        "pixel_xywh": [
+          399.81,
+          78.5,
+          133.35,
+          319.67
+        ],
+        "norm_xyxy": [
+          0.624703125,
+          0.16354166666666667,
+          0.8330624999999999,
+          0.8295208333333334
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.16354166666666667,
+          0.624703125,
+          0.8295208333333334,
+          0.8330624999999999
+        ],
+        "area": 23794.596899999997
+      },
+      {
+        "pixel_xywh": [
+          75.33,
+          85.84,
+          167.16,
+          292.79
+        ],
+        "norm_xyxy": [
+          0.11770312499999999,
+          0.17883333333333334,
+          0.37889062500000004,
+          0.7888125
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.17883333333333334,
+          0.11770312499999999,
+          0.7888125,
+          0.37889062500000004
+        ],
+        "area": 6003.0657999999985
+      }
+    ]
+  },
+  {
+    "name": "coco_sheep_4_000000094871",
+    "file_name": "000000094871.jpg",
+    "image_id": 94871,
+    "width": 480,
+    "height": 640,
+    "primary_category": "sheep",
+    "count": 4,
+    "tier": "med",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000094871.jpg",
+    "flickr_url": "http://farm9.staticflickr.com/8503/8282824777_4495950c61_z.jpg",
+    "all_categories": [
+      "sheep",
+      "person",
+      "handbag"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          285.45,
+          123.15,
+          96.46,
+          240.24
+        ],
+        "norm_xyxy": [
+          0.5946874999999999,
+          0.19242187500000002,
+          0.7956458333333333,
+          0.567796875
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.19242187500000002,
+          0.5946874999999999,
+          0.567796875,
+          0.7956458333333333
+        ],
+        "area": 12518.329699999997
+      },
+      {
+        "pixel_xywh": [
+          41.58,
+          130.21,
+          182.66,
+          252.8
+        ],
+        "norm_xyxy": [
+          0.086625,
+          0.203453125,
+          0.4671666666666667,
+          0.598453125
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.203453125,
+          0.086625,
+          0.598453125,
+          0.4671666666666667
+        ],
+        "area": 21773.33945
+      },
+      {
+        "pixel_xywh": [
+          97.8,
+          411.42,
+          378.24,
+          218.61
+        ],
+        "norm_xyxy": [
+          0.20375,
+          0.64284375,
+          0.99175,
+          0.984421875
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.64284375,
+          0.20375,
+          0.984421875,
+          0.99175
+        ],
+        "area": 63983.55529999999
+      },
+      {
+        "pixel_xywh": [
+          244.3,
+          209.3,
+          106.66,
+          122.37
+        ],
+        "norm_xyxy": [
+          0.5089583333333334,
+          0.32703125,
+          0.7311666666666667,
+          0.518234375
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.32703125,
+          0.5089583333333334,
+          0.518234375,
+          0.7311666666666667
+        ],
+        "area": 2918.738499999999
+      }
+    ]
+  },
+  {
+    "name": "coco_car_4_000000577932",
+    "file_name": "000000577932.jpg",
+    "image_id": 577932,
+    "width": 640,
+    "height": 543,
+    "primary_category": "car",
+    "count": 4,
+    "tier": "med",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000577932.jpg",
+    "flickr_url": "http://farm5.staticflickr.com/4019/5159956078_f820c56d6f_z.jpg",
+    "all_categories": [
+      "bicycle",
+      "car",
+      "person",
+      "traffic light",
+      "backpack",
+      "umbrella",
+      "handbag"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          495.12,
+          245.3,
+          144.8,
+          290.77
+        ],
+        "norm_xyxy": [
+          0.773625,
+          0.4517495395948435,
+          0.9998750000000001,
+          0.9872375690607733
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.4517495395948435,
+          0.773625,
+          0.9872375690607733,
+          0.9998750000000001
+        ],
+        "area": 28713.983750000007
+      },
+      {
+        "pixel_xywh": [
+          183.24,
+          227.4,
+          84.67,
+          55.07
+        ],
+        "norm_xyxy": [
+          0.2863125,
+          0.41878453038674035,
+          0.41860937500000006,
+          0.5202025782688766
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.41878453038674035,
+          0.2863125,
+          0.5202025782688766,
+          0.41860937500000006
+        ],
+        "area": 3475.7753999999995
+      },
+      {
+        "pixel_xywh": [
+          34.4,
+          221.68,
+          67.46,
+          48.71
+        ],
+        "norm_xyxy": [
+          0.05375,
+          0.40825046040515656,
+          0.15915624999999997,
+          0.49795580110497234
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.40825046040515656,
+          0.05375,
+          0.49795580110497234,
+          0.15915624999999997
+        ],
+        "area": 2530.4082000000003
+      },
+      {
+        "pixel_xywh": [
+          0.82,
+          197.69,
+          12.19,
+          14.5
+        ],
+        "norm_xyxy": [
+          0.0012812499999999998,
+          0.3640699815837937,
+          0.020328125,
+          0.3907734806629834
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.3640699815837937,
+          0.0012812499999999998,
+          0.3907734806629834,
+          0.020328125
+        ],
+        "area": 134.98870000000002
+      }
+    ]
+  },
+  {
+    "name": "coco_bird_3_000000456496",
+    "file_name": "000000456496.jpg",
+    "image_id": 456496,
+    "width": 640,
+    "height": 426,
+    "primary_category": "bird",
+    "count": 3,
+    "tier": "med",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000456496.jpg",
+    "flickr_url": "http://farm4.staticflickr.com/3810/10095484263_8ff0024f65_z.jpg",
+    "all_categories": [
+      "bird",
+      "person",
+      "handbag"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          403.82,
+          332.04,
+          34.73,
+          66.56
+        ],
+        "norm_xyxy": [
+          0.63096875,
+          0.7794366197183099,
+          0.6852343750000001,
+          0.935680751173709
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.7794366197183099,
+          0.63096875,
+          0.935680751173709,
+          0.6852343750000001
+        ],
+        "area": 1474.2136500000006
+      },
+      {
+        "pixel_xywh": [
+          128.68,
+          289.09,
+          52.21,
+          54.95
+        ],
+        "norm_xyxy": [
+          0.2010625,
+          0.6786150234741783,
+          0.28264062500000003,
+          0.8076056338028168
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.6786150234741783,
+          0.2010625,
+          0.8076056338028168,
+          0.28264062500000003
+        ],
+        "area": 1245.0494499999998
+      },
+      {
+        "pixel_xywh": [
+          17.84,
+          291.74,
+          76.01,
+          45.99
+        ],
+        "norm_xyxy": [
+          0.027875,
+          0.6848356807511737,
+          0.14664062500000002,
+          0.792793427230047
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.6848356807511737,
+          0.027875,
+          0.792793427230047,
+          0.14664062500000002
+        ],
+        "area": 1539.8438500000004
+      }
+    ]
+  },
+  {
+    "name": "coco_bottle_3_000000008021",
+    "file_name": "000000008021.jpg",
+    "image_id": 8021,
+    "width": 640,
+    "height": 480,
+    "primary_category": "bottle",
+    "count": 3,
+    "tier": "med",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000008021.jpg",
+    "flickr_url": "http://farm7.staticflickr.com/6117/6240308255_77782d0723_z.jpg",
+    "all_categories": [
+      "tie",
+      "person",
+      "bottle"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          443.84,
+          367.93,
+          7.96,
+          18.12
+        ],
+        "norm_xyxy": [
+          0.6935,
+          0.7665208333333333,
+          0.7059374999999999,
+          0.8042708333333334
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.7665208333333333,
+          0.6935,
+          0.8042708333333334,
+          0.7059374999999999
+        ],
+        "area": 109.60645000000012
+      },
+      {
+        "pixel_xywh": [
+          436.56,
+          368.91,
+          7.95,
+          16.84
+        ],
+        "norm_xyxy": [
+          0.682125,
+          0.7685625,
+          0.694546875,
+          0.8036458333333333
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.7685625,
+          0.682125,
+          0.8036458333333333,
+          0.694546875
+        ],
+        "area": 110.08194999999998
+      },
+      {
+        "pixel_xywh": [
+          431.83,
+          369.24,
+          5.55,
+          16.89
+        ],
+        "norm_xyxy": [
+          0.674734375,
+          0.76925,
+          0.68340625,
+          0.8044375
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.76925,
+          0.674734375,
+          0.8044375,
+          0.68340625
+        ],
+        "area": 73.13090000000025
+      }
+    ]
+  },
+  {
+    "name": "coco_chair_3_000000054605",
+    "file_name": "000000054605.jpg",
+    "image_id": 54605,
+    "width": 612,
+    "height": 612,
+    "primary_category": "chair",
+    "count": 3,
+    "tier": "med",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000054605.jpg",
+    "flickr_url": "http://farm9.staticflickr.com/8396/8645114496_3c5bd1615f_z.jpg",
+    "all_categories": [
+      "dining table",
+      "fork",
+      "cake",
+      "cup",
+      "chair",
+      "person"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          480.63,
+          13.39,
+          95.63,
+          200.37
+        ],
+        "norm_xyxy": [
+          0.7853431372549019,
+          0.021879084967320262,
+          0.9416013071895425,
+          0.349281045751634
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.021879084967320262,
+          0.7853431372549019,
+          0.349281045751634,
+          0.9416013071895425
+        ],
+        "area": 7376.1662
+      },
+      {
+        "pixel_xywh": [
+          286.87,
+          99.18,
+          99.71,
+          113.65
+        ],
+        "norm_xyxy": [
+          0.46874183006535947,
+          0.16205882352941178,
+          0.6316666666666666,
+          0.34776143790849673
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.16205882352941178,
+          0.46874183006535947,
+          0.34776143790849673,
+          0.6316666666666666
+        ],
+        "area": 7706.5738
+      },
+      {
+        "pixel_xywh": [
+          419.06,
+          1.27,
+          49.15,
+          88.63
+        ],
+        "norm_xyxy": [
+          0.6847385620915033,
+          0.0020751633986928106,
+          0.7650490196078431,
+          0.14689542483660128
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.0020751633986928106,
+          0.6847385620915033,
+          0.14689542483660128,
+          0.7650490196078431
+        ],
+        "area": 2071.5535
+      }
+    ]
+  },
+  {
+    "name": "coco_surfboard_3_000000043435",
+    "file_name": "000000043435.jpg",
+    "image_id": 43435,
+    "width": 638,
+    "height": 640,
+    "primary_category": "surfboard",
+    "count": 3,
+    "tier": "med",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000043435.jpg",
+    "flickr_url": "http://farm4.staticflickr.com/3705/9683286086_a3e09af27b_z.jpg",
+    "all_categories": [
+      "person",
+      "surfboard"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          167.5,
+          466.67,
+          40.15,
+          15.69
+        ],
+        "norm_xyxy": [
+          0.26253918495297807,
+          0.729171875,
+          0.3254702194357367,
+          0.7536875000000001
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.729171875,
+          0.26253918495297807,
+          0.7536875000000001,
+          0.3254702194357367
+        ],
+        "area": 271.83835000000005
+      },
+      {
+        "pixel_xywh": [
+          105.35,
+          477.37,
+          95.46,
+          37.55
+        ],
+        "norm_xyxy": [
+          0.16512539184952976,
+          0.745890625,
+          0.31474921630094044,
+          0.8045625
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.745890625,
+          0.16512539184952976,
+          0.8045625,
+          0.31474921630094044
+        ],
+        "area": 1151.207500000003
+      },
+      {
+        "pixel_xywh": [
+          442.54,
+          236.77,
+          66.47,
+          40.24
+        ],
+        "norm_xyxy": [
+          0.6936363636363637,
+          0.369953125,
+          0.79782131661442,
+          0.432828125
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.369953125,
+          0.6936363636363637,
+          0.432828125,
+          0.79782131661442
+        ],
+        "area": 837.0227499999991
+      }
+    ]
+  },
+  {
+    "name": "coco_person_3_000000461751",
+    "file_name": "000000461751.jpg",
+    "image_id": 461751,
+    "width": 640,
+    "height": 569,
+    "primary_category": "person",
+    "count": 3,
+    "tier": "med",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000461751.jpg",
+    "flickr_url": "http://farm6.staticflickr.com/5035/7145171189_ac4034c5f3_z.jpg",
+    "all_categories": [
+      "car",
+      "motorcycle",
+      "person",
+      "backpack"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          47.97,
+          112.06,
+          291.83,
+          365.12
+        ],
+        "norm_xyxy": [
+          0.074953125,
+          0.19694200351493849,
+          0.5309375,
+          0.8386291739894552
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.19694200351493849,
+          0.074953125,
+          0.8386291739894552,
+          0.5309375
+        ],
+        "area": 49906.3325
+      },
+      {
+        "pixel_xywh": [
+          268.52,
+          94.62,
+          207.14,
+          124.03
+        ],
+        "norm_xyxy": [
+          0.41956249999999995,
+          0.16629173989455184,
+          0.7432187499999999,
+          0.3842706502636204
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.16629173989455184,
+          0.41956249999999995,
+          0.3842706502636204,
+          0.7432187499999999
+        ],
+        "area": 12840.769599999998
+      },
+      {
+        "pixel_xywh": [
+          464.34,
+          120.29,
+          175.66,
+          448.71
+        ],
+        "norm_xyxy": [
+          0.72553125,
+          0.2114059753954306,
+          1.0,
+          1.0
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.2114059753954306,
+          0.72553125,
+          1.0,
+          1.0
+        ],
+        "area": 48168.33635000002
+      }
+    ]
+  },
+  {
+    "name": "coco_orange_4_000000276434",
+    "file_name": "000000276434.jpg",
+    "image_id": 276434,
+    "width": 640,
+    "height": 427,
+    "primary_category": "orange",
+    "count": 4,
+    "tier": "med",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000276434.jpg",
+    "flickr_url": "http://farm4.staticflickr.com/3554/3431913937_84630a1cdf_z.jpg",
+    "all_categories": [
+      "dining table",
+      "knife",
+      "person",
+      "orange",
+      "cake"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          244.08,
+          284.05,
+          103.27,
+          41.02
+        ],
+        "norm_xyxy": [
+          0.381375,
+          0.6652224824355972,
+          0.542734375,
+          0.761288056206089
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.6652224824355972,
+          0.381375,
+          0.761288056206089,
+          0.542734375
+        ],
+        "area": 2569.0289500000003
+      },
+      {
+        "pixel_xywh": [
+          180.63,
+          150.42,
+          98.94,
+          22.78
+        ],
+        "norm_xyxy": [
+          0.282234375,
+          0.352271662763466,
+          0.436828125,
+          0.4056206088992974
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.352271662763466,
+          0.282234375,
+          0.4056206088992974,
+          0.436828125
+        ],
+        "area": 1355.9198999999996
+      },
+      {
+        "pixel_xywh": [
+          180.45,
+          116.91,
+          40.47,
+          13.66
+        ],
+        "norm_xyxy": [
+          0.28195312499999997,
+          0.27379391100702577,
+          0.3451875,
+          0.3057845433255269
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.27379391100702577,
+          0.28195312499999997,
+          0.3057845433255269,
+          0.3451875
+        ],
+        "area": 199.30984999999993
+      },
+      {
+        "pixel_xywh": [
+          333.33,
+          257.46,
+          21.07,
+          25.5
+        ],
+        "norm_xyxy": [
+          0.520828125,
+          0.602950819672131,
+          0.55375,
+          0.6626697892271662
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.602950819672131,
+          0.520828125,
+          0.6626697892271662,
+          0.55375
+        ],
+        "area": 292.03814999999975
+      }
+    ]
+  },
+  {
+    "name": "coco_boat_5_000000511599",
+    "file_name": "000000511599.jpg",
+    "image_id": 511599,
+    "width": 640,
+    "height": 480,
+    "primary_category": "boat",
+    "count": 5,
+    "tier": "med",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000511599.jpg",
+    "flickr_url": "http://farm5.staticflickr.com/4127/5057922539_44be49d73a_z.jpg",
+    "all_categories": [
+      "boat",
+      "person",
+      "truck",
+      "backpack",
+      "handbag",
+      "suitcase"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          40.99,
+          240.54,
+          519.91,
+          37.75
+        ],
+        "norm_xyxy": [
+          0.064046875,
+          0.5011249999999999,
+          0.8764062499999999,
+          0.5797708333333332
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.5011249999999999,
+          0.064046875,
+          0.5797708333333332,
+          0.8764062499999999
+        ],
+        "area": 5255.623600000004
+      },
+      {
+        "pixel_xywh": [
+          328.34,
+          115.48,
+          127.05,
+          15.42
+        ],
+        "norm_xyxy": [
+          0.5130312499999999,
+          0.24058333333333334,
+          0.711546875,
+          0.27270833333333333
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.24058333333333334,
+          0.5130312499999999,
+          0.27270833333333333,
+          0.711546875
+        ],
+        "area": 1109.3384000000005
+      },
+      {
+        "pixel_xywh": [
+          0.89,
+          124.92,
+          45.64,
+          10.55
+        ],
+        "norm_xyxy": [
+          0.001390625,
+          0.26025,
+          0.07270312500000001,
+          0.28222916666666664
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.26025,
+          0.001390625,
+          0.28222916666666664,
+          0.07270312500000001
+        ],
+        "area": 294.3968000000002
+      },
+      {
+        "pixel_xywh": [
+          505.88,
+          96.0,
+          31.21,
+          8.14
+        ],
+        "norm_xyxy": [
+          0.7904375,
+          0.2,
+          0.839203125,
+          0.21695833333333334
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.2,
+          0.7904375,
+          0.21695833333333334,
+          0.839203125
+        ],
+        "area": 143.7616500000003
+      },
+      {
+        "pixel_xywh": [
+          237.26,
+          115.07,
+          67.47,
+          15.52
+        ],
+        "norm_xyxy": [
+          0.37071875,
+          0.23972916666666666,
+          0.47614062500000004,
+          0.2720625
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.23972916666666666,
+          0.37071875,
+          0.2720625,
+          0.47614062500000004
+        ],
+        "area": 432.4362500000003
+      }
+    ]
+  },
+  {
+    "name": "coco_motorcycle_4_000000338219",
+    "file_name": "000000338219.jpg",
+    "image_id": 338219,
+    "width": 640,
+    "height": 566,
+    "primary_category": "motorcycle",
+    "count": 4,
+    "tier": "med",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000338219.jpg",
+    "flickr_url": "http://farm8.staticflickr.com/7283/8999990657_da131bf6a9_z.jpg",
+    "all_categories": [
+      "motorcycle",
+      "person",
+      "chair"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          22.89,
+          89.03,
+          506.22,
+          454.08
+        ],
+        "norm_xyxy": [
+          0.035765625,
+          0.15729681978798588,
+          0.826734375,
+          0.9595583038869259
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.15729681978798588,
+          0.035765625,
+          0.9595583038869259,
+          0.826734375
+        ],
+        "area": 134659.67275
+      },
+      {
+        "pixel_xywh": [
+          354.39,
+          151.06,
+          276.62,
+          179.74
+        ],
+        "norm_xyxy": [
+          0.553734375,
+          0.2668904593639576,
+          0.985953125,
+          0.584452296819788
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.2668904593639576,
+          0.553734375,
+          0.584452296819788,
+          0.985953125
+        ],
+        "area": 28888.6928
+      },
+      {
+        "pixel_xywh": [
+          547.88,
+          143.2,
+          92.12,
+          149.75
+        ],
+        "norm_xyxy": [
+          0.8560625,
+          0.2530035335689046,
+          1.0,
+          0.5175795053003533
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.2530035335689046,
+          0.8560625,
+          0.5175795053003533,
+          1.0
+        ],
+        "area": 2672.9971
+      },
+      {
+        "pixel_xywh": [
+          0.33,
+          159.24,
+          37.28,
+          38.49
+        ],
+        "norm_xyxy": [
+          0.000515625,
+          0.2813427561837456,
+          0.058765625,
+          0.3493462897526502
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.2813427561837456,
+          0.000515625,
+          0.3493462897526502,
+          0.058765625
+        ],
+        "area": 957.6367500000001
+      }
+    ]
+  },
+  {
+    "name": "coco_elephant_3_000000535156",
+    "file_name": "000000535156.jpg",
+    "image_id": 535156,
+    "width": 640,
+    "height": 505,
+    "primary_category": "elephant",
+    "count": 3,
+    "tier": "med",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000535156.jpg",
+    "flickr_url": "http://farm8.staticflickr.com/7077/7355684452_9f9312dc27_z.jpg",
+    "all_categories": [
+      "elephant"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          133.61,
+          50.2,
+          397.43,
+          388.37
+        ],
+        "norm_xyxy": [
+          0.208765625,
+          0.09940594059405941,
+          0.82975,
+          0.8684554455445544
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.09940594059405941,
+          0.208765625,
+          0.8684554455445544,
+          0.82975
+        ],
+        "area": 81350.58655
+      },
+      {
+        "pixel_xywh": [
+          1.13,
+          112.04,
+          197.02,
+          129.08
+        ],
+        "norm_xyxy": [
+          0.0017656249999999998,
+          0.22186138613861386,
+          0.309609375,
+          0.4774653465346535
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.22186138613861386,
+          0.0017656249999999998,
+          0.4774653465346535,
+          0.309609375
+        ],
+        "area": 14383.715900000001
+      },
+      {
+        "pixel_xywh": [
+          373.63,
+          190.18,
+          195.56,
+          230.77
+        ],
+        "norm_xyxy": [
+          0.583796875,
+          0.3765940594059406,
+          0.8893593750000001,
+          0.8335643564356436
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.3765940594059406,
+          0.583796875,
+          0.8335643564356436,
+          0.8893593750000001
+        ],
+        "area": 10860.198199999999
+      }
+    ]
+  },
+  {
+    "name": "coco_bowl_4_000000397133",
+    "file_name": "000000397133.jpg",
+    "image_id": 397133,
+    "width": 640,
+    "height": 427,
+    "primary_category": "bowl",
+    "count": 4,
+    "tier": "med",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000397133.jpg",
+    "flickr_url": "http://farm7.staticflickr.com/6116/6255196340_da26cf2c9e_z.jpg",
+    "all_categories": [
+      "bottle",
+      "dining table",
+      "person",
+      "knife",
+      "bowl",
+      "oven",
+      "cup",
+      "broccoli",
+      "spoon",
+      "carrot",
+      "sink"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          31.28,
+          344.0,
+          68.12,
+          40.83
+        ],
+        "norm_xyxy": [
+          0.048875,
+          0.8056206088992974,
+          0.15531250000000002,
+          0.9012412177985948
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.8056206088992974,
+          0.048875,
+          0.9012412177985948,
+          0.15531250000000002
+        ],
+        "area": 2136.46615
+      },
+      {
+        "pixel_xywh": [
+          59.63,
+          287.36,
+          76.07,
+          41.3
+        ],
+        "norm_xyxy": [
+          0.093171875,
+          0.6729742388758783,
+          0.21203124999999998,
+          0.7696955503512881
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.6729742388758783,
+          0.093171875,
+          0.7696955503512881,
+          0.21203124999999998
+        ],
+        "area": 2016.1509000000015
+      },
+      {
+        "pixel_xywh": [
+          155.97,
+          168.95,
+          26.03,
+          17.13
+        ],
+        "norm_xyxy": [
+          0.243703125,
+          0.39566744730679154,
+          0.284375,
+          0.4357845433255269
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.39566744730679154,
+          0.243703125,
+          0.4357845433255269,
+          0.284375
+        ],
+        "area": 351.9638500000004
+      },
+      {
+        "pixel_xywh": [
+          157.2,
+          114.15,
+          17.86,
+          15.82
+        ],
+        "norm_xyxy": [
+          0.24562499999999998,
+          0.26733021077283375,
+          0.27353125,
+          0.30437939110070256
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.26733021077283375,
+          0.24562499999999998,
+          0.30437939110070256,
+          0.27353125
+        ],
+        "area": 217.57500000000013
+      }
+    ]
+  },
+  {
+    "name": "coco_person_10_000000247917",
+    "file_name": "000000247917.jpg",
+    "image_id": 247917,
+    "width": 612,
+    "height": 612,
+    "primary_category": "person",
+    "count": 10,
+    "tier": "high",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000247917.jpg",
+    "flickr_url": "http://farm9.staticflickr.com/8164/7205570594_5aba222a6f_z.jpg",
+    "all_categories": [
+      "person",
+      "baseball glove"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          456.81,
+          222.76,
+          141.48,
+          335.13
+        ],
+        "norm_xyxy": [
+          0.746421568627451,
+          0.36398692810457517,
+          0.9775980392156862,
+          0.9115849673202614
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.36398692810457517,
+          0.746421568627451,
+          0.9115849673202614,
+          0.9775980392156862
+        ],
+        "area": 22925.981299999996
+      },
+      {
+        "pixel_xywh": [
+          386.63,
+          214.52,
+          96.45,
+          342.9
+        ],
+        "norm_xyxy": [
+          0.6317483660130719,
+          0.3505228758169935,
+          0.7893464052287581,
+          0.9108169934640522
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.3505228758169935,
+          0.6317483660130719,
+          0.9108169934640522,
+          0.7893464052287581
+        ],
+        "area": 19281.4786
+      },
+      {
+        "pixel_xywh": [
+          250.25,
+          240.78,
+          87.57,
+          335.9
+        ],
+        "norm_xyxy": [
+          0.4089052287581699,
+          0.3934313725490196,
+          0.5519934640522876,
+          0.9422875816993463
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.3934313725490196,
+          0.4089052287581699,
+          0.9422875816993463,
+          0.5519934640522876
+        ],
+        "area": 21397.368050000005
+      },
+      {
+        "pixel_xywh": [
+          149.2,
+          238.65,
+          113.28,
+          349.52
+        ],
+        "norm_xyxy": [
+          0.2437908496732026,
+          0.38995098039215687,
+          0.42888888888888893,
+          0.9610620915032679
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.38995098039215687,
+          0.2437908496732026,
+          0.9610620915032679,
+          0.42888888888888893
+        ],
+        "area": 24474.2047
+      },
+      {
+        "pixel_xywh": [
+          34.38,
+          204.92,
+          118.28,
+          391.95
+        ],
+        "norm_xyxy": [
+          0.0561764705882353,
+          0.3348366013071895,
+          0.24944444444444444,
+          0.9752777777777778
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.3348366013071895,
+          0.0561764705882353,
+          0.9752777777777778,
+          0.24944444444444444
+        ],
+        "area": 28632.56820000001
+      },
+      {
+        "pixel_xywh": [
+          307.79,
+          199.92,
+          51.78,
+          112.93
+        ],
+        "norm_xyxy": [
+          0.5029248366013073,
+          0.32666666666666666,
+          0.5875326797385622,
+          0.5111928104575164
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.32666666666666666,
+          0.5029248366013073,
+          0.5111928104575164,
+          0.5875326797385622
+        ],
+        "area": 3638.503649999999
+      },
+      {
+        "pixel_xywh": [
+          335.57,
+          97.64,
+          148.53,
+          203.55
+        ],
+        "norm_xyxy": [
+          0.5483169934640523,
+          0.1595424836601307,
+          0.7910130718954249,
+          0.492140522875817
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.1595424836601307,
+          0.5483169934640523,
+          0.492140522875817,
+          0.7910130718954249
+        ],
+        "area": 12652.465149999995
+      },
+      {
+        "pixel_xywh": [
+          328.2,
+          241.14,
+          86.2,
+          331.18
+        ],
+        "norm_xyxy": [
+          0.5362745098039216,
+          0.3940196078431372,
+          0.6771241830065359,
+          0.9351633986928104
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.3940196078431372,
+          0.5362745098039216,
+          0.9351633986928104,
+          0.6771241830065359
+        ],
+        "area": 19153.804449999996
+      },
+      {
+        "pixel_xywh": [
+          52.03,
+          55.62,
+          169.32,
+          499.16
+        ],
+        "norm_xyxy": [
+          0.08501633986928105,
+          0.09088235294117647,
+          0.3616830065359477,
+          0.9065032679738562
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.09088235294117647,
+          0.08501633986928105,
+          0.9065032679738562,
+          0.3616830065359477
+        ],
+        "area": 28014.56445
+      },
+      {
+        "pixel_xywh": [
+          162.14,
+          206.65,
+          93.79,
+          120.81
+        ],
+        "norm_xyxy": [
+          0.2649346405228758,
+          0.3376633986928105,
+          0.41818627450980395,
+          0.5350653594771242
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.3376633986928105,
+          0.2649346405228758,
+          0.5350653594771242,
+          0.41818627450980395
+        ],
+        "area": 1815.2475500000003
+      }
+    ]
+  },
+  {
+    "name": "coco_car_11_000000089556",
+    "file_name": "000000089556.jpg",
+    "image_id": 89556,
+    "width": 640,
+    "height": 480,
+    "primary_category": "car",
+    "count": 11,
+    "tier": "high",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000089556.jpg",
+    "flickr_url": "http://farm7.staticflickr.com/6093/6210323230_57fab50c4b_z.jpg",
+    "all_categories": [
+      "car",
+      "fire hydrant",
+      "truck"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          294.36,
+          156.5,
+          124.23,
+          70.58
+        ],
+        "norm_xyxy": [
+          0.4599375,
+          0.3260416666666667,
+          0.654046875,
+          0.4730833333333333
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.3260416666666667,
+          0.4599375,
+          0.4730833333333333,
+          0.654046875
+        ],
+        "area": 2763.117400000001
+      },
+      {
+        "pixel_xywh": [
+          267.44,
+          143.71,
+          97.45,
+          49.49
+        ],
+        "norm_xyxy": [
+          0.417875,
+          0.29939583333333336,
+          0.570140625,
+          0.4025
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.29939583333333336,
+          0.417875,
+          0.4025,
+          0.570140625
+        ],
+        "area": 3288.9170999999997
+      },
+      {
+        "pixel_xywh": [
+          182.13,
+          151.83,
+          56.92,
+          40.67
+        ],
+        "norm_xyxy": [
+          0.284578125,
+          0.31631250000000005,
+          0.373515625,
+          0.4010416666666667
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.31631250000000005,
+          0.284578125,
+          0.4010416666666667,
+          0.373515625
+        ],
+        "area": 1751.7951
+      },
+      {
+        "pixel_xywh": [
+          106.82,
+          155.16,
+          40.67,
+          9.62
+        ],
+        "norm_xyxy": [
+          0.16690624999999998,
+          0.32325,
+          0.230453125,
+          0.34329166666666666
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.32325,
+          0.16690624999999998,
+          0.34329166666666666,
+          0.230453125
+        ],
+        "area": 270.5097000000001
+      },
+      {
+        "pixel_xywh": [
+          401.52,
+          129.24,
+          38.42,
+          15.73
+        ],
+        "norm_xyxy": [
+          0.627375,
+          0.26925000000000004,
+          0.68740625,
+          0.30202083333333335
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.26925000000000004,
+          0.627375,
+          0.30202083333333335,
+          0.68740625
+        ],
+        "area": 457.50994999999995
+      },
+      {
+        "pixel_xywh": [
+          579.06,
+          122.73,
+          40.32,
+          10.04
+        ],
+        "norm_xyxy": [
+          0.9047812499999999,
+          0.2556875,
+          0.96778125,
+          0.2766041666666667
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.2556875,
+          0.9047812499999999,
+          0.2766041666666667,
+          0.96778125
+        ],
+        "area": 280.3445999999996
+      },
+      {
+        "pixel_xywh": [
+          362.81,
+          136.79,
+          24.18,
+          8.42
+        ],
+        "norm_xyxy": [
+          0.566890625,
+          0.2849791666666667,
+          0.604671875,
+          0.3025208333333333
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.2849791666666667,
+          0.566890625,
+          0.3025208333333333,
+          0.604671875
+        ],
+        "area": 101.22619999999996
+      },
+      {
+        "pixel_xywh": [
+          587.25,
+          142.9,
+          43.33,
+          43.53
+        ],
+        "norm_xyxy": [
+          0.917578125,
+          0.29770833333333335,
+          0.9852812500000001,
+          0.38839583333333333
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.29770833333333335,
+          0.917578125,
+          0.38839583333333333,
+          0.9852812500000001
+        ],
+        "area": 723.6522000000001
+      },
+      {
+        "pixel_xywh": [
+          1.13,
+          166.02,
+          295.91,
+          220.24
+        ],
+        "norm_xyxy": [
+          0.0017656249999999998,
+          0.34587500000000004,
+          0.464125,
+          0.8047083333333334
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.34587500000000004,
+          0.0017656249999999998,
+          0.8047083333333334,
+          0.464125
+        ],
+        "area": 45269.4112
+      },
+      {
+        "pixel_xywh": [
+          250.96,
+          143.58,
+          31.34,
+          45.66
+        ],
+        "norm_xyxy": [
+          0.392125,
+          0.29912500000000003,
+          0.44109375,
+          0.39425000000000004
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.29912500000000003,
+          0.392125,
+          0.39425000000000004,
+          0.44109375
+        ],
+        "area": 361.08979999999923
+      },
+      {
+        "pixel_xywh": [
+          136.13,
+          138.0,
+          43.0,
+          12.99
+        ],
+        "norm_xyxy": [
+          0.212703125,
+          0.2875,
+          0.279890625,
+          0.3145625
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.2875,
+          0.212703125,
+          0.3145625,
+          0.279890625
+        ],
+        "area": 209.75205000000003
+      }
+    ]
+  },
+  {
+    "name": "coco_chair_7_000000013659",
+    "file_name": "000000013659.jpg",
+    "image_id": 13659,
+    "width": 640,
+    "height": 480,
+    "primary_category": "chair",
+    "count": 7,
+    "tier": "high",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000013659.jpg",
+    "flickr_url": "http://farm7.staticflickr.com/6144/5987177856_785814a990_z.jpg",
+    "all_categories": [
+      "chair",
+      "dining table",
+      "person",
+      "laptop",
+      "cup",
+      "tv"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          364.64,
+          290.06,
+          123.6,
+          166.87
+        ],
+        "norm_xyxy": [
+          0.56975,
+          0.6042916666666667,
+          0.762875,
+          0.9519375
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.6042916666666667,
+          0.56975,
+          0.9519375,
+          0.762875
+        ],
+        "area": 10332.542850000002
+      },
+      {
+        "pixel_xywh": [
+          305.75,
+          145.44,
+          93.0,
+          123.57
+        ],
+        "norm_xyxy": [
+          0.477734375,
+          0.303,
+          0.623046875,
+          0.5604375
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.303,
+          0.477734375,
+          0.5604375,
+          0.623046875
+        ],
+        "area": 2528.2628999999984
+      },
+      {
+        "pixel_xywh": [
+          482.27,
+          173.3,
+          87.39,
+          149.13
+        ],
+        "norm_xyxy": [
+          0.753546875,
+          0.3610416666666667,
+          0.8900937499999999,
+          0.6717291666666667
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.3610416666666667,
+          0.753546875,
+          0.6717291666666667,
+          0.8900937499999999
+        ],
+        "area": 11571.237649999995
+      },
+      {
+        "pixel_xywh": [
+          188.62,
+          124.46,
+          89.19,
+          70.21
+        ],
+        "norm_xyxy": [
+          0.29471875000000003,
+          0.25929166666666664,
+          0.434078125,
+          0.4055625
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.25929166666666664,
+          0.29471875000000003,
+          0.4055625,
+          0.434078125
+        ],
+        "area": 3250.8677000000002
+      },
+      {
+        "pixel_xywh": [
+          377.81,
+          416.0,
+          44.38,
+          57.81
+        ],
+        "norm_xyxy": [
+          0.590328125,
+          0.8666666666666667,
+          0.659671875,
+          0.9871041666666667
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.8666666666666667,
+          0.590328125,
+          0.9871041666666667,
+          0.659671875
+        ],
+        "area": 1518.9017999999994
+      },
+      {
+        "pixel_xywh": [
+          282.12,
+          217.81,
+          49.67,
+          92.83
+        ],
+        "norm_xyxy": [
+          0.4408125,
+          0.45377083333333335,
+          0.518421875,
+          0.6471666666666667
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.45377083333333335,
+          0.4408125,
+          0.6471666666666667,
+          0.518421875
+        ],
+        "area": 1981.2406999999996
+      },
+      {
+        "pixel_xywh": [
+          567.44,
+          160.52,
+          43.32,
+          124.23
+        ],
+        "norm_xyxy": [
+          0.8866250000000001,
+          0.3344166666666667,
+          0.9543125000000001,
+          0.5932291666666667
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.3344166666666667,
+          0.8866250000000001,
+          0.5932291666666667,
+          0.9543125000000001
+        ],
+        "area": 1927.1629000000012
+      }
+    ]
+  },
+  {
+    "name": "coco_bird_22_000000147498",
+    "file_name": "000000147498.jpg",
+    "image_id": 147498,
+    "width": 640,
+    "height": 524,
+    "primary_category": "bird",
+    "count": 22,
+    "tier": "high",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000147498.jpg",
+    "flickr_url": "http://farm9.staticflickr.com/8063/8243726314_4c66ec3015_z.jpg",
+    "all_categories": [
+      "bird"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          308.81,
+          282.6,
+          7.38,
+          5.95
+        ],
+        "norm_xyxy": [
+          0.482515625,
+          0.5393129770992366,
+          0.494046875,
+          0.5506679389312977
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.5393129770992366,
+          0.482515625,
+          0.5506679389312977,
+          0.494046875
+        ],
+        "area": 19.659099999999878
+      },
+      {
+        "pixel_xywh": [
+          371.93,
+          184.35,
+          7.48,
+          9.55
+        ],
+        "norm_xyxy": [
+          0.581140625,
+          0.35181297709923665,
+          0.592828125,
+          0.3700381679389313
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.35181297709923665,
+          0.581140625,
+          0.3700381679389313,
+          0.592828125
+        ],
+        "area": 20.95440000000007
+      },
+      {
+        "pixel_xywh": [
+          223.1,
+          338.56,
+          8.94,
+          5.58
+        ],
+        "norm_xyxy": [
+          0.34859375,
+          0.6461068702290076,
+          0.3625625,
+          0.6567557251908397
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.6461068702290076,
+          0.34859375,
+          0.6567557251908397,
+          0.3625625
+        ],
+        "area": 21.375349999999855
+      },
+      {
+        "pixel_xywh": [
+          348.18,
+          245.6,
+          9.01,
+          5.92
+        ],
+        "norm_xyxy": [
+          0.54403125,
+          0.46870229007633585,
+          0.558109375,
+          0.48
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.46870229007633585,
+          0.54403125,
+          0.48,
+          0.558109375
+        ],
+        "area": 17.649100000000036
+      },
+      {
+        "pixel_xywh": [
+          198.51,
+          366.98,
+          6.74,
+          5.44
+        ],
+        "norm_xyxy": [
+          0.310171875,
+          0.7003435114503818,
+          0.320703125,
+          0.7107251908396947
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.7003435114503818,
+          0.310171875,
+          0.7107251908396947,
+          0.320703125
+        ],
+        "area": 16.637599999999996
+      },
+      {
+        "pixel_xywh": [
+          175.87,
+          376.91,
+          4.44,
+          4.44
+        ],
+        "norm_xyxy": [
+          0.274796875,
+          0.719293893129771,
+          0.281734375,
+          0.7277671755725191
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.719293893129771,
+          0.274796875,
+          0.7277671755725191,
+          0.281734375
+        ],
+        "area": 11.475599999999961
+      },
+      {
+        "pixel_xywh": [
+          165.25,
+          369.67,
+          8.75,
+          6.47
+        ],
+        "norm_xyxy": [
+          0.258203125,
+          0.7054770992366413,
+          0.271875,
+          0.7178244274809161
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.7054770992366413,
+          0.258203125,
+          0.7178244274809161,
+          0.271875
+        ],
+        "area": 25.66924999999999
+      },
+      {
+        "pixel_xywh": [
+          206.7,
+          326.24,
+          8.39,
+          6.91
+        ],
+        "norm_xyxy": [
+          0.32296874999999997,
+          0.6225954198473282,
+          0.33607812499999995,
+          0.6357824427480917
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.6225954198473282,
+          0.32296874999999997,
+          0.6357824427480917,
+          0.33607812499999995
+        ],
+        "area": 35.46004999999985
+      },
+      {
+        "pixel_xywh": [
+          374.89,
+          261.95,
+          8.45,
+          6.99
+        ],
+        "norm_xyxy": [
+          0.585765625,
+          0.49990458015267175,
+          0.5989687499999999,
+          0.5132442748091604
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.49990458015267175,
+          0.585765625,
+          0.5132442748091604,
+          0.5989687499999999
+        ],
+        "area": 26.75409999999999
+      },
+      {
+        "pixel_xywh": [
+          349.16,
+          213.81,
+          8.12,
+          7.78
+        ],
+        "norm_xyxy": [
+          0.5455625000000001,
+          0.40803435114503817,
+          0.55825,
+          0.422881679389313
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.40803435114503817,
+          0.5455625000000001,
+          0.422881679389313,
+          0.55825
+        ],
+        "area": 24.07774999999998
+      },
+      {
+        "pixel_xywh": [
+          149.81,
+          306.13,
+          7.33,
+          9.67
+        ],
+        "norm_xyxy": [
+          0.234078125,
+          0.5842175572519084,
+          0.24553125000000003,
+          0.6026717557251908
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.5842175572519084,
+          0.234078125,
+          0.6026717557251908,
+          0.24553125000000003
+        ],
+        "area": 34.41169999999999
+      },
+      {
+        "pixel_xywh": [
+          173.02,
+          288.47,
+          9.38,
+          8.7
+        ],
+        "norm_xyxy": [
+          0.27034375,
+          0.5505152671755725,
+          0.28500000000000003,
+          0.567118320610687
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.5505152671755725,
+          0.27034375,
+          0.567118320610687,
+          0.28500000000000003
+        ],
+        "area": 35.946149999999975
+      },
+      {
+        "pixel_xywh": [
+          322.24,
+          239.48,
+          10.1,
+          7.37
+        ],
+        "norm_xyxy": [
+          0.5035000000000001,
+          0.4570229007633588,
+          0.51928125,
+          0.47108778625954195
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.4570229007633588,
+          0.5035000000000001,
+          0.47108778625954195,
+          0.51928125
+        ],
+        "area": 33.7209499999999
+      },
+      {
+        "pixel_xywh": [
+          267.86,
+          218.67,
+          6.61,
+          4.67
+        ],
+        "norm_xyxy": [
+          0.41853125,
+          0.4173091603053435,
+          0.42885937500000004,
+          0.42622137404580146
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.4173091603053435,
+          0.41853125,
+          0.42622137404580146,
+          0.42885937500000004
+        ],
+        "area": 14.78255000000006
+      },
+      {
+        "pixel_xywh": [
+          288.65,
+          306.09,
+          7.65,
+          7.5
+        ],
+        "norm_xyxy": [
+          0.451015625,
+          0.5841412213740458,
+          0.46296874999999993,
+          0.5984541984732824
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.5841412213740458,
+          0.451015625,
+          0.5984541984732824,
+          0.46296874999999993
+        ],
+        "area": 27.336349999999992
+      },
+      {
+        "pixel_xywh": [
+          362.6,
+          155.06,
+          9.97,
+          9.32
+        ],
+        "norm_xyxy": [
+          0.5665625000000001,
+          0.29591603053435117,
+          0.5821406250000001,
+          0.3137022900763359
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.29591603053435117,
+          0.5665625000000001,
+          0.3137022900763359,
+          0.5821406250000001
+        ],
+        "area": 43.57059999999996
+      },
+      {
+        "pixel_xywh": [
+          294.81,
+          161.78,
+          9.44,
+          5.99
+        ],
+        "norm_xyxy": [
+          0.460640625,
+          0.30874045801526717,
+          0.475390625,
+          0.32017175572519085
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.30874045801526717,
+          0.460640625,
+          0.32017175572519085,
+          0.475390625
+        ],
+        "area": 19.696799999999932
+      },
+      {
+        "pixel_xywh": [
+          190.01,
+          401.64,
+          8.03,
+          6.4
+        ],
+        "norm_xyxy": [
+          0.29689062499999996,
+          0.7664885496183206,
+          0.3094375,
+          0.7787022900763358
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.7664885496183206,
+          0.29689062499999996,
+          0.7787022900763358,
+          0.3094375
+        ],
+        "area": 18.700350000000043
+      },
+      {
+        "pixel_xywh": [
+          227.66,
+          327.17,
+          4.9,
+          4.13
+        ],
+        "norm_xyxy": [
+          0.35571875,
+          0.6243702290076336,
+          0.363375,
+          0.6322519083969466
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.6243702290076336,
+          0.35571875,
+          0.6322519083969466,
+          0.363375
+        ],
+        "area": 8.503849999999971
+      },
+      {
+        "pixel_xywh": [
+          279.97,
+          284.34,
+          7.11,
+          7.45
+        ],
+        "norm_xyxy": [
+          0.43745312500000005,
+          0.5426335877862595,
+          0.4485625000000001,
+          0.5568511450381679
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.5426335877862595,
+          0.43745312500000005,
+          0.5568511450381679,
+          0.4485625000000001
+        ],
+        "area": 19.06429999999997
+      },
+      {
+        "pixel_xywh": [
+          291.44,
+          296.92,
+          9.08,
+          7.41
+        ],
+        "norm_xyxy": [
+          0.455375,
+          0.5666412213740458,
+          0.4695625,
+          0.5807824427480917
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.5666412213740458,
+          0.455375,
+          0.5807824427480917,
+          0.4695625
+        ],
+        "area": 29.874149999999876
+      },
+      {
+        "pixel_xywh": [
+          178.17,
+          316.43,
+          9.11,
+          8.63
+        ],
+        "norm_xyxy": [
+          0.278390625,
+          0.6038740458015267,
+          0.29262499999999997,
+          0.6203435114503817
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.6038740458015267,
+          0.278390625,
+          0.6203435114503817,
+          0.29262499999999997
+        ],
+        "area": 35.77550000000003
+      }
+    ]
+  },
+  {
+    "name": "coco_bottle_13_000000213547",
+    "file_name": "000000213547.jpg",
+    "image_id": 213547,
+    "width": 480,
+    "height": 640,
+    "primary_category": "bottle",
+    "count": 13,
+    "tier": "high",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000213547.jpg",
+    "flickr_url": "http://farm3.staticflickr.com/2062/2243132921_779f9cdc24_z.jpg",
+    "all_categories": [
+      "bottle",
+      "person",
+      "horse",
+      "refrigerator",
+      "clock",
+      "cake"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          49.95,
+          263.3,
+          9.13,
+          35.73
+        ],
+        "norm_xyxy": [
+          0.1040625,
+          0.41140625000000003,
+          0.12308333333333335,
+          0.46723437500000004
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.41140625000000003,
+          0.1040625,
+          0.46723437500000004,
+          0.12308333333333335
+        ],
+        "area": 215.12989999999985
+      },
+      {
+        "pixel_xywh": [
+          58.48,
+          277.28,
+          11.66,
+          22.24
+        ],
+        "norm_xyxy": [
+          0.12183333333333332,
+          0.43324999999999997,
+          0.146125,
+          0.46799999999999997
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.43324999999999997,
+          0.12183333333333332,
+          0.46799999999999997,
+          0.146125
+        ],
+        "area": 222.04049999999995
+      },
+      {
+        "pixel_xywh": [
+          70.64,
+          268.3,
+          10.96,
+          31.55
+        ],
+        "norm_xyxy": [
+          0.14716666666666667,
+          0.41921875000000003,
+          0.16999999999999998,
+          0.46851562500000005
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.41921875000000003,
+          0.14716666666666667,
+          0.46851562500000005,
+          0.16999999999999998
+        ],
+        "area": 263.6295499999999
+      },
+      {
+        "pixel_xywh": [
+          40.6,
+          263.19,
+          11.01,
+          35.62
+        ],
+        "norm_xyxy": [
+          0.08458333333333333,
+          0.411234375,
+          0.10752083333333333,
+          0.466890625
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.411234375,
+          0.08458333333333333,
+          0.466890625,
+          0.10752083333333333
+        ],
+        "area": 277.10749999999985
+      },
+      {
+        "pixel_xywh": [
+          27.68,
+          259.47,
+          13.84,
+          38.73
+        ],
+        "norm_xyxy": [
+          0.057666666666666665,
+          0.40542187500000004,
+          0.0865,
+          0.46593750000000006
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.40542187500000004,
+          0.057666666666666665,
+          0.46593750000000006,
+          0.0865
+        ],
+        "area": 343.4724499999998
+      },
+      {
+        "pixel_xywh": [
+          41.85,
+          316.07,
+          22.02,
+          39.92
+        ],
+        "norm_xyxy": [
+          0.0871875,
+          0.493859375,
+          0.1330625,
+          0.5562343750000001
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.493859375,
+          0.0871875,
+          0.5562343750000001,
+          0.1330625
+        ],
+        "area": 591.1682000000003
+      },
+      {
+        "pixel_xywh": [
+          61.62,
+          318.42,
+          8.87,
+          33.83
+        ],
+        "norm_xyxy": [
+          0.128375,
+          0.49753125000000004,
+          0.14685416666666665,
+          0.550390625
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.49753125000000004,
+          0.128375,
+          0.550390625,
+          0.14685416666666665
+        ],
+        "area": 174.74999999999991
+      },
+      {
+        "pixel_xywh": [
+          76.82,
+          314.49,
+          14.6,
+          39.64
+        ],
+        "norm_xyxy": [
+          0.16004166666666667,
+          0.491390625,
+          0.1904583333333333,
+          0.553328125
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.491390625,
+          0.16004166666666667,
+          0.553328125,
+          0.1904583333333333
+        ],
+        "area": 402.9344999999999
+      },
+      {
+        "pixel_xywh": [
+          59.94,
+          357.64,
+          9.09,
+          31.68
+        ],
+        "norm_xyxy": [
+          0.124875,
+          0.5588124999999999,
+          0.1438125,
+          0.6083125
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.5588124999999999,
+          0.124875,
+          0.6083125,
+          0.1438125
+        ],
+        "area": 229.37889999999982
+      },
+      {
+        "pixel_xywh": [
+          51.33,
+          360.16,
+          9.18,
+          29.6
+        ],
+        "norm_xyxy": [
+          0.10693749999999999,
+          0.5627500000000001,
+          0.1260625,
+          0.6090000000000001
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.5627500000000001,
+          0.10693749999999999,
+          0.6090000000000001,
+          0.1260625
+        ],
+        "area": 215.44229999999965
+      },
+      {
+        "pixel_xywh": [
+          90.93,
+          275.93,
+          12.68,
+          23.18
+        ],
+        "norm_xyxy": [
+          0.1894375,
+          0.431140625,
+          0.2158541666666667,
+          0.467359375
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.431140625,
+          0.1894375,
+          0.467359375,
+          0.2158541666666667
+        ],
+        "area": 213.55655000000002
+      },
+      {
+        "pixel_xywh": [
+          36.5,
+          361.24,
+          11.08,
+          28.58
+        ],
+        "norm_xyxy": [
+          0.07604166666666666,
+          0.5644375,
+          0.09912499999999999,
+          0.60909375
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.5644375,
+          0.07604166666666666,
+          0.60909375,
+          0.09912499999999999
+        ],
+        "area": 264.3800499999998
+      },
+      {
+        "pixel_xywh": [
+          88.56,
+          358.14,
+          11.9,
+          33.47
+        ],
+        "norm_xyxy": [
+          0.1845,
+          0.55959375,
+          0.20929166666666668,
+          0.611890625
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.55959375,
+          0.1845,
+          0.611890625,
+          0.20929166666666668
+        ],
+        "area": 288.39150000000006
+      }
+    ]
+  },
+  {
+    "name": "coco_zebra_7_000000215245",
+    "file_name": "000000215245.jpg",
+    "image_id": 215245,
+    "width": 640,
+    "height": 480,
+    "primary_category": "zebra",
+    "count": 7,
+    "tier": "high",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000215245.jpg",
+    "flickr_url": "http://farm6.staticflickr.com/5187/5699107573_2059b4c0e1_z.jpg",
+    "all_categories": [
+      "zebra"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          158.62,
+          290.35,
+          173.0,
+          124.33
+        ],
+        "norm_xyxy": [
+          0.24784375,
+          0.6048958333333334,
+          0.51815625,
+          0.8639166666666667
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.6048958333333334,
+          0.24784375,
+          0.8639166666666667,
+          0.51815625
+        ],
+        "area": 12895.831299999998
+      },
+      {
+        "pixel_xywh": [
+          309.12,
+          267.33,
+          139.49,
+          72.14
+        ],
+        "norm_xyxy": [
+          0.483,
+          0.5569375,
+          0.7009531250000001,
+          0.7072291666666666
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.5569375,
+          0.483,
+          0.7072291666666666,
+          0.7009531250000001
+        ],
+        "area": 4348.3557500000015
+      },
+      {
+        "pixel_xywh": [
+          233.37,
+          199.01,
+          56.51,
+          34.2
+        ],
+        "norm_xyxy": [
+          0.364640625,
+          0.41460416666666666,
+          0.4529375,
+          0.48585416666666664
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.41460416666666666,
+          0.364640625,
+          0.48585416666666664,
+          0.4529375
+        ],
+        "area": 1307.9694499999998
+      },
+      {
+        "pixel_xywh": [
+          160.16,
+          199.9,
+          47.71,
+          30.35
+        ],
+        "norm_xyxy": [
+          0.25025,
+          0.4164583333333333,
+          0.324796875,
+          0.4796875
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.4164583333333333,
+          0.25025,
+          0.4796875,
+          0.324796875
+        ],
+        "area": 666.7360499999995
+      },
+      {
+        "pixel_xywh": [
+          193.25,
+          204.47,
+          42.39,
+          22.44
+        ],
+        "norm_xyxy": [
+          0.301953125,
+          0.4259791666666667,
+          0.3681875,
+          0.47272916666666664
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.4259791666666667,
+          0.301953125,
+          0.47272916666666664,
+          0.3681875
+        ],
+        "area": 547.9286999999998
+      },
+      {
+        "pixel_xywh": [
+          13.76,
+          268.79,
+          205.24,
+          152.75
+        ],
+        "norm_xyxy": [
+          0.0215,
+          0.5599791666666667,
+          0.3421875,
+          0.8782083333333334
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.5599791666666667,
+          0.0215,
+          0.8782083333333334,
+          0.3421875
+        ],
+        "area": 11563.876849999997
+      },
+      {
+        "pixel_xywh": [
+          324.57,
+          309.19,
+          80.37,
+          102.67
+        ],
+        "norm_xyxy": [
+          0.507140625,
+          0.6441458333333333,
+          0.63271875,
+          0.8580416666666667
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.6441458333333333,
+          0.507140625,
+          0.8580416666666667,
+          0.63271875
+        ],
+        "area": 6176.561599999999
+      }
+    ]
+  },
+  {
+    "name": "coco_banana_13_000000090891",
+    "file_name": "000000090891.jpg",
+    "image_id": 90891,
+    "width": 640,
+    "height": 431,
+    "primary_category": "banana",
+    "count": 13,
+    "tier": "high",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000090891.jpg",
+    "flickr_url": "http://farm7.staticflickr.com/6145/5938772497_5a89d3ec7c_z.jpg",
+    "all_categories": [
+      "person",
+      "banana"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          380.66,
+          351.93,
+          67.73,
+          36.43
+        ],
+        "norm_xyxy": [
+          0.59478125,
+          0.8165429234338747,
+          0.7006093750000001,
+          0.9010672853828307
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.8165429234338747,
+          0.59478125,
+          0.9010672853828307,
+          0.7006093750000001
+        ],
+        "area": 1425.8594499999997
+      },
+      {
+        "pixel_xywh": [
+          414.49,
+          41.72,
+          41.33,
+          31.86
+        ],
+        "norm_xyxy": [
+          0.647640625,
+          0.09679814385150812,
+          0.71221875,
+          0.17071925754060324
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.09679814385150812,
+          0.647640625,
+          0.17071925754060324,
+          0.71221875
+        ],
+        "area": 890.15365
+      },
+      {
+        "pixel_xywh": [
+          93.5,
+          42.03,
+          28.97,
+          55.74
+        ],
+        "norm_xyxy": [
+          0.14609375,
+          0.09751740139211137,
+          0.191359375,
+          0.22684454756380512
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.09751740139211137,
+          0.14609375,
+          0.22684454756380512,
+          0.191359375
+        ],
+        "area": 1113.22835
+      },
+      {
+        "pixel_xywh": [
+          24.81,
+          57.71,
+          9.63,
+          8.82
+        ],
+        "norm_xyxy": [
+          0.038765625,
+          0.13389791183294664,
+          0.0538125,
+          0.15436194895591648
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.13389791183294664,
+          0.038765625,
+          0.15436194895591648,
+          0.0538125
+        ],
+        "area": 52.513549999999995
+      },
+      {
+        "pixel_xywh": [
+          20.63,
+          246.26,
+          9.32,
+          8.41
+        ],
+        "norm_xyxy": [
+          0.032234374999999996,
+          0.571368909512761,
+          0.046796875,
+          0.5908816705336427
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.571368909512761,
+          0.032234374999999996,
+          0.5908816705336427,
+          0.046796875
+        ],
+        "area": 38.454900000000016
+      },
+      {
+        "pixel_xywh": [
+          193.84,
+          131.84,
+          11.97,
+          14.92
+        ],
+        "norm_xyxy": [
+          0.302875,
+          0.30589327146171696,
+          0.321578125,
+          0.3405104408352668
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.30589327146171696,
+          0.302875,
+          0.3405104408352668,
+          0.321578125
+        ],
+        "area": 110.23149999999983
+      },
+      {
+        "pixel_xywh": [
+          233.88,
+          123.03,
+          12.11,
+          10.53
+        ],
+        "norm_xyxy": [
+          0.36543749999999997,
+          0.2854524361948956,
+          0.384359375,
+          0.30988399071925754
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.2854524361948956,
+          0.36543749999999997,
+          0.30988399071925754,
+          0.384359375
+        ],
+        "area": 97.83540000000004
+      },
+      {
+        "pixel_xywh": [
+          219.41,
+          204.95,
+          38.26,
+          71.59
+        ],
+        "norm_xyxy": [
+          0.342828125,
+          0.47552204176334106,
+          0.40260937500000005,
+          0.6416241299303943
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.47552204176334106,
+          0.342828125,
+          0.6416241299303943,
+          0.40260937500000005
+        ],
+        "area": 1669.360750000001
+      },
+      {
+        "pixel_xywh": [
+          368.86,
+          281.35,
+          52.28,
+          68.71
+        ],
+        "norm_xyxy": [
+          0.57634375,
+          0.6527842227378191,
+          0.65803125,
+          0.8122041763341067
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.6527842227378191,
+          0.57634375,
+          0.8122041763341067,
+          0.65803125
+        ],
+        "area": 2806.758549999998
+      },
+      {
+        "pixel_xywh": [
+          491.5,
+          75.39,
+          14.7,
+          17.2
+        ],
+        "norm_xyxy": [
+          0.76796875,
+          0.17491879350348027,
+          0.7909375,
+          0.2148259860788863
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.17491879350348027,
+          0.76796875,
+          0.2148259860788863,
+          0.7909375
+        ],
+        "area": 160.56739999999988
+      },
+      {
+        "pixel_xywh": [
+          19.37,
+          333.02,
+          28.09,
+          37.77
+        ],
+        "norm_xyxy": [
+          0.030265625,
+          0.7726682134570765,
+          0.07415625,
+          0.8603016241299303
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.7726682134570765,
+          0.030265625,
+          0.8603016241299303,
+          0.07415625
+        ],
+        "area": 709.1734500000005
+      },
+      {
+        "pixel_xywh": [
+          598.54,
+          16.34,
+          36.43,
+          33.93
+        ],
+        "norm_xyxy": [
+          0.93521875,
+          0.03791183294663573,
+          0.9921406249999999,
+          0.11663573085846866
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.03791183294663573,
+          0.93521875,
+          0.11663573085846866,
+          0.9921406249999999
+        ],
+        "area": 933.8068500000008
+      },
+      {
+        "pixel_xywh": [
+          170.61,
+          404.74,
+          21.47,
+          16.2
+        ],
+        "norm_xyxy": [
+          0.266578125,
+          0.9390719257540604,
+          0.30012500000000003,
+          0.9766589327146171
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.9390719257540604,
+          0.266578125,
+          0.9766589327146171,
+          0.30012500000000003
+        ],
+        "area": 237.51025000000013
+      }
+    ]
+  },
+  {
+    "name": "coco_book_7_000000366884",
+    "file_name": "000000366884.jpg",
+    "image_id": 366884,
+    "width": 640,
+    "height": 480,
+    "primary_category": "book",
+    "count": 7,
+    "tier": "high",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000366884.jpg",
+    "flickr_url": "http://farm4.staticflickr.com/3486/3939243337_e036a6b538_z.jpg",
+    "all_categories": [
+      "dog",
+      "chair",
+      "person",
+      "bed",
+      "book",
+      "suitcase",
+      "tv",
+      "keyboard"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          32.73,
+          73.76,
+          43.68,
+          48.32
+        ],
+        "norm_xyxy": [
+          0.051140624999999995,
+          0.15366666666666667,
+          0.119390625,
+          0.25433333333333336
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.15366666666666667,
+          0.051140624999999995,
+          0.25433333333333336,
+          0.119390625
+        ],
+        "area": 1980.7880499999999
+      },
+      {
+        "pixel_xywh": [
+          0.0,
+          233.63,
+          21.11,
+          32.16
+        ],
+        "norm_xyxy": [
+          0.0,
+          0.48672916666666666,
+          0.032984374999999996,
+          0.5537291666666666
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.48672916666666666,
+          0.0,
+          0.5537291666666666,
+          0.032984374999999996
+        ],
+        "area": 638.4349000000001
+      },
+      {
+        "pixel_xywh": [
+          0.01,
+          163.3,
+          25.47,
+          9.85
+        ],
+        "norm_xyxy": [
+          1.5625e-05,
+          0.34020833333333333,
+          0.0398125,
+          0.36072916666666666
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.34020833333333333,
+          1.5625e-05,
+          0.36072916666666666,
+          0.0398125
+        ],
+        "area": 226.54350000000014
+      },
+      {
+        "pixel_xywh": [
+          284.98,
+          191.97,
+          20.8,
+          15.88
+        ],
+        "norm_xyxy": [
+          0.44528125,
+          0.3999375,
+          0.47778125000000005,
+          0.4330208333333333
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.3999375,
+          0.44528125,
+          0.4330208333333333,
+          0.47778125000000005
+        ],
+        "area": 205.08964999999984
+      },
+      {
+        "pixel_xywh": [
+          382.19,
+          208.17,
+          13.25,
+          3.12
+        ],
+        "norm_xyxy": [
+          0.597171875,
+          0.43368749999999995,
+          0.617875,
+          0.4401875
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.43368749999999995,
+          0.597171875,
+          0.4401875,
+          0.617875
+        ],
+        "area": 36.543600000000126
+      },
+      {
+        "pixel_xywh": [
+          6.93,
+          87.82,
+          25.96,
+          32.67
+        ],
+        "norm_xyxy": [
+          0.010828125,
+          0.1829583333333333,
+          0.051390625,
+          0.2510208333333333
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.1829583333333333,
+          0.010828125,
+          0.2510208333333333,
+          0.051390625
+        ],
+        "area": 794.5861000000001
+      },
+      {
+        "pixel_xywh": [
+          0.44,
+          173.31,
+          22.22,
+          9.83
+        ],
+        "norm_xyxy": [
+          0.0006875,
+          0.3610625,
+          0.03540625,
+          0.3815416666666667
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.3610625,
+          0.0006875,
+          0.3815416666666667,
+          0.03540625
+        ],
+        "area": 191.00724999999989
+      }
+    ]
+  },
+  {
+    "name": "coco_cup_11_000000074733",
+    "file_name": "000000074733.jpg",
+    "image_id": 74733,
+    "width": 612,
+    "height": 612,
+    "primary_category": "cup",
+    "count": 11,
+    "tier": "high",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000074733.jpg",
+    "flickr_url": "http://farm6.staticflickr.com/5461/9330037796_1700b955f3_z.jpg",
+    "all_categories": [
+      "dining table",
+      "person",
+      "cup",
+      "pizza",
+      "chair"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          536.24,
+          123.24,
+          75.76,
+          135.02
+        ],
+        "norm_xyxy": [
+          0.8762091503267974,
+          0.20137254901960783,
+          1.0,
+          0.42199346405228755
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.20137254901960783,
+          0.8762091503267974,
+          0.42199346405228755,
+          1.0
+        ],
+        "area": 8543.460299999999
+      },
+      {
+        "pixel_xywh": [
+          116.24,
+          53.13,
+          72.35,
+          125.56
+        ],
+        "norm_xyxy": [
+          0.18993464052287581,
+          0.08681372549019609,
+          0.30815359477124177,
+          0.29197712418300653
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.08681372549019609,
+          0.18993464052287581,
+          0.29197712418300653,
+          0.30815359477124177
+        ],
+        "area": 7232.157150000001
+      },
+      {
+        "pixel_xywh": [
+          48.07,
+          70.85,
+          78.3,
+          131.2
+        ],
+        "norm_xyxy": [
+          0.07854575163398693,
+          0.11576797385620914,
+          0.20648692810457517,
+          0.3301470588235294
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.11576797385620914,
+          0.07854575163398693,
+          0.3301470588235294,
+          0.20648692810457517
+        ],
+        "area": 8306.747650000001
+      },
+      {
+        "pixel_xywh": [
+          0.0,
+          86.17,
+          57.46,
+          149.52
+        ],
+        "norm_xyxy": [
+          0.0,
+          0.14080065359477126,
+          0.0938888888888889,
+          0.3851143790849673
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.14080065359477126,
+          0.0,
+          0.3851143790849673,
+          0.0938888888888889
+        ],
+        "area": 7836.6609
+      },
+      {
+        "pixel_xywh": [
+          281.3,
+          395.12,
+          164.66,
+          204.46
+        ],
+        "norm_xyxy": [
+          0.459640522875817,
+          0.6456209150326797,
+          0.7286928104575164,
+          0.9797058823529412
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.6456209150326797,
+          0.459640522875817,
+          0.9797058823529412,
+          0.7286928104575164
+        ],
+        "area": 27989.048950000008
+      },
+      {
+        "pixel_xywh": [
+          180.61,
+          39.11,
+          64.41,
+          117.75
+        ],
+        "norm_xyxy": [
+          0.29511437908496735,
+          0.06390522875816994,
+          0.400359477124183,
+          0.25630718954248366
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.06390522875816994,
+          0.29511437908496735,
+          0.25630718954248366,
+          0.400359477124183
+        ],
+        "area": 6133.222850000001
+      },
+      {
+        "pixel_xywh": [
+          305.47,
+          1.13,
+          25.75,
+          33.44
+        ],
+        "norm_xyxy": [
+          0.4991339869281046,
+          0.0018464052287581697,
+          0.5412091503267974,
+          0.05648692810457517
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.0018464052287581697,
+          0.4991339869281046,
+          0.05648692810457517,
+          0.5412091503267974
+        ],
+        "area": 774.9796499999998
+      },
+      {
+        "pixel_xywh": [
+          394.71,
+          323.19,
+          147.15,
+          243.43
+        ],
+        "norm_xyxy": [
+          0.6449509803921568,
+          0.5280882352941176,
+          0.8853921568627451,
+          0.9258496732026144
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.5280882352941176,
+          0.6449509803921568,
+          0.9258496732026144,
+          0.8853921568627451
+        ],
+        "area": 21657.17915000001
+      },
+      {
+        "pixel_xywh": [
+          359.56,
+          0.57,
+          23.91,
+          32.5
+        ],
+        "norm_xyxy": [
+          0.5875163398692811,
+          0.0009313725490196077,
+          0.6265849673202615,
+          0.0540359477124183
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.0009313725490196077,
+          0.5875163398692811,
+          0.0540359477124183,
+          0.6265849673202615
+        ],
+        "area": 668.5187000000004
+      },
+      {
+        "pixel_xywh": [
+          484.17,
+          273.06,
+          127.83,
+          211.73
+        ],
+        "norm_xyxy": [
+          0.7911274509803922,
+          0.4461764705882353,
+          1.0,
+          0.7921405228758169
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.4461764705882353,
+          0.7911274509803922,
+          0.7921405228758169,
+          1.0
+        ],
+        "area": 15192.190900000001
+      },
+      {
+        "pixel_xywh": [
+          564.17,
+          234.26,
+          47.83,
+          191.78
+        ],
+        "norm_xyxy": [
+          0.921846405228758,
+          0.3827777777777778,
+          1.0,
+          0.6961437908496731
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.3827777777777778,
+          0.921846405228758,
+          0.6961437908496731,
+          1.0
+        ],
+        "area": 3452.2987000000003
+      }
+    ]
+  },
+  {
+    "name": "coco_apple_8_000000359833",
+    "file_name": "000000359833.jpg",
+    "image_id": 359833,
+    "width": 480,
+    "height": 640,
+    "primary_category": "apple",
+    "count": 8,
+    "tier": "high",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000359833.jpg",
+    "flickr_url": "http://farm9.staticflickr.com/8350/8185927378_1291fac336_z.jpg",
+    "all_categories": [
+      "apple",
+      "orange",
+      "person"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          168.36,
+          283.87,
+          61.36,
+          65.46
+        ],
+        "norm_xyxy": [
+          0.35075,
+          0.443546875,
+          0.4785833333333334,
+          0.545828125
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.443546875,
+          0.35075,
+          0.545828125,
+          0.4785833333333334
+        ],
+        "area": 2918.512799999999
+      },
+      {
+        "pixel_xywh": [
+          0.0,
+          158.13,
+          290.52,
+          210.05
+        ],
+        "norm_xyxy": [
+          0.0,
+          0.24707812499999998,
+          0.60525,
+          0.57528125
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.24707812499999998,
+          0.0,
+          0.57528125,
+          0.60525
+        ],
+        "area": 46995.38040000001
+      },
+      {
+        "pixel_xywh": [
+          0.0,
+          362.29,
+          150.03,
+          277.71
+        ],
+        "norm_xyxy": [
+          0.0,
+          0.566078125,
+          0.3125625,
+          1.0
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.566078125,
+          0.0,
+          1.0,
+          0.3125625
+        ],
+        "area": 33212.84525
+      },
+      {
+        "pixel_xywh": [
+          54.41,
+          0.14,
+          302.1,
+          75.88
+        ],
+        "norm_xyxy": [
+          0.11335416666666666,
+          0.00021875000000000003,
+          0.7427291666666667,
+          0.11878124999999999
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.00021875000000000003,
+          0.11335416666666666,
+          0.11878124999999999,
+          0.7427291666666667
+        ],
+        "area": 15104.026100000005
+      },
+      {
+        "pixel_xywh": [
+          169.65,
+          103.0,
+          40.32,
+          34.91
+        ],
+        "norm_xyxy": [
+          0.3534375,
+          0.1609375,
+          0.4374375,
+          0.215484375
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.1609375,
+          0.3534375,
+          0.215484375,
+          0.4374375
+        ],
+        "area": 931.9201499999998
+      },
+      {
+        "pixel_xywh": [
+          28.11,
+          82.07,
+          46.66,
+          42.05
+        ],
+        "norm_xyxy": [
+          0.058562499999999997,
+          0.12823437499999998,
+          0.15577083333333333,
+          0.19393749999999998
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.12823437499999998,
+          0.058562499999999997,
+          0.19393749999999998,
+          0.15577083333333333
+        ],
+        "area": 1538.2791000000002
+      },
+      {
+        "pixel_xywh": [
+          0.0,
+          134.63,
+          65.73,
+          48.92
+        ],
+        "norm_xyxy": [
+          0.0,
+          0.210359375,
+          0.13693750000000002,
+          0.286796875
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.210359375,
+          0.0,
+          0.286796875,
+          0.13693750000000002
+        ],
+        "area": 2415.1861
+      },
+      {
+        "pixel_xywh": [
+          146.69,
+          138.33,
+          91.9,
+          52.1
+        ],
+        "norm_xyxy": [
+          0.3056041666666667,
+          0.21614062500000003,
+          0.4970625,
+          0.297546875
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.21614062500000003,
+          0.3056041666666667,
+          0.297546875,
+          0.4970625
+        ],
+        "area": 2856.7414
+      }
+    ]
+  },
+  {
+    "name": "coco_dining table_6_000000091406",
+    "file_name": "000000091406.jpg",
+    "image_id": 91406,
+    "width": 640,
+    "height": 424,
+    "primary_category": "dining table",
+    "count": 6,
+    "tier": "high",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000091406.jpg",
+    "flickr_url": "http://farm8.staticflickr.com/7170/6843637155_9379f537f6_z.jpg",
+    "all_categories": [
+      "tv",
+      "chair",
+      "dining table",
+      "person",
+      "pizza",
+      "book",
+      "knife"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          443.0,
+          375.0,
+          197.0,
+          48.0
+        ],
+        "norm_xyxy": [
+          0.6921875,
+          0.8844339622641509,
+          1.0,
+          0.9976415094339622
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.8844339622641509,
+          0.6921875,
+          0.9976415094339622,
+          1.0
+        ],
+        "area": 5043.0
+      },
+      {
+        "pixel_xywh": [
+          181.19,
+          162.76,
+          69.05,
+          90.76
+        ],
+        "norm_xyxy": [
+          0.283109375,
+          0.3838679245283019,
+          0.391,
+          0.5979245283018868
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.3838679245283019,
+          0.283109375,
+          0.5979245283018868,
+          0.391
+        ],
+        "area": 1044.4667999999995
+      },
+      {
+        "pixel_xywh": [
+          19.91,
+          185.13,
+          134.36,
+          32.84
+        ],
+        "norm_xyxy": [
+          0.031109375,
+          0.43662735849056605,
+          0.24104687500000002,
+          0.5140801886792453
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.43662735849056605,
+          0.031109375,
+          0.5140801886792453,
+          0.24104687500000002
+        ],
+        "area": 1930.009100000001
+      },
+      {
+        "pixel_xywh": [
+          190.92,
+          177.42,
+          81.61,
+          84.9
+        ],
+        "norm_xyxy": [
+          0.2983125,
+          0.4184433962264151,
+          0.42582812499999995,
+          0.6186792452830189
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.4184433962264151,
+          0.2983125,
+          0.6186792452830189,
+          0.42582812499999995
+        ],
+        "area": 1925.181200000002
+      },
+      {
+        "pixel_xywh": [
+          2.2,
+          154.18,
+          171.81,
+          42.95
+        ],
+        "norm_xyxy": [
+          0.0034375000000000005,
+          0.3636320754716981,
+          0.271890625,
+          0.4649292452830189
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.3636320754716981,
+          0.0034375000000000005,
+          0.4649292452830189,
+          0.271890625
+        ],
+        "area": 2747.1280499999984
+      },
+      {
+        "pixel_xywh": [
+          571.57,
+          207.04,
+          68.43,
+          182.82
+        ],
+        "norm_xyxy": [
+          0.8930781250000001,
+          0.4883018867924528,
+          1.0,
+          0.9194811320754718
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.4883018867924528,
+          0.8930781250000001,
+          0.9194811320754718,
+          1.0
+        ],
+        "area": 4291.567100000002
+      }
+    ]
+  },
+  {
+    "name": "coco_toilet_10_000000458054",
+    "file_name": "000000458054.jpg",
+    "image_id": 458054,
+    "width": 640,
+    "height": 426,
+    "primary_category": "toilet",
+    "count": 10,
+    "tier": "high",
+    "license_id": 4,
+    "license_name": "Attribution License",
+    "license_url": "http://creativecommons.org/licenses/by/2.0/",
+    "coco_url": "http://images.cocodataset.org/val2017/000000458054.jpg",
+    "flickr_url": "http://farm9.staticflickr.com/8010/7579121084_7f1d01cd39_z.jpg",
+    "all_categories": [
+      "toilet"
+    ],
+    "boxes": [
+      {
+        "pixel_xywh": [
+          33.27,
+          0.0,
+          303.17,
+          426.0
+        ],
+        "norm_xyxy": [
+          0.051984375000000006,
+          0.0,
+          0.5256875,
+          1.0
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.0,
+          0.051984375000000006,
+          1.0,
+          0.5256875
+        ],
+        "area": 46990.2912
+      },
+      {
+        "pixel_xywh": [
+          228.8,
+          172.38,
+          195.29,
+          180.93
+        ],
+        "norm_xyxy": [
+          0.35750000000000004,
+          0.40464788732394363,
+          0.6626406250000001,
+          0.8293661971830986
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.40464788732394363,
+          0.35750000000000004,
+          0.8293661971830986,
+          0.6626406250000001
+        ],
+        "area": 24038.682499999995
+      },
+      {
+        "pixel_xywh": [
+          236.35,
+          11.53,
+          268.75,
+          379.3
+        ],
+        "norm_xyxy": [
+          0.36929687499999997,
+          0.027065727699530515,
+          0.7892187500000001,
+          0.9174413145539906
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.027065727699530515,
+          0.36929687499999997,
+          0.9174413145539906,
+          0.7892187500000001
+        ],
+        "area": 28197.469249999987
+      },
+      {
+        "pixel_xywh": [
+          346.72,
+          73.55,
+          193.9,
+          239.74
+        ],
+        "norm_xyxy": [
+          0.5417500000000001,
+          0.1726525821596244,
+          0.84471875,
+          0.7354225352112677
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.1726525821596244,
+          0.5417500000000001,
+          0.7354225352112677,
+          0.84471875
+        ],
+        "area": 13459.071
+      },
+      {
+        "pixel_xywh": [
+          448.38,
+          41.46,
+          138.27,
+          165.25
+        ],
+        "norm_xyxy": [
+          0.70059375,
+          0.09732394366197183,
+          0.916640625,
+          0.4852347417840376
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.09732394366197183,
+          0.70059375,
+          0.4852347417840376,
+          0.916640625
+        ],
+        "area": 7161.323000000001
+      },
+      {
+        "pixel_xywh": [
+          399.88,
+          28.4,
+          150.53,
+          212.71
+        ],
+        "norm_xyxy": [
+          0.6248125,
+          0.06666666666666667,
+          0.860015625,
+          0.5659859154929577
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.06666666666666667,
+          0.6248125,
+          0.5659859154929577,
+          0.860015625
+        ],
+        "area": 5298.39135
+      },
+      {
+        "pixel_xywh": [
+          539.94,
+          78.89,
+          100.06,
+          151.04
+        ],
+        "norm_xyxy": [
+          0.8436562500000001,
+          0.18518779342723005,
+          1.0,
+          0.5397417840375587
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.18518779342723005,
+          0.8436562500000001,
+          0.5397417840375587,
+          1.0
+        ],
+        "area": 7676.304449999996
+      },
+      {
+        "pixel_xywh": [
+          0.0,
+          0.0,
+          201.7,
+          426.0
+        ],
+        "norm_xyxy": [
+          0.0,
+          0.0,
+          0.31515624999999997,
+          1.0
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.0,
+          0.0,
+          1.0,
+          0.31515624999999997
+        ],
+        "area": 47570.85075
+      },
+      {
+        "pixel_xywh": [
+          504.25,
+          135.9,
+          52.6,
+          34.26
+        ],
+        "norm_xyxy": [
+          0.787890625,
+          0.3190140845070423,
+          0.870078125,
+          0.39943661971830985
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.3190140845070423,
+          0.787890625,
+          0.39943661971830985,
+          0.870078125
+        ],
+        "area": 666.426249999999
+      },
+      {
+        "pixel_xywh": [
+          428.64,
+          129.32,
+          134.7,
+          103.95
+        ],
+        "norm_xyxy": [
+          0.66975,
+          0.3035680751173709,
+          0.8802187499999998,
+          0.5475821596244131
+        ],
+        "norm_ymin_xmin_ymax_xmax": [
+          0.3035680751173709,
+          0.66975,
+          0.5475821596244131,
+          0.8802187499999998
+        ],
+        "area": 4439.078549999999
+      }
+    ]
+  }
+]

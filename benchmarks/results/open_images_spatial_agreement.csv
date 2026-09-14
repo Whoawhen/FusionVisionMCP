@@ -1,0 +1,37 @@
+fixture_name,image_id,subject,object,official_relationship,analogue_geometry_state,detected_both,measured_state,gap_pixels,a_inside_b,b_inside_a,embed_depth,agreement,license
+oi_containment_coffee_cup_coffee_ff05a375,ff05a3754a8e7247,Coffee cup,Coffee,contain,containment,True,touching,1.41,0.0,0.0,0.0,False,https://creativecommons.org/licenses/by/2.0/
+oi_containment_flowerpot_houseplant_6c72a2d6,6c72a2d685f8bca7,Flowerpot,Houseplant,contain,containment,True,overlapping,0.0,0.8123,0.2264,32.19,True,https://creativecommons.org/licenses/by/2.0/
+oi_containment_woman_car_e7fbfa67,e7fbfa67d3efc7b4,Woman,Car,inside_of,containment,True,overlapping,0.0,1.0,0.0109,49.65,True,https://creativecommons.org/licenses/by/2.0/
+oi_containment_wine_glass_wine_f5f0106c,f5f0106cdf31b21d,Wine glass,Wine,contain,containment,True,overlapping,0.0,0.5147,1.0,27.58,True,https://creativecommons.org/licenses/by/2.0/
+oi_containment_coffee_cup_tea_00e0a53e,00e0a53e14bf2447,Coffee cup,Tea,contain,containment,True,overlapping,0.0,0.0772,1.0,3.75,True,https://creativecommons.org/licenses/by/2.0/
+oi_containment_flowerpot_rose_d4457bb0,d4457bb0551265a6,Flowerpot,Rose,contain,containment,True,separate,208.43,0.0,0.0,0.0,False,https://creativecommons.org/licenses/by/2.0/
+oi_containment_man_car_6eeba38d,6eeba38d344dffd7,Man,Car,inside_of,containment,True,overlapping,0.0,0.0009,0.0001,1.0,False,https://creativecommons.org/licenses/by/2.0/
+oi_containment_mug_coffee_de578e71,de578e711d5d2712,Mug,Coffee,contain,containment,True,overlapping,0.0,0.2411,1.0,18.46,True,https://creativecommons.org/licenses/by/2.0/
+oi_containment_bowl_egg_(food)_a61ac2bd,a61ac2bd6c0fbe6f,Bowl,Egg (Food),contain,containment,True,separate,6.0,0.0,0.0,0.0,False,https://creativecommons.org/licenses/by/2.0/
+oi_containment_bottle_beer_5d6db82b,5d6db82b8eeb448f,Bottle,Beer,contain,containment,True,overlapping,0.0,1.0,1.0,43.79,True,https://creativecommons.org/licenses/by/2.0/
+oi_containment_wine_glass_cocktail_ca7f1c22,ca7f1c22d5781c58,Wine glass,Cocktail,contain,containment,True,overlapping,0.0,1.0,1.0,21.89,True,https://creativecommons.org/licenses/by/2.0/
+oi_containment_girl_car_f8d71e2f,f8d71e2f8479fe92,Girl,Car,inside_of,containment,True,overlapping,0.0,1.0,0.0092,50.45,True,https://creativecommons.org/licenses/by/2.0/
+oi_contact_woman_microphone_fe600639,fe600639ac5f36c1,Woman,Microphone,holds,contact,True,overlapping,0.0,0.0315,1.0,5.98,True,https://creativecommons.org/licenses/by/2.0/
+oi_contact_man_accordion_de635c5d,de635c5d3ecd3c46,Man,Accordion,holds,contact,True,overlapping,0.0,0.0004,0.0005,1.33,True,https://creativecommons.org/licenses/by/2.0/
+oi_contact_woman_racket_9d94d833,9d94d83310780c6f,Woman,Racket,holds,contact,True,overlapping,0.0,0.0001,0.0016,1.0,True,https://creativecommons.org/licenses/by/2.0/
+oi_contact_man_paddle_95c11dbb,95c11dbb3f5ebe2e,Man,Paddle,holds,contact,True,touching,1.0,0.0,0.0,0.0,True,https://creativecommons.org/licenses/by/2.0/
+oi_contact_boy_tennis_racket_422d4210,422d4210cdcdb6a5,Boy,Tennis racket,holds,contact,True,overlapping,0.0,0.0005,0.0033,2.24,True,https://creativecommons.org/licenses/by/2.0/
+oi_contact_man_violin_0fa1f463,0fa1f463189c8e42,Man,Violin,holds,contact,True,overlapping,0.0,0.0069,0.0272,2.22,True,https://creativecommons.org/licenses/by/2.0/
+oi_contact_man_surfboard_2b046ed2,2b046ed2fcd7b9d1,Man,Surfboard,holds,contact,True,overlapping,0.0,0.0005,0.0008,1.0,True,https://creativecommons.org/licenses/by/2.0/
+oi_contact_girl_bicycle_115bec3d,115bec3d6d7f09f2,Girl,Bicycle,holds,contact,True,overlapping,0.0,0.03,0.018,2.66,True,https://creativecommons.org/licenses/by/2.0/
+oi_contact_man_chair_2ddc8a00,2ddc8a002b4183e1,Man,Chair,on,contact,True,separate,91.24,0.0,0.0,0.0,False,https://creativecommons.org/licenses/by/2.0/
+oi_contact_man_tripod_3a87f9cb,3a87f9cb8d6cd23a,Man,Tripod,holds,contact,True,separate,21.0,0.0,0.0,0.0,False,https://creativecommons.org/licenses/by/2.0/
+oi_contact_man_binoculars_50484de6,50484de6c76032d6,Man,Binoculars,holds,contact,True,overlapping,0.0,0.0005,0.0025,7.22,True,https://creativecommons.org/licenses/by/2.0/
+oi_contact_boy_football_9d2aad58,9d2aad58b0bf0451,Boy,Football,holds,contact,True,separate,512.96,0.0,0.0,0.0,False,https://creativecommons.org/licenses/by/2.0/
+oi_separate_chair_table_78f2c3f1,78f2c3f1b0899c09,Chair,Table,at,separate,True,separate,130.08,0.0,0.0,0.0,True,https://creativecommons.org/licenses/by/2.0/
+oi_separate_man_table_3eedefc7,3eedefc73da3120e,Man,Table,at,separate,True,separate,115.76,0.0,0.0,0.0,True,https://creativecommons.org/licenses/by/2.0/
+oi_separate_chair_coffee_table_1fd97b32,1fd97b32298d03ae,Chair,Coffee table,at,separate,True,overlapping,0.0,0.824,0.9999,37.25,False,https://creativecommons.org/licenses/by/2.0/
+oi_separate_woman_table_66ef4a8a,66ef4a8a4a84b9b3,Woman,Table,at,separate,True,touching,2.0,0.0,0.0,0.0,False,https://creativecommons.org/licenses/by/2.0/
+oi_separate_man_desk_a47cd830,a47cd83076dc497e,Man,Desk,at,separate,True,overlapping,0.0,0.0017,0.0024,1.14,False,https://creativecommons.org/licenses/by/2.0/
+oi_separate_boy_table_6b9fc961,6b9fc961a434ab72,Boy,Table,at,separate,True,separate,61.66,0.0,0.0,0.0,True,https://creativecommons.org/licenses/by/2.0/
+oi_separate_chair_desk_f5f77d3a,f5f77d3a50ea6e21,Chair,Desk,at,separate,True,touching,1.41,0.0,0.0,0.0,False,https://creativecommons.org/licenses/by/2.0/
+oi_separate_woman_desk_4afc9fce,4afc9fce9b1398c0,Woman,Desk,at,separate,True,separate,147.28,0.0,0.0,0.0,True,https://creativecommons.org/licenses/by/2.0/
+oi_separate_girl_desk_59f89863,59f89863852379cf,Girl,Desk,at,separate,True,separate,81.32,0.0,0.0,0.0,True,https://creativecommons.org/licenses/by/2.0/
+oi_separate_chair_coffee_table_aeb082b4,aeb082b467a2c39e,Chair,Coffee table,at,separate,False,separate,75.19,0.0,0.0,0.0,True,https://creativecommons.org/licenses/by/2.0/
+oi_separate_woman_table_44a1c33f,44a1c33f790c5687,Woman,Table,at,separate,True,separate,100.81,0.0,0.0,0.0,True,https://creativecommons.org/licenses/by/2.0/
+oi_separate_chair_table_1eb99df4,1eb99df4147f898f,Chair,Table,at,separate,True,separate,2.24,0.0,0.0,0.0,True,https://creativecommons.org/licenses/by/2.0/

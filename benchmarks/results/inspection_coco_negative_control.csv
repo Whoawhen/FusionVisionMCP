@@ -1,0 +1,25 @@
+fixture_name,image_id,coco_gt_person_count,detected_person,detected_arm,detected_leg,detected_hand,detected_head,detected_finger,anomaly_count,anomaly_descriptions,license
+coco_bicycle_1_000000374545,374545,"n/a (secondary category, no box-level truth)",32,0,4,0,0,2,0,,http://creativecommons.org/licenses/by/2.0/
+coco_airplane_1_000000134886,134886,"n/a (secondary category, no box-level truth)",23,1,2,1,3,1,0,,http://creativecommons.org/licenses/by/2.0/
+coco_bus_1_000000303818,303818,"n/a (secondary category, no box-level truth)",29,0,18,2,0,1,0,,http://creativecommons.org/licenses/by/2.0/
+coco_horse_1_000000045070,45070,"n/a (secondary category, no box-level truth)",1,0,6,3,2,6,0,,http://creativecommons.org/licenses/by/2.0/
+coco_laptop_2_000000363840,363840,"n/a (secondary category, no box-level truth)",1,0,2,0,3,2,0,,http://creativecommons.org/licenses/by/2.0/
+coco_sheep_4_000000094871,94871,"n/a (secondary category, no box-level truth)",13,6,23,7,0,9,1,"Structural anomaly: person 1 of 10 at [123, 0, 286, 385] has 6 legs associated with them (expected at most 2).",http://creativecommons.org/licenses/by/2.0/
+coco_car_4_000000577932,577932,"n/a (secondary category, no box-level truth)",27,1,12,1,3,0,0,,http://creativecommons.org/licenses/by/2.0/
+coco_bird_3_000000456496,456496,"n/a (secondary category, no box-level truth)",1,1,3,1,2,2,0,,http://creativecommons.org/licenses/by/2.0/
+coco_bottle_3_000000008021,8021,"n/a (secondary category, no box-level truth)",3,2,2,2,10,8,0,,http://creativecommons.org/licenses/by/2.0/
+coco_chair_3_000000054605,54605,"n/a (secondary category, no box-level truth)",18,0,2,2,0,4,0,,http://creativecommons.org/licenses/by/2.0/
+coco_surfboard_3_000000043435,43435,"n/a (secondary category, no box-level truth)",2,3,10,9,3,7,0,,http://creativecommons.org/licenses/by/2.0/
+coco_person_3_000000461751,461751,3,23,2,2,1,4,2,0,,http://creativecommons.org/licenses/by/2.0/
+coco_orange_4_000000276434,276434,"n/a (secondary category, no box-level truth)",1,3,3,1,0,7,0,,http://creativecommons.org/licenses/by/2.0/
+coco_boat_5_000000511599,511599,"n/a (secondary category, no box-level truth)",39,0,10,1,0,2,0,,http://creativecommons.org/licenses/by/2.0/
+coco_motorcycle_4_000000338219,338219,"n/a (secondary category, no box-level truth)",34,0,3,1,3,2,0,,http://creativecommons.org/licenses/by/2.0/
+coco_bowl_4_000000397133,397133,"n/a (secondary category, no box-level truth)",2,3,5,1,1,10,0,,http://creativecommons.org/licenses/by/2.0/
+coco_person_10_000000247917,247917,10,21,0,19,12,0,3,0,,http://creativecommons.org/licenses/by/2.0/
+coco_chair_7_000000013659,13659,"n/a (secondary category, no box-level truth)",4,0,2,9,4,16,0,,http://creativecommons.org/licenses/by/2.0/
+coco_bottle_13_000000213547,213547,"n/a (secondary category, no box-level truth)",2,5,11,8,3,11,0,,http://creativecommons.org/licenses/by/2.0/
+coco_banana_13_000000090891,90891,"n/a (secondary category, no box-level truth)",5,11,16,9,7,7,0,,http://creativecommons.org/licenses/by/2.0/
+coco_book_7_000000366884,366884,"n/a (secondary category, no box-level truth)",1,0,4,0,3,1,0,,http://creativecommons.org/licenses/by/2.0/
+coco_cup_11_000000074733,74733,"n/a (secondary category, no box-level truth)",3,0,0,3,0,2,0,,http://creativecommons.org/licenses/by/2.0/
+coco_apple_8_000000359833,359833,"n/a (secondary category, no box-level truth)",1,3,1,1,1,4,0,,http://creativecommons.org/licenses/by/2.0/
+coco_dining table_6_000000091406,91406,"n/a (secondary category, no box-level truth)",4,0,5,5,4,7,0,,http://creativecommons.org/licenses/by/2.0/

@@ -1,0 +1,220 @@
+#  florence2.py
+#
+#  Copyright (c) 2025-2026 Junpei Kawamoto
+#
+#  This software is released under the MIT License.
+#
+#  http://opensource.org/licenses/mit-license.php
+
+import json
+from typing import Any
+
+import torch
+from PIL.Image import Image
+from torch import dtype
+from transformers import AutoProcessor, Florence2ForConditionalGeneration
+
+from .constants import CaptionLevel
+from .device import resolve_device
+from .subprocess import subprocess
+
+
+class Florence2:
+    device: str
+    torch_dtype: dtype
+    model: Any
+    processor: Any
+
+    def __init__(self, model_id: str, device: str | None = None) -> None:
+        self.device = resolve_device(device)
+        if self.device.startswith("mps"):
+            self.torch_dtype = torch.float16
+        else:
+            self.torch_dtype = torch.float32
+
+        self.model = Florence2ForConditionalGeneration.from_pretrained(
+            model_id, dtype=self.torch_dtype, trust_remote_code=True
+        ).to(self.device)
+        self.processor = AutoProcessor.from_pretrained(
+            model_id, trust_remote_code=True, clean_up_tokenization_spaces=True
+        )
+
+    def ocr(self, images: list[Image]) -> list[str]:
+        return self.generate("<OCR>", images)
+
+    def caption(self, images: list[Image], level: CaptionLevel = CaptionLevel.NORMAL) -> list[str]:
+        return self.generate(str(level.value), images)
+
+    def detect_objects(
+        self, images: list[Image], object_name: str, exclude_full_frame: bool = False
+    ) -> list[dict[str, Any]]:
+        """Locates instances of the named object, returning bounding boxes, center points and labels.
+
+        `exclude_full_frame`, off by default, drops any box covering almost the
+        entire image (>=98% of its area). Florence-2's grounding head confidently
+        returns exactly that box on a canvas with nothing matching the query
+        (a blank image asked for any noun), so this recovers the empty-result
+        answer for a caller that specifically expects to distinguish "found
+        nothing" from "found one instance". Left off by default because the same
+        shape is also the *correct* answer when the named object genuinely fills
+        the frame (a close-up photo of wood queried for "wood") -- unconditionally
+        dropping it would silently turn that legitimate detection into nothing
+        found, which is worse than the blank-canvas false positive this exists to
+        fix.
+        """
+        grounded = self.generate_structured("<CAPTION_TO_PHRASE_GROUNDING>", images, text=object_name)
+
+        results = []
+        for img, region in zip(images, grounded, strict=True):
+            bboxes = region.get("bboxes", [])
+            labels = region.get("labels", [])
+
+            if not exclude_full_frame:
+                results.append(_with_center_points({"bboxes": bboxes, "labels": labels}))
+                continue
+
+            img_area = img.width * img.height
+            filtered_bboxes = []
+            filtered_labels = []
+            for box, label in zip(bboxes, labels, strict=True):
+                x1, y1, x2, y2 = box
+                box_area = max(x2 - x1, 0) * max(y2 - y1, 0)
+                if img_area > 0 and box_area / img_area >= 0.98:
+                    continue
+                filtered_bboxes.append(box)
+                filtered_labels.append(label)
+
+            results.append(_with_center_points({"bboxes": filtered_bboxes, "labels": filtered_labels}))
+
+        return results
+
+    def dense_region_caption(self, images: list[Image]) -> list[dict[str, Any]]:
+        return self.generate_structured("<DENSE_REGION_CAPTION>", images)
+
+    def ocr_with_regions(self, images: list[Image]) -> list[dict[str, Any]]:
+        """OCR with verbatim text *and* the box each text span occupies.
+
+        Florence-2's `<OCR_WITH_REGION>` head transcribes text faithfully (unlike the
+        caption head, which paraphrases it) and returns each span's four-point polygon.
+        Each result is normalized to an axis-aligned `bboxes`/`labels` shape so callers
+        don't have to know about quads: `quad_boxes` becomes `bboxes` as
+        `[min_x, min_y, max_x, max_y]`, kept alongside the original `quad_boxes` for
+        callers that need the polygon. One entry per input image.
+        """
+        structured = self.generate_structured("<OCR_WITH_REGION>", images)
+        return [_quad_regions_to_bboxes(region) for region in structured]
+
+    def generate(self, prompt: str, images: list[Image]) -> list[str]:
+        """Runs any Florence-2 task token and always returns text.
+
+        Most task tokens (`<CAPTION>` and its relatives) decode to a plain string, which
+        this strips and returns as-is. A structured task token (`<OD>`, `<REGION_PROPOSAL>`,
+        `<OCR_WITH_REGION>` and the like) decodes to a dict instead -- calling `.strip()` on
+        that crashed here until this branch was added, breaking exactly the raw task tokens
+        `process`'s own docstring names as examples. JSON-encoding it keeps the `list[str]`
+        contract `process` promises ("this returns raw text either way") for every task token,
+        not only the ones that happen to decode to a string.
+        """
+        res = []
+        for parsed in self._run(prompt, images):
+            res.append(parsed.strip() if isinstance(parsed, str) else json.dumps(parsed))
+        return res
+
+    def generate_structured(self, task: str, images: list[Image], text: str | None = None) -> list[dict[str, Any]]:
+        prompt = task if text is None else task + text
+        return list(self._run(prompt, images, task=task))
+
+    def _run(self, prompt: str, images: list[Image], task: str | None = None) -> list[Any]:
+        task = task or prompt
+        res = []
+        for img in images:
+            with img.convert("RGB") as rgb_img:
+                inputs = self.processor(text=prompt, images=rgb_img, return_tensors="pt").to(
+                    self.device, self.torch_dtype
+                )
+
+                generated_ids = self.model.generate(
+                    input_ids=inputs["input_ids"],
+                    pixel_values=inputs["pixel_values"],
+                    max_new_tokens=1024,
+                    num_beams=3,
+                    do_sample=False,
+                )
+                generated_text = self.processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
+
+                parsed_answer = self.processor.post_process_generation(
+                    generated_text, task=task, image_size=(rgb_img.width, rgb_img.height)
+                )
+
+                res.append(parsed_answer[task])
+
+        return res
+
+
+def _with_center_points(region: dict[str, Any]) -> dict[str, Any]:
+    """Adds each box's center point to a Florence-2 bboxes/labels region result.
+
+    The grounding call already produces the boxes, so the centers cost two arithmetic
+    operations apiece. Returning both spares a caller that only wants a point from
+    having to make a second, identical model call to get it.
+    """
+    bboxes = region.get("bboxes", [])
+    return {
+        "bboxes": bboxes,
+        "points": [[(x1 + x2) / 2, (y1 + y2) / 2] for x1, y1, x2, y2 in bboxes],
+        "labels": region.get("labels", []),
+    }
+
+
+def _quad_regions_to_bboxes(region: dict[str, Any]) -> dict[str, Any]:
+    """Normalizes a Florence-2 `<OCR_WITH_REGION>` result into axis-aligned boxes.
+
+    The head returns `quad_boxes` (four-point polygons as
+    ``[x1, y1, x2, y2, x3, y3, x4, y4]``) and `labels` (the verbatim text per span).
+    Most callers want a simple bounding box, so each quad is collapsed to its
+    min/max extents and exposed as `bboxes`; the original `quad_boxes` are kept for
+    callers that need the polygon. `labels` is returned unchanged.
+    """
+    quad_boxes = region.get("quad_boxes", []) or []
+    labels = region.get("labels", []) or []
+    bboxes = []
+    for quad in quad_boxes:
+        xs = quad[0::2]
+        ys = quad[1::2]
+        bboxes.append([min(xs), min(ys), max(xs), max(ys)])
+    return {"quad_boxes": quad_boxes, "bboxes": bboxes, "labels": labels}
+
+
+class Florence2SP:
+    model_id: str
+    device: str | None
+
+    def __init__(self, model_id: str, device: str | None = None) -> None:
+        self.model_id = model_id
+        self.device = device
+
+    @subprocess
+    def ocr(self, images: list[Image]) -> list[str]:
+        return Florence2(self.model_id, self.device).ocr(images)
+
+    @subprocess
+    def caption(self, images: list[Image], level: CaptionLevel = CaptionLevel.NORMAL) -> list[str]:
+        return Florence2(self.model_id, self.device).caption(images, level)
+
+    @subprocess
+    def detect_objects(
+        self, images: list[Image], object_name: str, exclude_full_frame: bool = False
+    ) -> list[dict[str, Any]]:
+        return Florence2(self.model_id, self.device).detect_objects(images, object_name, exclude_full_frame)
+
+    @subprocess
+    def dense_region_caption(self, images: list[Image]) -> list[dict[str, Any]]:
+        return Florence2(self.model_id, self.device).dense_region_caption(images)
+
+    @subprocess
+    def ocr_with_regions(self, images: list[Image]) -> list[dict[str, Any]]:
+        return Florence2(self.model_id, self.device).ocr_with_regions(images)
+
+    @subprocess
+    def generate(self, prompt: str, images: list[Image]) -> list[str]:
+        return Florence2(self.model_id, self.device).generate(prompt, images)

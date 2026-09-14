@@ -1,0 +1,69 @@
+import torch
+import numpy as np
+from PIL.Image import Image
+from typing import Any
+
+from fusion_vision_mcp.device import resolve_device
+
+class EasyOCREngine:
+    """
+    Specialist OCR model using EasyOCR (CRAFT + CRNN).
+
+    This model is optimized for extracting text in the wild (scene text, 
+    watermarks, stylized fonts, logos) and returns explicit confidence scores.
+    It is loaded lazily and respects the central idle-release mechanism.
+    """
+
+    def __init__(
+        self,
+        device: torch.device | None = None,
+    ) -> None:
+        self.device = device if device is not None else torch.device(resolve_device())
+        self._reader = None
+
+    def release(self) -> None:
+        if self._reader is not None:
+            del self._reader
+            self._reader = None
+        if self.device.type == "cuda":
+            torch.cuda.empty_cache()
+
+    def _load(self) -> "Any":
+        if self._reader is None:
+            import easyocr
+            use_gpu = self.device.type == "cuda"
+            self._reader = easyocr.Reader(['en'], gpu=use_gpu)
+        return self._reader
+
+    def ocr(self, image: Image, max_new_tokens: int = 256) -> str:
+        """
+        Extracts verbatim text from an image. 
+        Returns a flat string to satisfy the SpecialistOCR protocol for fusion.
+        """
+        results = self.readtext(image)
+        return "\n".join(r["text"] for r in results)
+
+    def readtext(self, image: Image) -> list[dict[str, Any]]:
+        """
+        Extracts text, bounding boxes, and confidence scores.
+        """
+        reader = self._load()
+        img_np = np.array(image.convert("RGB"))
+        results = reader.readtext(img_np)
+        
+        output = []
+        for bbox, text, prob in results:
+            # bbox is [[x1,y1], [x2,y1], [x2,y2], [x1,y2]]
+            # Convert numpy types to native Python types for JSON serialization
+            x1 = int(min(pt[0] for pt in bbox))
+            y1 = int(min(pt[1] for pt in bbox))
+            x2 = int(max(pt[0] for pt in bbox))
+            y2 = int(max(pt[1] for pt in bbox))
+            
+            output.append({
+                "text": text,
+                "confidence": float(prob),
+                "box": [x1, y1, x2, y2]
+            })
+        return output
+

@@ -1,0 +1,50 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-json
+      - id: check-yaml
+      - id: check-toml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: pretty-format-json
+        args: [--autofix, --no-sort-keys]
+  - repo: https://github.com/google/yamlfmt
+    rev: v0.21.0
+    hooks:
+      - id: yamlfmt
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.1
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+  - repo: https://github.com/tox-dev/pyproject-fmt
+    rev: v2.27.0
+    hooks:
+      - id: pyproject-fmt
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.3.0
+    hooks:
+      - id: mypy
+        args: []
+        files: ^src/
+        additional_dependencies:
+          - "mcp>=2"
+          - "rich-click>=1.8.8"
+          - "types-requests>=2.32.0.20250328"
+          - "torch>=2.6"
+          - "pillow>=11.1"
+          - "pytest>=8.3.4"
+          - "numpy>=2.1"
+          - "scipy>=1.14"
+          - "scipy-stubs"
+  - repo: local
+    hooks:
+      - id: pytest
+        name: Run pytest
+        entry: uv run pytest
+        language: system
+        pass_filenames: false
+        always_run: true

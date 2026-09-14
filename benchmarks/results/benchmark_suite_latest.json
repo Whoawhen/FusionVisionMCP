@@ -1,0 +1,128 @@
+{
+  "caption_flower": {
+    "time": 10.403373956680298,
+    "output": {
+      "text": "The image is a 3D rendering of a colorful flower-like object. It is made up of multiple layers of paper, arranged in a circular pattern. The colors of the paper are pastel, with shades of pink, orange, yellow, green, blue, and purple. The petals are evenly spaced and have a soft, velvety texture. The object appears to be floating on a white background."
+    }
+  },
+  "ocr_defect": {
+    "time": 7.891015529632568,
+    "output": {
+      "text": "Aasra\\n(eke\\n(R7NIT\\nhdiikeuzsc\\nCpedl\\nAwlGR \\nQgiell\\nchoui\\n(nunnliaant'\\nElf,\\nAvgwu)"
+    }
+  },
+  "count_flower": {
+    "time": 11.608411073684692,
+    "output": {
+      "count": 1,
+      "bboxes": [
+        [
+          23.799022674560547,
+          22.28426742553711,
+          102.5362548828125,
+          103.94024658203125
+        ]
+      ],
+      "points": [
+        [
+          63.16763877868652,
+          63.11225700378418
+        ]
+      ],
+      "labels": [
+        "petal"
+      ],
+      "scores": [
+        0.6980276107788086
+      ],
+      "group_boxes_dropped": 0,
+      "adaptive_threshold": {
+        "threshold": 0.405649870634079,
+        "used": true,
+        "confidence": 0.84,
+        "reason": "cliff at index 0 (gap=0.58); candidate=0.41, clamped=0.41",
+        "base_threshold": 0.15,
+        "raw_detection_count": 900
+      },
+      "_routing": {
+        "backend": "grounding_dino",
+        "unique_colors_per_1k_px": 384.46,
+        "mean_saturation": 0.0,
+        "luminance_stddev": 0.0,
+        "reason": "color density 384.46 >= threshold 10.0 -> photograph"
+      },
+      "silhouette": {
+        "box": [
+          23,
+          22,
+          102,
+          103
+        ],
+        "lobes": 1,
+        "by_distance": 1,
+        "distance_support": 1.0,
+        "by_radial": 8,
+        "radial_strength": 0.17924869817134548,
+        "notch_depth": 0.052380693619420354,
+        "solidity": 0.9964986737400531,
+        "agreement": false,
+        "inradius": 35.0,
+        "level_runs": [
+          [
+            1,
+            0.95,
+            0.2
+          ]
+        ],
+        "shattered": false,
+        "clipped": false
+      },
+      "consensus": {
+        "detector_count": 1,
+        "region_label_count": 0,
+        "agree": false
+      },
+      "separable": "no",
+      "estimates": {
+        "outline": 8,
+        "basis": "outline rosette (angular notches); the detector collapsed overlapping instances, but the outline still carries the lobe pattern"
+      },
+      "semantic_ambiguity": true,
+      "count_semantics": "minimum_visible_instances",
+      "ambiguity": {
+        "ambiguous": true,
+        "reason": "Detector collapsed overlapping instances into a single connected region, but outline geometry indicates composite structure",
+        "evidence": [
+          "Detector returned count=1 with separable='no'",
+          "Silhouette outline indicates 8 repeated lobes"
+        ]
+      }
+    }
+  },
+  "query_defect": {
+    "time": 39.488784074783325,
+    "output": {
+      "answer": "In the image, two men are standing outside a house, engaged in a conversation. One man is wearing a red shirt and a red baseball cap, while the other man is wearing a gray sweatshirt and a gray baseball cap. The man in the red shirt is holding a clipboard, possibly discussing something with the man in the gray sweatshirt. The presence of the clipboard suggests that they might be reviewing or discussing some documents or information.",
+      "observations": [
+        {
+          "claim": "unassociated_count: 2 part detection(s) belong to no person the detector found (2 person box(es) after dedup, from 2 raw). Detection coverage, not anatomy: excluded from every ratio above.",
+          "source": "detector",
+          "corroborated": false,
+          "evidence": [
+            "1 leg detection(s) matched no detected person box (of 7 after dedup, 9 raw)",
+            "1 finger detection(s) matched no detected person box (of 11 after dedup, 15 raw)"
+          ]
+        },
+        {
+          "claim": "In the image, two men are standing outside a house, engaged in a conversation. One man is wearing a red shirt and a red baseball cap, while the other man is wearing a gray sweatshirt and a gray baseball cap. The man in the red shirt is holding a clipboard, possibly discussing something with the man in the gray sweatshirt. The presence of the clipboard suggests that they might be reviewing or discussing some documents or information.",
+          "source": "vqa",
+          "corroborated": false,
+          "evidence": [
+            "VLM provided this claim, but it lacks structural corroboration."
+          ]
+        }
+      ],
+      "anomalies": []
+    }
+  }
+}

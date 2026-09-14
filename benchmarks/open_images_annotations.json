@@ -1,0 +1,866 @@
+[
+  {
+    "name": "oi_containment_coffee_cup_coffee_ff05a375",
+    "file_name": "ff05a3754a8e7247.jpg",
+    "image_id": "ff05a3754a8e7247",
+    "subject": "Coffee cup",
+    "object": "Coffee",
+    "relationship": "contain",
+    "analogue_geometry_state": "containment",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.1875,
+      0.0375,
+      0.854688,
+      0.975
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.248437,
+      0.102083,
+      0.804688,
+      0.91875
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c1.staticflickr.com/9/8691/17176775242_dfef1c7f39_z.jpg",
+    "original_url": "https://farm8.staticflickr.com/8691/17176775242_80c4cc8f4d_o.jpg"
+  },
+  {
+    "name": "oi_containment_flowerpot_houseplant_6c72a2d6",
+    "file_name": "6c72a2d685f8bca7.jpg",
+    "image_id": "6c72a2d685f8bca7",
+    "subject": "Flowerpot",
+    "object": "Houseplant",
+    "relationship": "contain",
+    "analogue_geometry_state": "containment",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.586643,
+      0.402527,
+      1.0,
+      1.0
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.018051,
+      0.122744,
+      1.0,
+      1.0
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c4.staticflickr.com/8/7009/6524260507_382ca2a60a_z.jpg",
+    "original_url": "https://farm8.staticflickr.com/7009/6524260507_d2746c4b11_o.jpg"
+  },
+  {
+    "name": "oi_containment_woman_car_e7fbfa67",
+    "file_name": "e7fbfa67d3efc7b4.jpg",
+    "image_id": "e7fbfa67d3efc7b4",
+    "subject": "Woman",
+    "object": "Car",
+    "relationship": "inside_of",
+    "analogue_geometry_state": "containment",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.368932,
+      0.510094,
+      0.480583,
+      0.57066
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.286408,
+      0.049798,
+      0.86165,
+      0.960969
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c6.staticflickr.com/5/4051/4655376346_86e929d5ea_z.jpg",
+    "original_url": "https://farm5.staticflickr.com/4051/4655376346_620f4e1a59_o.jpg"
+  },
+  {
+    "name": "oi_containment_wine_glass_wine_f5f0106c",
+    "file_name": "f5f0106cdf31b21d.jpg",
+    "image_id": "f5f0106cdf31b21d",
+    "subject": "Wine glass",
+    "object": "Wine",
+    "relationship": "contain",
+    "analogue_geometry_state": "containment",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.281711,
+      0.110619,
+      1.0,
+      0.473451
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.469027,
+      0.097345,
+      0.905605,
+      0.475664
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c2.staticflickr.com/7/6128/5999269435_6cfa731443_z.jpg",
+    "original_url": "https://c6.staticflickr.com/7/6128/5999269435_c5d050e192_o.jpg"
+  },
+  {
+    "name": "oi_containment_coffee_cup_tea_00e0a53e",
+    "file_name": "00e0a53e14bf2447.jpg",
+    "image_id": "00e0a53e14bf2447",
+    "subject": "Coffee cup",
+    "object": "Tea",
+    "relationship": "contain",
+    "analogue_geometry_state": "containment",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.0,
+      0.425,
+      0.24375,
+      0.6625
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.008333,
+      0.48125,
+      0.045833,
+      0.596875
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c8.staticflickr.com/8/7635/16810904778_01776f8b65_z.jpg",
+    "original_url": "https://farm8.staticflickr.com/7635/16810904778_d40921c745_o.jpg"
+  },
+  {
+    "name": "oi_containment_flowerpot_rose_d4457bb0",
+    "file_name": "d4457bb0551265a6.jpg",
+    "image_id": "d4457bb0551265a6",
+    "subject": "Flowerpot",
+    "object": "Rose",
+    "relationship": "contain",
+    "analogue_geometry_state": "containment",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.20625,
+      0.20625,
+      0.997917,
+      0.69375
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.235417,
+      0.0,
+      0.441667,
+      0.101563
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c6.staticflickr.com/9/8570/16688185916_c78164336f_z.jpg",
+    "original_url": "https://farm7.staticflickr.com/8570/16688185916_15470e4a35_o.jpg"
+  },
+  {
+    "name": "oi_containment_man_car_6eeba38d",
+    "file_name": "6eeba38d344dffd7.jpg",
+    "image_id": "6eeba38d344dffd7",
+    "subject": "Man",
+    "object": "Car",
+    "relationship": "inside_of",
+    "analogue_geometry_state": "containment",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.150463,
+      0.385915,
+      0.493056,
+      0.597183
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.243056,
+      0.097183,
+      0.858796,
+      0.895775
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c6.staticflickr.com/8/7368/9990144583_3e0abd69f6_z.jpg",
+    "original_url": "https://farm8.staticflickr.com/7368/9990144583_6b86bc3e89_o.jpg"
+  },
+  {
+    "name": "oi_containment_mug_coffee_de578e71",
+    "file_name": "de578e711d5d2712.jpg",
+    "image_id": "de578e711d5d2712",
+    "subject": "Mug",
+    "object": "Coffee",
+    "relationship": "contain",
+    "analogue_geometry_state": "containment",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.172566,
+      0.047198,
+      0.776549,
+      0.486726
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.314159,
+      0.150442,
+      0.542035,
+      0.445428
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c1.staticflickr.com/4/3149/2471138966_44fe5cb7f4_z.jpg",
+    "original_url": "https://farm3.staticflickr.com/3149/2471138966_0611b8f078_o.jpg"
+  },
+  {
+    "name": "oi_containment_bowl_egg_(food)_a61ac2bd",
+    "file_name": "a61ac2bd6c0fbe6f.jpg",
+    "image_id": "a61ac2bd6c0fbe6f",
+    "subject": "Bowl",
+    "object": "Egg (Food)",
+    "relationship": "contain",
+    "analogue_geometry_state": "containment",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.097345,
+      0.0,
+      0.719027,
+      0.905605
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.165929,
+      0.094395,
+      0.371681,
+      0.750737
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c4.staticflickr.com/6/5109/5652156970_c404c8021b_z.jpg",
+    "original_url": "https://c8.staticflickr.com/6/5109/5652156970_15397d9239_o.jpg"
+  },
+  {
+    "name": "oi_containment_bottle_beer_5d6db82b",
+    "file_name": "5d6db82b8eeb448f.jpg",
+    "image_id": "5d6db82b8eeb448f",
+    "subject": "Bottle",
+    "object": "Beer",
+    "relationship": "contain",
+    "analogue_geometry_state": "containment",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.0,
+      0.212389,
+      0.997788,
+      0.581121
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.493363,
+      0.235988,
+      0.980088,
+      0.582596
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c4.staticflickr.com/7/6088/6070350644_3d0d95a049_z.jpg",
+    "original_url": "https://c8.staticflickr.com/7/6088/6070350644_fc3ac27a81_o.jpg"
+  },
+  {
+    "name": "oi_containment_wine_glass_cocktail_ca7f1c22",
+    "file_name": "ca7f1c22d5781c58.jpg",
+    "image_id": "ca7f1c22d5781c58",
+    "subject": "Wine glass",
+    "object": "Cocktail",
+    "relationship": "contain",
+    "analogue_geometry_state": "containment",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.30625,
+      0.347917,
+      0.835938,
+      0.64375
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.307813,
+      0.35,
+      0.8375,
+      0.64375
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c5.staticflickr.com/9/8299/8020509451_750fa8506a_z.jpg",
+    "original_url": "https://c1.staticflickr.com/9/8299/8020509451_f2a3cbe3d7_o.jpg"
+  },
+  {
+    "name": "oi_containment_girl_car_f8d71e2f",
+    "file_name": "f8d71e2f8479fe92.jpg",
+    "image_id": "f8d71e2f8479fe92",
+    "subject": "Girl",
+    "object": "Car",
+    "relationship": "inside_of",
+    "analogue_geometry_state": "containment",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.421397,
+      0.562687,
+      0.530568,
+      0.61791
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.331878,
+      0.032836,
+      0.912664,
+      1.0
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c4.staticflickr.com/3/2712/4354945106_fe965e7440_z.jpg",
+    "original_url": "https://farm3.staticflickr.com/2712/4354945106_c5da6a1b07_o.jpg"
+  },
+  {
+    "name": "oi_contact_woman_microphone_fe600639",
+    "file_name": "fe600639ac5f36c1.jpg",
+    "image_id": "fe600639ac5f36c1",
+    "subject": "Woman",
+    "object": "Microphone",
+    "relationship": "holds",
+    "analogue_geometry_state": "contact",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.130531,
+      0.36377,
+      0.716814,
+      0.686303
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.35177,
+      0.466863,
+      0.495575,
+      0.555228
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c8.staticflickr.com/6/5612/15340259497_6b4323bab9_z.jpg",
+    "original_url": "https://farm2.staticflickr.com/5612/15340259497_dd0f22ebf2_o.jpg"
+  },
+  {
+    "name": "oi_contact_man_accordion_de635c5d",
+    "file_name": "de635c5d3ecd3c46.jpg",
+    "image_id": "de635c5d3ecd3c46",
+    "subject": "Man",
+    "object": "Accordion",
+    "relationship": "holds",
+    "analogue_geometry_state": "contact",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.152655,
+      0.230089,
+      0.995575,
+      0.768437
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.402655,
+      0.396755,
+      0.794248,
+      0.749263
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c1.staticflickr.com/4/3861/19151137210_ddf2de99c8_z.jpg",
+    "original_url": "https://farm7.staticflickr.com/3861/19151137210_1a90196f75_o.jpg"
+  },
+  {
+    "name": "oi_contact_woman_racket_9d94d833",
+    "file_name": "9d94d83310780c6f.jpg",
+    "image_id": "9d94d83310780c6f",
+    "subject": "Woman",
+    "object": "Racket",
+    "relationship": "holds",
+    "analogue_geometry_state": "contact",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.183628,
+      0.380531,
+      0.995575,
+      0.688791
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.0,
+      0.538348,
+      0.252212,
+      0.626844
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c4.staticflickr.com/9/8161/7490351106_e04a367e37_z.jpg",
+    "original_url": "https://c8.staticflickr.com/9/8161/7490351106_2c6aeb09b8_o.jpg"
+  },
+  {
+    "name": "oi_contact_man_paddle_95c11dbb",
+    "file_name": "95c11dbb3f5ebe2e.jpg",
+    "image_id": "95c11dbb3f5ebe2e",
+    "subject": "Man",
+    "object": "Paddle",
+    "relationship": "holds",
+    "analogue_geometry_state": "contact",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.301562,
+      0.277083,
+      0.901563,
+      0.65625
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.582812,
+      0.53125,
+      0.909375,
+      0.98125
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c6.staticflickr.com/1/10/16970659_fcfa653d49_z.jpg?zz=1",
+    "original_url": "https://c7.staticflickr.com/1/10/16970659_fcfa653d49_o.jpg"
+  },
+  {
+    "name": "oi_contact_boy_tennis_racket_422d4210",
+    "file_name": "422d4210cdcdb6a5.jpg",
+    "image_id": "422d4210cdcdb6a5",
+    "subject": "Boy",
+    "object": "Tennis racket",
+    "relationship": "holds",
+    "analogue_geometry_state": "contact",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.036873,
+      0.369469,
+      0.938053,
+      0.891593
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.328909,
+      0.132743,
+      0.492625,
+      0.55531
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c8.staticflickr.com/8/7216/7358944960_0f03a707d2_z.jpg",
+    "original_url": "https://farm6.staticflickr.com/7216/7358944960_98ca575c9a_o.jpg"
+  },
+  {
+    "name": "oi_contact_man_violin_0fa1f463",
+    "file_name": "0fa1f463189c8e42.jpg",
+    "image_id": "0fa1f463189c8e42",
+    "subject": "Man",
+    "object": "Violin",
+    "relationship": "holds",
+    "analogue_geometry_state": "contact",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.154217,
+      0.269283,
+      0.99759,
+      0.764547
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.0,
+      0.37889,
+      0.877108,
+      0.841678
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c8.staticflickr.com/5/4082/4767052683_54b1e7a1e9_z.jpg",
+    "original_url": "https://farm3.staticflickr.com/4082/4767052683_1495ee327f_o.jpg"
+  },
+  {
+    "name": "oi_contact_man_surfboard_2b046ed2",
+    "file_name": "2b046ed2fcd7b9d1.jpg",
+    "image_id": "2b046ed2fcd7b9d1",
+    "subject": "Man",
+    "object": "Surfboard",
+    "relationship": "holds",
+    "analogue_geometry_state": "contact",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.632743,
+      0.249263,
+      0.789823,
+      0.382006
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.765487,
+      0.174041,
+      0.803097,
+      0.438053
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c6.staticflickr.com/9/8712/16960966360_ff7c8fe7b8_z.jpg",
+    "original_url": "https://farm2.staticflickr.com/8712/16960966360_f844450fa6_o.jpg"
+  },
+  {
+    "name": "oi_contact_girl_bicycle_115bec3d",
+    "file_name": "115bec3d6d7f09f2.jpg",
+    "image_id": "115bec3d6d7f09f2",
+    "subject": "Girl",
+    "object": "Bicycle",
+    "relationship": "holds",
+    "analogue_geometry_state": "contact",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.154167,
+      0.4375,
+      0.820833,
+      0.653125
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.347917,
+      0.23125,
+      0.835417,
+      0.765625
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c2.staticflickr.com/4/3581/3685504815_c15a389bd3_z.jpg",
+    "original_url": "https://farm3.staticflickr.com/3581/3685504815_3b2e748520_o.jpg"
+  },
+  {
+    "name": "oi_contact_man_chair_2ddc8a00",
+    "file_name": "2ddc8a002b4183e1.jpg",
+    "image_id": "2ddc8a002b4183e1",
+    "subject": "Man",
+    "object": "Chair",
+    "relationship": "on",
+    "analogue_geometry_state": "contact",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.373894,
+      0.455081,
+      0.909292,
+      0.655376
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.457965,
+      0.480118,
+      0.915929,
+      0.712813
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c4.staticflickr.com/5/4088/5201203457_f524ca3e21_z.jpg",
+    "original_url": "https://farm2.staticflickr.com/4088/5201203457_203eb18260_o.jpg"
+  },
+  {
+    "name": "oi_contact_man_tripod_3a87f9cb",
+    "file_name": "3a87f9cb8d6cd23a.jpg",
+    "image_id": "3a87f9cb8d6cd23a",
+    "subject": "Man",
+    "object": "Tripod",
+    "relationship": "holds",
+    "analogue_geometry_state": "contact",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.078125,
+      0.3375,
+      0.998438,
+      0.95
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.289063,
+      0.0,
+      1.0,
+      0.6
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c8.staticflickr.com/3/2032/2280628345_0cc91a8907_z.jpg",
+    "original_url": "https://c3.staticflickr.com/3/2032/2280628345_a4014229e2_o.jpg"
+  },
+  {
+    "name": "oi_contact_man_binoculars_50484de6",
+    "file_name": "50484de6c76032d6.jpg",
+    "image_id": "50484de6c76032d6",
+    "subject": "Man",
+    "object": "Binoculars",
+    "relationship": "holds",
+    "analogue_geometry_state": "contact",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.163717,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.320796,
+      0.29351,
+      0.79646,
+      0.693215
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c1.staticflickr.com/1/203/443238285_e6e2eac45f_z.jpg?zz=1",
+    "original_url": "https://farm7.staticflickr.com/203/443238285_b2065a90b0_o.jpg"
+  },
+  {
+    "name": "oi_contact_boy_football_9d2aad58",
+    "file_name": "9d2aad58b0bf0451.jpg",
+    "image_id": "9d2aad58b0bf0451",
+    "subject": "Boy",
+    "object": "Football",
+    "relationship": "holds",
+    "analogue_geometry_state": "contact",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.739583,
+      0.485938,
+      0.995833,
+      0.585938
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.95,
+      0.49375,
+      0.997917,
+      0.539063
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c7.staticflickr.com/1/45/137154501_6ed0b07edb_z.jpg",
+    "original_url": "https://farm2.staticflickr.com/45/137154501_6ed0b07edb_o.jpg"
+  },
+  {
+    "name": "oi_separate_chair_table_78f2c3f1",
+    "file_name": "78f2c3f1b0899c09.jpg",
+    "image_id": "78f2c3f1b0899c09",
+    "subject": "Chair",
+    "object": "Table",
+    "relationship": "at",
+    "analogue_geometry_state": "separate",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.55625,
+      0.707812,
+      0.702083,
+      0.790625
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.510417,
+      0.510938,
+      0.685417,
+      0.654688
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c7.staticflickr.com/9/8191/8141824718_7e36bfcbc3_z.jpg",
+    "original_url": "https://c2.staticflickr.com/9/8191/8141824718_7dc572a92e_o.jpg"
+  },
+  {
+    "name": "oi_separate_man_table_3eedefc7",
+    "file_name": "3eedefc73da3120e.jpg",
+    "image_id": "3eedefc73da3120e",
+    "subject": "Man",
+    "object": "Table",
+    "relationship": "at",
+    "analogue_geometry_state": "separate",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.053125,
+      0.28125,
+      0.257813,
+      0.454167
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.320313,
+      0.25625,
+      0.998438,
+      0.997917
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c2.staticflickr.com/8/7377/9926668874_1df0139d2c_z.jpg",
+    "original_url": "https://c7.staticflickr.com/8/7377/9926668874_b37e492a5e_o.jpg"
+  },
+  {
+    "name": "oi_separate_chair_coffee_table_1fd97b32",
+    "file_name": "1fd97b32298d03ae.jpg",
+    "image_id": "1fd97b32298d03ae",
+    "subject": "Chair",
+    "object": "Coffee table",
+    "relationship": "at",
+    "analogue_geometry_state": "separate",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.202505,
+      0.179688,
+      1.0,
+      0.71875
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.653445,
+      0.7875,
+      1.0,
+      1.0
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c1.staticflickr.com/4/3136/4561235695_f8f8c32ce0_z.jpg",
+    "original_url": "https://c7.staticflickr.com/4/3136/4561235695_dc0867ac25_o.jpg"
+  },
+  {
+    "name": "oi_separate_woman_table_66ef4a8a",
+    "file_name": "66ef4a8a4a84b9b3.jpg",
+    "image_id": "66ef4a8a4a84b9b3",
+    "subject": "Woman",
+    "object": "Table",
+    "relationship": "at",
+    "analogue_geometry_state": "separate",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.3375,
+      0.803125,
+      1.0,
+      1.0
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.641667,
+      0.332812,
+      1.0,
+      0.757813
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c5.staticflickr.com/6/5464/8879975105_9eb116ea4b_z.jpg",
+    "original_url": "https://farm4.staticflickr.com/5464/8879975105_fb469b525d_o.jpg"
+  },
+  {
+    "name": "oi_separate_man_desk_a47cd830",
+    "file_name": "a47cd83076dc497e.jpg",
+    "image_id": "a47cd83076dc497e",
+    "subject": "Man",
+    "object": "Desk",
+    "relationship": "at",
+    "analogue_geometry_state": "separate",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.179204,
+      0.085546,
+      0.761062,
+      0.258112
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.391593,
+      0.370206,
+      0.767699,
+      0.685841
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c3.staticflickr.com/4/3425/3358203645_5c76c2bc64_z.jpg",
+    "original_url": "https://c7.staticflickr.com/4/3425/3358203645_2c30c651af_o.jpg"
+  },
+  {
+    "name": "oi_separate_boy_table_6b9fc961",
+    "file_name": "6b9fc961a434ab72.jpg",
+    "image_id": "6b9fc961a434ab72",
+    "subject": "Boy",
+    "object": "Table",
+    "relationship": "at",
+    "analogue_geometry_state": "separate",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.212389,
+      0.638643,
+      1.0,
+      1.0
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.820796,
+      0.0,
+      0.997788,
+      0.582596
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c8.staticflickr.com/7/6056/5900444685_f439966deb_z.jpg",
+    "original_url": "https://farm3.staticflickr.com/6056/5900444685_d98ab7b954_o.jpg"
+  },
+  {
+    "name": "oi_separate_chair_desk_f5f77d3a",
+    "file_name": "f5f77d3a50ea6e21.jpg",
+    "image_id": "f5f77d3a50ea6e21",
+    "subject": "Chair",
+    "object": "Desk",
+    "relationship": "at",
+    "analogue_geometry_state": "separate",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.158333,
+      0.221875,
+      0.564583,
+      0.439063
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.404167,
+      0.0,
+      0.841667,
+      0.146875
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c3.staticflickr.com/4/3040/2544333973_b7d86c671c_z.jpg",
+    "original_url": "https://farm2.staticflickr.com/3040/2544333973_05a1ac5fe4_o.jpg"
+  },
+  {
+    "name": "oi_separate_woman_desk_4afc9fce",
+    "file_name": "4afc9fce9b1398c0.jpg",
+    "image_id": "4afc9fce9b1398c0",
+    "subject": "Woman",
+    "object": "Desk",
+    "relationship": "at",
+    "analogue_geometry_state": "separate",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.01875,
+      0.25,
+      0.995833,
+      0.623438
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.658333,
+      0.670313,
+      0.95625,
+      0.998438
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c3.staticflickr.com/8/7578/16021283162_90cc43b7fd_z.jpg",
+    "original_url": "https://farm1.staticflickr.com/7578/16021283162_5f8c6f9705_o.jpg"
+  },
+  {
+    "name": "oi_separate_girl_desk_59f89863",
+    "file_name": "59f89863852379cf.jpg",
+    "image_id": "59f89863852379cf",
+    "subject": "Girl",
+    "object": "Desk",
+    "relationship": "at",
+    "analogue_geometry_state": "separate",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.25625,
+      0.409375,
+      0.4875,
+      0.525
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.420833,
+      0.095312,
+      0.560417,
+      0.340625
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c3.staticflickr.com/4/3693/9300557987_e8605cd4b0_z.jpg",
+    "original_url": "https://c8.staticflickr.com/4/3693/9300557987_e1891d0736_o.jpg"
+  },
+  {
+    "name": "oi_separate_chair_coffee_table_aeb082b4",
+    "file_name": "aeb082b467a2c39e.jpg",
+    "image_id": "aeb082b467a2c39e",
+    "subject": "Chair",
+    "object": "Coffee table",
+    "relationship": "at",
+    "analogue_geometry_state": "separate",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.539823,
+      0.470501,
+      0.891593,
+      0.679941
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.621681,
+      0.744838,
+      0.64823,
+      0.930678
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c2.staticflickr.com/9/8424/7510940252_99a7716cc0_z.jpg",
+    "original_url": "https://c7.staticflickr.com/9/8424/7510940252_aec06c1697_o.jpg"
+  },
+  {
+    "name": "oi_separate_woman_table_44a1c33f",
+    "file_name": "44a1c33f790c5687.jpg",
+    "image_id": "44a1c33f790c5687",
+    "subject": "Woman",
+    "object": "Table",
+    "relationship": "at",
+    "analogue_geometry_state": "separate",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.055276,
+      0.42607,
+      0.792295,
+      0.986381
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.874372,
+      0.14786,
+      0.998325,
+      0.998055
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c8.staticflickr.com/9/8556/15585085360_36bcb88f08_z.jpg",
+    "original_url": "https://farm8.staticflickr.com/8556/15585085360_b4cbba4bfd_o.jpg"
+  },
+  {
+    "name": "oi_separate_chair_table_1eb99df4",
+    "file_name": "1eb99df4147f898f.jpg",
+    "image_id": "1eb99df4147f898f",
+    "subject": "Chair",
+    "object": "Table",
+    "relationship": "at",
+    "analogue_geometry_state": "separate",
+    "box_subject_norm_ymin_xmin_ymax_xmax": [
+      0.508333,
+      0.792188,
+      0.85625,
+      0.992188
+    ],
+    "box_object_norm_ymin_xmin_ymax_xmax": [
+      0.527083,
+      0.0,
+      1.0,
+      0.696875
+    ],
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download_url": "https://c4.staticflickr.com/3/2801/4515587634_504555a5a0_z.jpg",
+    "original_url": "https://c8.staticflickr.com/3/2801/4515587634_37f0566625_o.jpg"
+  }
+]
