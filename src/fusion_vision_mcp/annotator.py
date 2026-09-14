@@ -39,3 +39,4 @@ def save_annotated_image(image: Image.Image, boxes: list[list[float]], labels: l
     filepath = os.path.abspath(os.path.join(temp_dir, filename))
     img_draw.save(filepath, "JPEG")
     return filepath
+

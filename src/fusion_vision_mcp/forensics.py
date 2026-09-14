@@ -58,3 +58,4 @@ def analyze_metadata_anomalies(image: Image.Image) -> list[dict[str, str]]:
     # Further heuristics could check for impossibly missing EXIF (e.g. claims to be photo but no ISO/FocalLength) 
     # but we will stick to explicit positive flags to minimize false positives.
     return anomalies
+
