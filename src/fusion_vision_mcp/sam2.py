@@ -1,10 +1,3 @@
-#  sam2.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """SAM2-backed segmentation: turns a bounding box into the object's silhouette."""
 
 from typing import Any

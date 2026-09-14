@@ -1,10 +1,3 @@
-#  routing.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Automatic back-end selection for `count_objects` based on model-free pixel statistics.
 
 `choose_count_backend` decides whether to route a counting request through Florence-2

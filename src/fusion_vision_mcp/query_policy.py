@@ -1,10 +1,3 @@
-#  query_policy.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Recognizes a maximally vague object name, for the blank-canvas false-detection guard.
 
 `detect_objects("object")` on a blank canvas returns a box spanning almost the entire frame --

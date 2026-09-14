@@ -1,10 +1,3 @@
-#  open_images_relation_fixtures.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Open Images visual relationship detection (VRD) fixtures for spatial relationship benchmarking.
 
 Prior to this module, `spatial_relations` and the underlying geometric measurements in

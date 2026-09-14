@@ -1,10 +1,3 @@
-#  coco_fixtures.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Curated COCO val2017 fixtures with professional ground-truth annotations.
 
 Currently, this repository's benchmark suite relies almost entirely on synthetic geometric

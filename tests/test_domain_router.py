@@ -1,10 +1,3 @@
-#  test_domain_router.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Unit tests for domain_router.py's pure logic. No model, runs in milliseconds.
 
 Live classification accuracy is measured in `benchmarks/tune_domain_threshold.py` against

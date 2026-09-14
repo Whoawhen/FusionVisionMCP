@@ -1,10 +1,3 @@
-#  harness.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Model-independent evaluation harness for repeated-instance counting.
 
 Scores anything matching the `InstanceDetector` shape -- `detect_objects(images,

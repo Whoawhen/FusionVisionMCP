@@ -1,10 +1,3 @@
-#  test_crosscheck.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Unit tests for the query_image cross-check execution (no models).
 
 The routing decision (classify + names_for) is covered by test_question.py; these

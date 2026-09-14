@@ -1,10 +1,3 @@
-#  test_open_images_fixtures.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Unit tests for Open Images visual relationship benchmark fixtures and agreement logic."""
 
 from __future__ import annotations

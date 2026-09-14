@@ -1,10 +1,3 @@
-#  tune_domain_threshold.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Empirically evaluate the domain router against `domain_fixtures.py`'s honest ground truth.
 
 The margin threshold only gates the `ambiguous` flag -- it cannot change which label wins

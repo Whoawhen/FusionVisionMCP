@@ -1,18 +1,18 @@
 {
   "caption_flower": {
-    "time": 10.403373956680298,
+    "time": 10.864839553833008,
     "output": {
       "text": "The image is a 3D rendering of a colorful flower-like object. It is made up of multiple layers of paper, arranged in a circular pattern. The colors of the paper are pastel, with shades of pink, orange, yellow, green, blue, and purple. The petals are evenly spaced and have a soft, velvety texture. The object appears to be floating on a white background."
     }
   },
   "ocr_defect": {
-    "time": 7.891015529632568,
+    "time": 0.5582704544067383,
     "output": {
-      "text": "Aasra\\n(eke\\n(R7NIT\\nhdiikeuzsc\\nCpedl\\nAwlGR \\nQgiell\\nchoui\\n(nunnliaant'\\nElf,\\nAvgwu)"
+      "text": "Error executing tool ocr: 'charmap' codec can't encode character '\\u2588' in position 12: character maps to <undefined>"
     }
   },
   "count_flower": {
-    "time": 11.608411073684692,
+    "time": 11.506036043167114,
     "output": {
       "count": 1,
       "bboxes": [
@@ -100,29 +100,9 @@
     }
   },
   "query_defect": {
-    "time": 39.488784074783325,
+    "time": 0.7154362201690674,
     "output": {
-      "answer": "In the image, two men are standing outside a house, engaged in a conversation. One man is wearing a red shirt and a red baseball cap, while the other man is wearing a gray sweatshirt and a gray baseball cap. The man in the red shirt is holding a clipboard, possibly discussing something with the man in the gray sweatshirt. The presence of the clipboard suggests that they might be reviewing or discussing some documents or information.",
-      "observations": [
-        {
-          "claim": "unassociated_count: 2 part detection(s) belong to no person the detector found (2 person box(es) after dedup, from 2 raw). Detection coverage, not anatomy: excluded from every ratio above.",
-          "source": "detector",
-          "corroborated": false,
-          "evidence": [
-            "1 leg detection(s) matched no detected person box (of 7 after dedup, 9 raw)",
-            "1 finger detection(s) matched no detected person box (of 11 after dedup, 15 raw)"
-          ]
-        },
-        {
-          "claim": "In the image, two men are standing outside a house, engaged in a conversation. One man is wearing a red shirt and a red baseball cap, while the other man is wearing a gray sweatshirt and a gray baseball cap. The man in the red shirt is holding a clipboard, possibly discussing something with the man in the gray sweatshirt. The presence of the clipboard suggests that they might be reviewing or discussing some documents or information.",
-          "source": "vqa",
-          "corroborated": false,
-          "evidence": [
-            "VLM provided this claim, but it lacks structural corroboration."
-          ]
-        }
-      ],
-      "anomalies": []
+      "text": "Error executing tool query_image: HfMoondream does not support an attention implementation through torch.nn.functional.scaled_dot_product_attention yet. Please request the support for this architecture: https://github.com/huggingface/transformers/issues/28005. If you believe this error is a bug, please open an issue in Transformers GitHub repository and load your model with the argument `attn_implementation=\"eager\"` meanwhile. Example: `model = AutoModel.from_pretrained(\"openai/whisper-tiny\", attn_implementation=\"eager\")`"
     }
   }
 }

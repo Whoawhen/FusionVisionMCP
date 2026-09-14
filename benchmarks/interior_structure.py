@@ -1,10 +1,3 @@
-#  interior_structure.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """A REJECTED experiment: counting repeated parts from interior colour.
 
 **This does not ship, and this file is kept only so the negative result is

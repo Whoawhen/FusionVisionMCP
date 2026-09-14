@@ -1,10 +1,3 @@
-#  test_routing.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Pure unit tests for routing.py.  No model, no server, no network -- runs in milliseconds.
 
 Live routing accuracy against the clip-art scene fixture is covered in ``test_server.py``

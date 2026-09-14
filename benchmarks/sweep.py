@@ -1,10 +1,3 @@
-#  sweep.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Phase 3: sweep the thresholds the shipped detector already exposes.
 
 Every documented counting limit was measured at Grounding DINO's default

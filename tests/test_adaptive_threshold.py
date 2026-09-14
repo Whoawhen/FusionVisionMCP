@@ -1,10 +1,3 @@
-#  test_adaptive_threshold.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Unit tests for adaptive_threshold.py. Pure logic, no model, runs in milliseconds."""
 
 from fusion_vision_mcp.adaptive_threshold import ThresholdResult, choose_threshold

@@ -1,10 +1,3 @@
-#  evaluate_spatial_relations.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Evaluate spatial_relations agreement against Open Images visual relationship ground truth.
 
 Prior to Sprint 16, `spatial_relations` and the underlying geometric measurements in

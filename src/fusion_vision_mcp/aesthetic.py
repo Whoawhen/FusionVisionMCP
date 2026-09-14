@@ -1,10 +1,3 @@
-#  aesthetic.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """CLIP-backed aesthetic scoring: rates how pleasing an image is to look at, independent of content."""
 
 import hashlib

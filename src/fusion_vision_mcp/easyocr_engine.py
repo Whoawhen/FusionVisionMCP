@@ -17,8 +17,10 @@ class EasyOCREngine:
     def __init__(
         self,
         device: torch.device | None = None,
+        languages: list[str] | None = None
     ) -> None:
         self.device = device if device is not None else torch.device(resolve_device())
+        self.languages = languages or ['en', 'es', 'fr', 'de']
         self._reader = None
 
     def release(self) -> None:
@@ -32,7 +34,7 @@ class EasyOCREngine:
         if self._reader is None:
             import easyocr
             use_gpu = self.device.type == "cuda"
-            self._reader = easyocr.Reader(['en'], gpu=use_gpu)
+            self._reader = easyocr.Reader(self.languages, gpu=use_gpu)
         return self._reader
 
     def ocr(self, image: Image, max_new_tokens: int = 256) -> str:
@@ -49,7 +51,8 @@ class EasyOCREngine:
         """
         reader = self._load()
         img_np = np.array(image.convert("RGB"))
-        results = reader.readtext(img_np)
+        # We pass batch_size=2 to enforce a strict memory cap on CPU execution
+        results = reader.readtext(img_np, batch_size=2)
         
         output = []
         for bbox, text, prob in results:

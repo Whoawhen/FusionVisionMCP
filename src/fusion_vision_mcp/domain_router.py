@@ -1,10 +1,3 @@
-#  domain_router.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Domain routing using SigLIP2 zero-shot classification.
 
 Routes images to the appropriate vision backend based on their visual domain:

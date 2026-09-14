@@ -1,10 +1,3 @@
-#  grounding_dino.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Grounding DINO: open-vocabulary detection that returns one box per instance.
 
 Both detection heads already in this server emit regions as a *sequence*: Florence-2

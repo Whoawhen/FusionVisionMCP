@@ -1,10 +1,3 @@
-#  inspection_coco_negative_control.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Negative control for `inspection._check_anatomy`, against real photographs of people.
 
 Sprint 17 of the v0.8.1 plan ("The missing negative control"). The third vision pass found that

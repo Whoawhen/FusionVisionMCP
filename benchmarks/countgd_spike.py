@@ -1,10 +1,3 @@
-#  countgd_spike.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """A REJECTED spike: CountGD as a drop-in counting backend.
 
 **This does not ship. It is kept so the result is reproducible rather than asserted.**

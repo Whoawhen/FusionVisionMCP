@@ -1,10 +1,3 @@
-#  fixtures.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Counting fixtures with known ground truth.
 
 Synthetic cases are drawn programmatically, so their instance count is exact by

@@ -1,10 +1,3 @@
-#  idle.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Keeps a model loaded while it is being used and releases it once it goes idle.
 
 Loading Florence-2 or Moondream costs several seconds, so unloading after every

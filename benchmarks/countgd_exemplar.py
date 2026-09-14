@@ -1,10 +1,3 @@
-#  countgd_exemplar.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """A REJECTED spike: CountGD's visual-exemplar mode on HF's Grounding DINO graph.
 
 **This does not ship.** Kept so the result is reproducible; not imported from `src/`.

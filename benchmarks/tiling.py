@@ -1,10 +1,3 @@
-#  tiling.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Experiment: does tiled inference recover heavily-overlapping instances?
 
 The one positive the shipped detector still misses is eight shapes overlapping by

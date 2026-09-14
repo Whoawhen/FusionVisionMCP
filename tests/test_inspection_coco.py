@@ -1,10 +1,3 @@
-#  test_inspection_coco.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Live-model negative control for `inspection._check_anatomy` (Sprint 17, v0.8.1 plan).
 
 `tests/test_inspection.py` only ever exercises `_check_anatomy` against a `_StubDetector`

@@ -1,10 +1,3 @@
-#  domain_fixtures.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Fixtures for domain-router testing, covering all five `domain_router.py` groups.
 
 Kept separate from `fixtures.py`'s `all_fixtures()`, which is the *counting* benchmark's

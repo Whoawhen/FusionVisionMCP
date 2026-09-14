@@ -1,10 +1,3 @@
-#  constants.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Model-choice constants and the `CaptionLevel` enum, kept free of torch/transformers.
 
 Split out of the model wrapper modules (`aesthetic.py`, `florence2.py`,

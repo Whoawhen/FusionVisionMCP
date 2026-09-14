@@ -1,10 +1,3 @@
-#  moondream.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 from typing import Any
 
 import torch
@@ -49,6 +42,7 @@ class Moondream:
             revision=revision,
             trust_remote_code=True,
             torch_dtype=torch_dtype,
+            attn_implementation="sdpa",
         ).to(self.device)  # type: ignore[arg-type]
 
     def query(self, images: list[Image], question: str) -> list[str]:

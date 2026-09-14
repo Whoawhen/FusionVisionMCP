@@ -1,10 +1,3 @@
-#  measure_coco_colors.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Compute the unique-RGB-colors-per-1000-pixels statistic across COCO val2017 fixtures.
 
 Sprint 4 demonstrated that SigLIP2 zero-shot domain classification misclassified the

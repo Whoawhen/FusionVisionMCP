@@ -1,10 +1,3 @@
-#  adaptive_threshold.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Adaptive detection threshold selection for Grounding DINO.
 
 The fixed `threshold=0.15` default was chosen by sweeping the counting benchmark

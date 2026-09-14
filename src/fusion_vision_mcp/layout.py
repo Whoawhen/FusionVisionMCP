@@ -1,10 +1,3 @@
-#  layout.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Column detection for OCR.
 
 A document laid out in side-by-side columns (a two-column form, meeting notes,

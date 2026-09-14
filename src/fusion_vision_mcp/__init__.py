@@ -1,10 +1,3 @@
-#  __init__.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 import importlib.metadata
 import logging
 import math
@@ -228,7 +221,7 @@ class AestheticScorer(Protocol):
 class AppContext:
     """Context for the FastMCP app."""
 
-    processor: Processor
+    florence2: Processor
     vqa: VqaProcessor
     segmenter: Segmenter
     aesthetic: AestheticScorer
@@ -270,7 +263,7 @@ async def app_lifespan(
     if idle_timeout > 0:
         # Keep each model in this process so repeat calls stay fast, and let the
         # idle timer hand its memory back once the work stops.
-        processor = cast(
+        florence2 = cast(
             Processor,
             IdleProxy(IdleReleased(lambda: Florence2(model_id, device), idle_timeout, "Florence-2")),
         )
@@ -286,9 +279,9 @@ async def app_lifespan(
         )
     else:
         if subprocess:
-            processor = Florence2SP(model_id, device)
+            florence2 = Florence2SP(model_id, device)
         else:
-            processor = Florence2(model_id, device)
+            florence2 = Florence2(model_id, device)
         vqa = Moondream(moondream_model_id, moondream_revision, device)
 
     # Always lazy, on both paths. `IdleReleased` builds on first use and, with a
@@ -335,7 +328,7 @@ async def app_lifespan(
             )
         )
 
-    yield AppContext(processor, vqa, segmenter, aesthetic, counter, ocr_specialist, iqa, reasoner)
+    yield AppContext(florence2, vqa, segmenter, aesthetic, counter, ocr_specialist, iqa, reasoner)
 
 
 def server(
@@ -563,7 +556,7 @@ def server(
         """
         app = ctx.request_context.lifespan_context
         with get_images(src) as images:
-            captions = app.processor.caption(images, CaptionLevel.MORE_DETAILED)
+            captions = app.florence2.caption(images, CaptionLevel.MORE_DETAILED)
             if not verify_text and not auto_verify_text:
                 return captions
 
@@ -574,7 +567,7 @@ def server(
             if not should_verify:
                 return captions
 
-            regioned = app.processor.ocr_with_regions(images)
+            regioned = app.florence2.ocr_with_regions(images)
             results = []
             for image, caption_text, page_regions in zip(images, captions, regioned, strict=True):
                 text_regions = [
@@ -591,12 +584,27 @@ def server(
             return results
 
     @mcp.tool()
-    def detect_objects(ctx: Context[AppContext], src: ImagePath, object_name: ObjectName) -> list[dict[str, Any]]:
+    def detect_objects(
+        ctx: Context[AppContext],
+        src: ImagePath,
+        object_name: ObjectName,
+        return_annotated: Annotated[
+            bool,
+            Field(
+                description=(
+                    "If true, returns a local temp file path to an annotated image with drawn bounding boxes."
+                )
+            ),
+        ] = False,
+    ) -> list[dict[str, Any]] | dict[str, Any]:
         """Locate a named object in an image, as bounding boxes and center points.
 
         Returns `bboxes` ([x1, y1, x2, y2] each), `points` (the center of each box)
         and `labels`, all index-aligned -- so use this whether you want regions or
         coordinates; the centers come free with the boxes.
+
+        If `return_annotated` is true, the return value becomes a dictionary containing
+        the regular results plus an `annotated_image_path` key.
 
         The count of results is NOT a reliable count of objects on an ambiguous
         class name: Florence-2 can return several overlapping results for one
@@ -621,10 +629,20 @@ def server(
         vocabulary itself: a specific noun that genuinely fills the frame (a
         close-up of wood, asked for "wood") is returned unfiltered.
         """
+        app = ctx.request_context.lifespan_context
         with get_images(src) as images:
-            return execute_detection(
-                ctx.request_context.lifespan_context, images, object_name, backend_preference="florence2"
+            results = execute_detection(
+                app, images, object_name, backend_preference="florence2"
             )
+            
+            if return_annotated:
+                from fusion_vision_mcp.annotator import save_annotated_image
+                for img, res in zip(images, results):
+                    if "bboxes" in res and res["bboxes"]:
+                        filepath = save_annotated_image(img, res["bboxes"], res.get("labels"))
+                        res["annotated_image_path"] = filepath
+            
+            return results
 
     @mcp.tool()
     def dense_region_caption(ctx: Context[AppContext], src: ImagePath) -> list[dict[str, Any]]:
@@ -637,7 +655,7 @@ def server(
         describes the whole scene in prose with no coordinates.
         """
         with get_images(src) as images:
-            return ctx.request_context.lifespan_context.processor.dense_region_caption(images)
+            return ctx.request_context.lifespan_context.florence2.dense_region_caption(images)
 
     @mcp.tool()
     def query_image(
@@ -712,6 +730,21 @@ def server(
                 results = []
                 for image, answer in zip(images, answers, strict=True):
                     observations, anomalies = analyze_inspection(app, image, [answer])
+                    
+                    # Metadata/EXIF Forensics
+                    from fusion_vision_mcp.forensics import analyze_metadata_anomalies
+                    meta_anomalies = analyze_metadata_anomalies(image)
+                    for ma in meta_anomalies:
+                        obs = Observation(
+                            claim=ma["claim"],
+                            source=ma["source"],
+                            corroborated=False,
+                            evidence=[ma["evidence"]]
+                        )
+                        anomalies.append(Anomaly(
+                            description="Generative metadata signature detected.",
+                            observations=[obs]
+                        ))
                     
                     # Spec 20: Auto-check for generative text hallucinations
                     try:
@@ -825,12 +858,11 @@ def server(
             bool,
             Field(
                 description=(
-                    "When true (default), automatically select the detection threshold from the "
-                    "score distribution. Grounding DINO runs once with a minimal threshold to "
-                    "collect all raw scores, then choose_threshold selects a conservative floor "
-                    "based on the confidence cliff between a strong target and weaker distractors. "
-                    "The result includes an adaptive_threshold diagnostic block. Set false to use "
-                    "the fixed threshold value directly."
+                    "When true, evaluates the raw detection distribution using kernel density "
+                    "estimation to automatically raise the threshold just above noise clusters "
+                    "if clear modes exist. Suppresses hundreds of false-positive sub-boxes in "
+                    "texture-heavy scenes while preserving real detections. Overrides manual "
+                    "threshold if the adaptive threshold is higher."
                 )
             ),
         ] = True,
@@ -848,6 +880,12 @@ def server(
                     "`group_boxes_dropped` is not applicable."
                 )
             ),
+        ] = False,
+        return_annotated: Annotated[
+            bool,
+            Field(
+                description="If true, saves an annotated image with counting boxes and returns the file path."
+            )
         ] = False,
     ) -> list[dict[str, Any]]:
         """Count how many instances of a named object an image contains.
@@ -942,7 +980,7 @@ def server(
                 if verify_silhouette:
                     _add_silhouette(app, image, result)
                 if consensus:
-                    region_label_count = _region_label_consensus(app.processor, image, object_name)
+                    region_label_count = _region_label_consensus(app.florence2, image, object_name)
                     result["consensus"] = {
                         "detector_count": result.get("count"),
                         "region_label_count": region_label_count,
@@ -982,6 +1020,18 @@ def server(
                 result["count_semantics"] = count_semantics
                 if ambiguity_res.ambiguous:
                     result["ambiguity"] = ambiguity_res.as_dict()
+                    
+            if return_annotated:
+                from fusion_vision_mcp.annotator import save_annotated_image
+                for img, res in zip(images, results):
+                    if "bboxes" in res and res["bboxes"]:
+                        # For counting, if labels are missing, generate them dynamically
+                        labels = res.get("labels")
+                        if not labels and "bboxes" in res:
+                            labels = [f"{object_name} {i+1}" for i in range(len(res["bboxes"]))]
+                        filepath = save_annotated_image(img, res["bboxes"], labels)
+                        res["annotated_image_path"] = filepath
+                        
             return results
 
     @mcp.tool()
@@ -1336,7 +1386,7 @@ def server(
         document where each one misleads. This returns raw text either way.
         """
         with get_images(src) as images:
-            return ctx.request_context.lifespan_context.processor.generate(prompt, images)
+            return ctx.request_context.lifespan_context.florence2.generate(prompt, images)
 
     return mcp
 
@@ -1547,7 +1597,7 @@ def _vqa_cross_check(app: AppContext, image: Image, question_text: str) -> dict[
             "separable": _separability(result),
         }
     if category == question.OCR:
-        return {"tool": "ocr", "text": app.processor.ocr([image])[0]}
+        return {"tool": "ocr", "text": app.florence2.ocr([image])[0]}
     if category == question.SIZE:
         return _size_measurement(app, image, names[0], question_text)
     return None
@@ -1728,10 +1778,10 @@ def _critique_one(
     """
     box: list[int] | None
     if target_subject:
-        detected = app.processor.detect_objects([image], target_subject)[0]
+        detected = app.florence2.detect_objects([image], target_subject)[0]
         box = [int(v) for v in detected["bboxes"][0]] if detected["bboxes"] else None
     else:
-        box = _pick_primary_subject(app.processor.dense_region_caption([image])[0], (image.width, image.height))
+        box = _pick_primary_subject(app.florence2.dense_region_caption([image])[0], (image.width, image.height))
 
     aesthetics = app.aesthetic.score([image])[0]
     style: dict[str, Any] | None = None
@@ -1770,15 +1820,15 @@ def _critique_one(
 def _dispatch(app: AppContext, operation: str, images: list[Image], *, question: str, object_name: str) -> Any:
     """Routes a `batch_analyze_images` operation to the right processor call."""
     if operation == "caption":
-        return app.processor.caption(images, CaptionLevel.MORE_DETAILED)
+        return app.florence2.caption(images, CaptionLevel.MORE_DETAILED)
     if operation == "ocr":
-        return app.processor.ocr(images)
+        return app.florence2.ocr(images)
     if operation == "detect":
         if not object_name:
             raise ValueError("object_name is required for the 'detect' operation")
-        return app.processor.detect_objects(images, object_name)
+        return app.florence2.detect_objects(images, object_name)
     if operation == "dense_caption":
-        return app.processor.dense_region_caption(images)
+        return app.florence2.dense_region_caption(images)
     if operation == "query":
         if not question:
             raise ValueError("question is required for the 'query' operation")

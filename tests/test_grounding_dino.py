@@ -1,10 +1,3 @@
-#  test_grounding_dino.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Unit tests for the counting detector's pure logic.
 
 `_envelope_indices` and `_as_prompt` need no weights, so these run in milliseconds and

@@ -1,10 +1,3 @@
-#  ambiguity.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Semantic ambiguity detection for object counting (Spec 15).
 
 When independent detectors collapse overlapping instances into a single connected

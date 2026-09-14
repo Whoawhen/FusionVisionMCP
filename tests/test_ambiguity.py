@@ -1,10 +1,3 @@
-#  test_ambiguity.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Unit tests for semantic ambiguity reporting (Spec 15).
 
 These test the diagnostic ambiguity classification logic directly using synthetic

@@ -1,10 +1,3 @@
-#  ocr_fusion.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """OCR Fusion: combines Florence-2 captioning and OCR with Granite-Docling specialist OCR.
 
 Implements:

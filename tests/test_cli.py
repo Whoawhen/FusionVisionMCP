@@ -1,10 +1,3 @@
-#  test_cli.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 import pytest
 import rich_click as click
 

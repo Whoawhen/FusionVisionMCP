@@ -1,10 +1,3 @@
-#  florence2.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 
 import json
 from typing import Any
@@ -33,7 +26,10 @@ class Florence2:
             self.torch_dtype = torch.float32
 
         self.model = Florence2ForConditionalGeneration.from_pretrained(
-            model_id, dtype=self.torch_dtype, trust_remote_code=True
+            model_id, 
+            dtype=self.torch_dtype, 
+            trust_remote_code=True,
+            attn_implementation="sdpa"
         ).to(self.device)
         self.processor = AutoProcessor.from_pretrained(
             model_id, trust_remote_code=True, clean_up_tokenization_spaces=True

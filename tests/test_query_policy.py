@@ -1,10 +1,3 @@
-#  test_query_policy.py
-#
-#  Copyright (c) 2025-2026 Junpei Kawamoto
-#
-#  This software is released under the MIT License.
-#
-#  http://opensource.org/licenses/mit-license.php
 """Unit tests for the generic-query guard. Pure logic, no model, runs in milliseconds."""
 
 from fusion_vision_mcp.query_policy import (
