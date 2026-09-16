@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import numpy as np
 from PIL import Image, ImageDraw
 
 from fusion_vision_mcp.layout import find_column_splits, split_columns
@@ -163,3 +164,64 @@ def test_small_text_single_paragraph_is_not_split() -> None:
     """
     image = Image.open(TEST_DIR / "layout_small_text_paragraph.png")
     assert find_column_splits(image) == []
+
+
+def _invert(image: Image.Image) -> Image.Image:
+    """Light-text-on-dark version of a page, as a dark-themed export or a film scan."""
+    return Image.fromarray((255 - np.asarray(image.convert("L"))).astype(np.uint8))
+
+
+def test_existing_fixtures_are_unaffected_by_adaptive_ink() -> None:
+    """The adaptive path must not perturb ordinary dark-on-light pages.
+
+    `_ink_mask` keeps the fixed threshold whenever it yields a plausible ink fraction,
+    so every fixture here binarizes exactly as it did before the fallback existed.
+    These are the values documented in CLAUDE.md.
+    """
+    assert find_column_splits(Image.open(TEST_DIR / "layout_two_column.png")) == [310]
+    assert find_column_splits(Image.open(TEST_DIR / "layout_two_column_ruled.png")) == [310]
+    assert find_column_splits(Image.open(TEST_DIR / "layout_three_column.png")) == [230, 531]
+    assert find_column_splits(Image.open(TEST_DIR / "layout_table.png")) == []
+    assert find_column_splits(Image.open(TEST_DIR / "layout_paragraph.png")) == []
+
+
+def test_inverted_page_still_finds_its_gutter() -> None:
+    """A white-on-dark page read ~99% "ink" under the fixed threshold, so no column of
+    pixels was ever blank enough to be a gutter and nothing ever split."""
+    inverted = _invert(Image.open(TEST_DIR / "layout_two_column.png"))
+    splits = find_column_splits(inverted)
+
+    assert len(splits) == 1
+    assert abs(splits[0] - 310) <= 2
+
+
+def test_inverted_three_column_splits_twice() -> None:
+    inverted = _invert(Image.open(TEST_DIR / "layout_three_column.png"))
+    splits = find_column_splits(inverted)
+
+    assert len(splits) == 2
+    assert abs(splits[0] - 230) <= 2
+    assert abs(splits[1] - 531) <= 2
+
+
+def test_inverted_negative_controls_still_do_not_split() -> None:
+    """The fallback must not buy recall by losing the negative controls."""
+    assert find_column_splits(_invert(Image.open(TEST_DIR / "layout_table.png"))) == []
+    assert find_column_splits(_invert(Image.open(TEST_DIR / "layout_paragraph.png"))) == []
+
+
+def test_low_contrast_page_still_finds_its_gutter() -> None:
+    """Light-grey text on white falls under the fixed threshold entirely, reading as a
+    blank page: zero ink, therefore zero splits."""
+    original = np.asarray(Image.open(TEST_DIR / "layout_two_column.png").convert("L")).astype(np.float64)
+    faint = Image.fromarray((255 - (255 - original) * 0.18).astype(np.uint8))
+    splits = find_column_splits(faint)
+
+    assert len(splits) == 1
+    assert abs(splits[0] - 310) <= 2
+
+
+def test_blank_page_has_no_columns() -> None:
+    """Nothing text-like at all: the fallback must not invent structure."""
+    assert find_column_splits(_blank()) == []
+    assert find_column_splits(Image.new("L", (800, 400), "black")) == []

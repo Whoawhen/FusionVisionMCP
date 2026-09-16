@@ -27,8 +27,16 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL.Image import Image
 
-#: A pixel darker than this (0-255 grayscale) counts as ink.
+#: A pixel darker than this (0-255 grayscale) counts as ink on an ordinary
+#: dark-text-on-light-page scan.
 _INK_THRESHOLD: Final[int] = 200
+
+#: Plausible share of a text page that is ink. Outside this band the fixed
+#: threshold above has clearly mis-read the page -- an inverted (light-on-dark)
+#: page measures ~0.99 under it, and a washed-out or very low-contrast scan
+#: measures ~0 -- and `_ink_mask` re-derives the threshold from the image itself.
+#: Measured against this repo's own fixtures, which sit between 0.014 and 0.025.
+_INK_FRACTION_BAND: Final[tuple[float, float]] = (0.0005, 0.5)
 
 #: A column of pixels counts as part of a gutter (blank vertical strip) when its
 #: ink density is at or below this fraction of the body height. Not exactly
@@ -75,6 +83,51 @@ _LINE_ROW_DENSITY_FRAC: Final[float] = 0.005
 _MIN_LINES_FOR_SPLIT: Final[int] = 3
 
 
+def _otsu_threshold(gray: NDArray[np.uint8]) -> int:
+    """Otsu's method: the grey level that best separates the image into two classes."""
+    hist = np.bincount(gray.ravel(), minlength=256).astype(np.float64)
+    total = hist.sum()
+    if total <= 0:
+        return _INK_THRESHOLD
+
+    probability = hist / total
+    levels = np.arange(256, dtype=np.float64)
+    weight_bg = np.cumsum(probability)
+    mean_bg = np.cumsum(probability * levels)
+    mean_total = mean_bg[-1]
+
+    denominator = weight_bg * (1.0 - weight_bg)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        between_class = (mean_total * weight_bg - mean_bg) ** 2 / denominator
+    between_class[~np.isfinite(between_class)] = 0.0
+    return int(np.argmax(between_class))
+
+
+def _ink_mask(body: NDArray[np.uint8]) -> NDArray[np.bool_]:
+    """Boolean ink mask for a page body, tolerant of inverted and low-contrast pages.
+
+    The fixed `_INK_THRESHOLD` stays the primary path so ordinary dark-on-light scans
+    binarize exactly as they always have -- this is bit-identical to
+    `body < _INK_THRESHOLD` for every fixture in `tests/`. It only re-derives a
+    threshold when the fixed one produces an implausible amount of ink, which is what a
+    white-on-dark page (~0.99) or a washed-out scan (~0) looks like. Otsu then splits
+    the histogram and the *minority* class is taken as ink, since background dominates
+    a text page whichever way round it is printed.
+    """
+    ink = body < _INK_THRESHOLD
+    low, high = _INK_FRACTION_BAND
+    if low <= ink.mean() <= high:
+        return ink
+
+    threshold = _otsu_threshold(body)
+    dark = body <= threshold
+    light = ~dark
+    candidate = dark if dark.mean() <= light.mean() else light
+    # If re-deriving does not land in the plausible band either, there is no text-like
+    # structure here; keep the original reading rather than inventing one.
+    return candidate if low <= candidate.mean() <= high else ink
+
+
 def _count_line_bands(body: NDArray[np.uint8]) -> int:
     """Counts contiguous ink-bearing row runs (text lines) in a page body.
 
@@ -83,7 +136,7 @@ def _count_line_bands(body: NDArray[np.uint8]) -> int:
     floor here -- a fully blank inter-line row does not gain a false line
     just because a rule line passes through it.
     """
-    ink = body < _INK_THRESHOLD
+    ink = _ink_mask(body)
     density = ink.sum(axis=1)
     has_text = density > max(1, int(_LINE_ROW_DENSITY_FRAC * body.shape[1]))
 
@@ -134,7 +187,7 @@ def find_column_splits(image: Image) -> list[int]:
     if 1 < line_bands < _MIN_LINES_FOR_SPLIT:
         return []
 
-    ink = body < _INK_THRESHOLD
+    ink = _ink_mask(body)
     density = ink.sum(axis=0)
     is_gap = _close_thin_ink(density <= max(1, int(_GUTTER_DENSITY_FRAC * body.shape[0])))
 

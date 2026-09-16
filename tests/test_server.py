@@ -1081,7 +1081,7 @@ async def test_critique_composition_compare_with_returns_both(
 # These use documented fixture data directly, no model required.
 # ---------------------------------------------------------------------------
 
-from fusion_vision_mcp import _separability, _vqa_consistency
+from fusion_vision_mcp.analysis import _separability, _vqa_consistency
 
 
 class TestSeparability:

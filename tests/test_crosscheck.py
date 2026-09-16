@@ -8,7 +8,7 @@ app objects and synthetic masks, so no model has to download to run them.
 import numpy as np
 from PIL import Image
 
-from fusion_vision_mcp import _vqa_cross_check
+from fusion_vision_mcp.analysis import _vqa_cross_check
 
 
 class _StubCounter:

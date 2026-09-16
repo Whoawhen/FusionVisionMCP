@@ -2,6 +2,42 @@
 
 ## v0.8.2
 
+### Structure
+
+`__init__.py` was 1,952 lines with every tool definition and helper inline; it is now ~250 and
+holds only `server()`, `app_lifespan` and the lazy model factories. Tool definitions moved to
+`tools/` grouped by domain (text, detection, vqa, aesthetics), the structural types to
+`protocols.py`, shared cross-checks to `analysis.py`, image loading to `images.py`, and the
+annotated parameter types to `params.py`. No tool behaviour changed: all eleven are still
+registered with identical names, schemas and descriptions, verified over the wire. The only
+visible difference is the order `tools/list` returns them in.
+
+### Robustness
+
+- `layout` binarized with a fixed threshold, so an inverted (white-on-dark) page read as ~99%
+  ink and never found a gutter, and a low-contrast scan read as ~0% and never found one either.
+  `_ink_mask` keeps the fixed threshold whenever it yields a plausible ink fraction -- so every
+  existing fixture binarizes bit-identically -- and otherwise re-derives it with Otsu, taking the
+  minority class as ink. Inverted and faint two/three-column pages now split correctly, and the
+  negative controls still hold when inverted.
+- `save_annotated_image` crashed with `OSError: cannot write mode RGBA as JPEG` on any image with
+  an alpha channel -- i.e. `detect_objects(return_annotated=true)` on an ordinary transparent PNG.
+  `get_images` does not normalise mode and no fixture has alpha, so nothing caught it.
+
+### Tests
+
+New suites for three previously untested modules: `annotator` (including the RGBA crash above),
+`device` (accelerator preference and the explicit-override path) and `sam2` (dtype selection and
+the empty-box short circuit, with the HF loaders stubbed so nothing downloads). 244 unit tests,
+up from 202 at the start of this release.
+
+### Dependencies
+
+`torch`/`torchvision` moved to 2.14.0/0.29.0 and the lockfile now matches what a fresh
+`uv tool install` resolves -- the two had drifted, so the suite was validating a different torch
+than the one that shipped. Full suite re-run on 2.14.
+
+
 A correctness and cost release. The test suite could not be collected at all, which is how
 three runtime-breaking defects reached a tagged release unnoticed; fixing collection came
 first, and everything below was verified against a suite that actually runs.

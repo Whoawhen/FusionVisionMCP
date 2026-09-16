@@ -386,6 +386,26 @@ We needed to split aesthetics into `photographic_aesthetic`, `technical_quality`
 **Structured Visual Inspection (Sprint 10)**
 VLMs are notoriously blind to generative AI artifacts (e.g., humans with 3 arms). We built `structured_analysis` into `query_image` to physically measure anatomy using Grounding DINO (`person`, `arm`, `leg`, etc.) and evaluate against physiological ratios (e.g., `arm > persons * 2 + 1`). If the ratio fails, it raises an `Anomaly` backed by a physical `Observation`, overriding the VLM's hallucination. (Sprints 17-19 later refined this by enforcing strict part-to-person association and bounding-box deduplication to ensure the anomaly flags aren't just detector noise).
 
+## Where things live
+
+`__init__.py` was 1,952 lines with all eleven tool definitions and their helpers inline. It is now ~250 and
+holds only the entry point: `server()`, `app_lifespan`, and the per-model lazy factories.
+
+- `tools/` -- the MCP tool definitions, grouped by domain (`text`, `detection`, `vqa`, `aesthetics`). Each
+  module exposes `register(mcp)`; `tools.register_all` fixes the declaration order, which is the order a client
+  sees the tools listed. Adding a tool means adding it to one of these, not to `__init__`.
+- `protocols.py` -- the structural types the tools are written against (`Processor`, `VqaProcessor`,
+  `Segmenter`, `AestheticScorer`, `InstanceDetector`) plus `AppContext`. They are `Protocol`s specifically so
+  the tools can be type-checked without importing a torch-importing wrapper.
+- `analysis.py` -- the cross-checks and measurements shared by tools (`_vqa_cross_check`, `_enrich_aesthetics`,
+  `_separability`, the aesthetic comparison, the dispatch table).
+- `images.py` -- `get_images`, the one place that knows a PDF becomes one image per page.
+- `params.py` -- the `Annotated` parameter types. Their `Field(description=...)` text is what a calling agent
+  reads at tool-selection time, so it is public contract, not decoration.
+
+**`protocols`, `analysis`, `images`, `params` and `detection_policy` are all on the eager import path**, so the
+torch-free rule below applies to them too: take constants from `constants`, never from a model wrapper.
+
 ## The idle timer measures completed calls, not attribute lookups
 
 `IdleProxy.__getattr__` runs on every *attribute lookup*, and `get()` used to cancel and recreate a

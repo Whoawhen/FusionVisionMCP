@@ -13,7 +13,11 @@ def save_annotated_image(image: Image.Image, boxes: list[list[float]], labels: l
     temp_dir = os.path.join(tempfile.gettempdir(), ".fusion_vision_temp")
     os.makedirs(temp_dir, exist_ok=True)
     
-    img_draw = image.copy()
+    # Convert rather than copy: the output is saved as JPEG, which cannot encode an
+    # alpha channel, so an RGBA source (any transparent PNG -- `get_images` does not
+    # normalise mode) raised `OSError: cannot write mode RGBA as JPEG`. Converting also
+    # makes the red box and label render correctly on a grayscale or palette source.
+    img_draw = image.convert("RGB")
     draw = ImageDraw.Draw(img_draw)
     
     for i, box in enumerate(boxes):
