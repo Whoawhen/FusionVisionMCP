@@ -52,18 +52,39 @@ uv run --with pytest --with anyio pytest tests -q
 
 `uv run` and `uv tool install` can fail here in ways specific to the environment, not the code — see the OneDrive note below if this checkout is ever moved back under a synced folder.
 
-## Remotes
+## Remotes, and why attribution stays even though this is no longer a fork
 
-`origin` is this fork (`Whoawhen/FusionVisionMCP`, public, renamed from `warrens951/mcp-florence2` on 2026-08-20 —
-both the repo name and the GitHub account username changed that day); `upstream` is `jkawamoto/mcp-florence2`,
-kept only for reference. `main` no longer tracks `upstream/main` as a clean mirror — that convention existed to
-keep a PR back to upstream possible, but by 2026-08-27 the two projects had diverged too far for it to mean
-anything (11 tools across five local models here vs. upstream's original three tools on Florence-2 alone; the
-`mcp_florence2` package was deleted outright early on, replaced by this repo's own `fusion_vision_mcp` — see
-below). Commit directly to `main` as needed; there's no longer a reason to keep its history free of
-fork-specific commits. Attribution to the original author is retained regardless, via the MIT copyright header in
-`florence2.py` and the `authors` list in `pyproject.toml`, since this fork's `Florence2` wrapper class still
-descends from his original implementation even though it's since grown well past it.
+**This checkout currently has no git remotes configured.** `git remote -v` is empty. The history was
+deliberately flattened (root commit `44377fd`, "Flattened from v0.8.1") to sever the fork lineage from
+`jkawamoto/mcp-florence2`, which by then meant nothing: 11 tools across five local models here against
+upstream's three on Florence-2 alone, and the `mcp_florence2` package deleted outright early on and replaced by
+this repo's own `fusion_vision_mcp`. Commit directly to `main`; there is no upstream to keep history clean for.
+
+A `Whoawhen/FusionVisionMCP` repo exists on GitHub but its history is **unrelated** to this checkout's (it stops
+at v0.8.0, 2026-09-12) and it is still flagged by GitHub as a fork (`isFork: true`, parent
+`jkawamoto/mcp-florence2`). Note that force-pushing flattened history would *not* clear that flag — the fork
+relationship is repo metadata, not git history. Detaching it means either asking GitHub Support or recreating
+the repo as a standalone one. A full mirror of the old repo (259 commits) is bundled at
+`C:\AI\MCP\_backups\FusionVisionMCP-github-20260916.bundle` before any of that happens.
+
+**Severing the fork relationship is not the same as dropping attribution, and the second one is not optional.**
+Measured 2026-09-16 against upstream rather than assumed: `src/fusion_vision_mcp/florence2.py` still contains
+**18 of upstream's 36 substantive lines byte-for-byte** — `ocr()` and `caption()` are character-identical, as is
+the `AutoProcessor.from_pretrained(...)` call — and `src/fusion_vision_mcp/__main__.py` is a **verbatim copy**
+apart from the import path. MIT grants everything else freely in exchange for exactly one condition: the
+copyright notice travels with substantial portions of the software. Remove it while that code is present and
+there is no license covering it at all.
+
+So attribution is retained in four places, and none of them should be "cleaned up":
+
+- `LICENSE` — byte-identical to upstream's, "Copyright (c) 2025 Junpei Kawamoto". **Do not let a repo-creation
+  flow replace this with a fresh notice**; that is the single most common way this breaks.
+- The MIT header at the top of `florence2.py` and `__main__.py` (restored 2026-09-16 after being lost in the
+  flattening).
+- The `authors` list in `pyproject.toml`.
+
+`__init__.py` and `cli.py` share only two or three generic boilerplate lines with upstream (`import rich_click
+as click`, a logger assignment) — not copyrightable expression, and they carry no header for that reason.
 
 ## `ocr` is EasyOCR, and it returns nothing rather than inventing text
 
