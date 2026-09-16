@@ -37,7 +37,7 @@ def _load_head_state_dict() -> dict[str, torch.Tensor]:
     """
     path = _cache_path()
     if not path.exists():
-        response = requests.get(_HEAD_URL)
+        response = requests.get(_HEAD_URL, timeout=(5.0, 30.0))
         response.raise_for_status()
         digest = hashlib.sha256(response.content).hexdigest()
         if digest != _HEAD_SHA256:
@@ -73,6 +73,28 @@ class _AestheticHead(torch.nn.Module):
         return result
 
 
+#: "a photograph" is the medium the aesthetic head was trained on; the rest are the
+#: common alternatives a caller might want to read the score in the context of.
+_STYLE_PROMPTS: Final[list[str]] = [
+    "a photograph",
+    "a digital photograph",
+    "an oil painting",
+    "a watercolor painting",
+    "an acrylic painting",
+    "a digital illustration",
+    "an anime drawing",
+    "a manga panel",
+    "a pencil sketch",
+    "an ink drawing",
+    "a charcoal drawing",
+    "a 3D render",
+    "a vector graphic",
+    "a pixel art image",
+    "a collage",
+    "a screenshot",
+]
+
+
 class Aesthetic:
     """Wraps CLIP ViT-L/14 plus a small trained head to score an image's aesthetic quality.
 
@@ -100,18 +122,35 @@ class Aesthetic:
         # similarities by `logit_scale.exp()`; capturing it once here avoids re-reading the
         # parameter on every `classify_style` call.
         self._logit_scale: float = self.model.logit_scale.exp().item()
+        self._cached_text_features: Any = None
 
         self.head = _AestheticHead().to(self.device)
         self.head.load_state_dict(_load_head_state_dict())
         self.head.eval()
 
-    def score(self, images: list[Image]) -> list[dict[str, Any]]:
-        """Returns one {"score": float, "rating": str} dict per image, score roughly 1-10."""
+    def _encode_images(self, images: list[Image]) -> Any:
+        """Unit-normalized CLIP image embeddings; the input both heads share."""
         with torch.no_grad():
             inputs = self.processor(images=images, return_tensors="pt").to(self.device)
             inputs["pixel_values"] = inputs["pixel_values"].to(self.torch_dtype)
             features = self.model.get_image_features(**inputs)
-            features = features / features.norm(dim=-1, keepdim=True)
+            return features / features.norm(dim=-1, keepdim=True)
+
+    def _text_features(self) -> Any:
+        """Embeddings for the fixed style palette, encoded once per instance.
+
+        The prompts never change, so re-encoding all 16 on every `classify_style`
+        call was pure repeated work.
+        """
+        if self._cached_text_features is None:
+            with torch.no_grad():
+                text_inputs = self.processor(text=_STYLE_PROMPTS, return_tensors="pt", padding=True).to(self.device)
+                text_features = self.model.get_text_features(**text_inputs)
+                self._cached_text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+        return self._cached_text_features
+
+    def _score_from_features(self, features: Any) -> list[dict[str, Any]]:
+        with torch.no_grad():
             # The head is shallow and was trained in float32; casting here avoids fp16
             # underflow that a network this shallow has no depth to absorb.
             predictions = self.head(features.float()).squeeze(-1).tolist()
@@ -127,6 +166,19 @@ class Aesthetic:
             for value in predictions
         ]
 
+    def score(self, images: list[Image]) -> list[dict[str, Any]]:
+        """Returns one {"score": float, "rating": str} dict per image, score roughly 1-10."""
+        return self._score_from_features(self._encode_images(images))
+
+    def score_and_classify(self, images: list[Image]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Both heads off a single image encode.
+
+        `score` and `classify_style` compute the identical normalized embedding, so
+        calling them in sequence ran the vision tower twice over the same pixels.
+        """
+        features = self._encode_images(images)
+        return self._score_from_features(features), self._classify_from_features(features)
+
     def classify_style(self, images: list[Image]) -> list[dict[str, Any]]:
         """Zero-shot medium/genre classification, reusing the already-loaded CLIP backbone.
 
@@ -140,36 +192,12 @@ class Aesthetic:
         sorted list of `{style, score}` (softmax-normalized probabilities). `style` is the
         top-ranked prompt with its leading article stripped, e.g. "oil painting".
         """
-        # "a photograph" is the medium the aesthetic head was trained on; the rest are the
-        # common alternatives a caller might want to read the score in the context of.
-        prompts = [
-            "a photograph",
-            "a digital photograph",
-            "an oil painting",
-            "a watercolor painting",
-            "an acrylic painting",
-            "a digital illustration",
-            "an anime drawing",
-            "a manga panel",
-            "a pencil sketch",
-            "an ink drawing",
-            "a charcoal drawing",
-            "a 3D render",
-            "a vector graphic",
-            "a pixel art image",
-            "a collage",
-            "a screenshot",
-        ]
+        return self._classify_from_features(self._encode_images(images))
+
+    def _classify_from_features(self, image_features: Any) -> list[dict[str, Any]]:
+        prompts = _STYLE_PROMPTS
         with torch.no_grad():
-            image_inputs = self.processor(images=images, return_tensors="pt").to(self.device)
-            image_inputs["pixel_values"] = image_inputs["pixel_values"].to(self.torch_dtype)
-            image_features = self.model.get_image_features(**image_inputs)
-            image_features = image_features / image_features.norm(dim=-1, keepdim=True)
-
-            text_inputs = self.processor(text=prompts, return_tensors="pt", padding=True).to(self.device)
-            text_features = self.model.get_text_features(**text_inputs)
-            text_features = text_features / text_features.norm(dim=-1, keepdim=True)
-
+            text_features = self._text_features()
             # Cosine similarity (features are already unit-normalized) → softmax over styles.
             # Cast to float32 so the softmax is stable under fp16.
             logits = (image_features.float() @ text_features.float().T) * self._logit_scale

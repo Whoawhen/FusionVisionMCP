@@ -9,7 +9,6 @@ from transformers import AutoProcessor, Florence2ForConditionalGeneration
 
 from .constants import CaptionLevel
 from .device import resolve_device
-from .subprocess import subprocess
 
 
 class Florence2:
@@ -20,10 +19,9 @@ class Florence2:
 
     def __init__(self, model_id: str, device: str | None = None) -> None:
         self.device = resolve_device(device)
-        if self.device.startswith("mps"):
-            self.torch_dtype = torch.float16
-        else:
-            self.torch_dtype = torch.float32
+        # Matches moondream/grounding_dino/sam2/aesthetic: half precision anywhere
+        # that is not CPU. Previously this was fp32 on CUDA too, costing 2x memory.
+        self.torch_dtype = torch.float32 if self.device == "cpu" else torch.float16
 
         self.model = Florence2ForConditionalGeneration.from_pretrained(
             model_id, 
@@ -179,38 +177,3 @@ def _quad_regions_to_bboxes(region: dict[str, Any]) -> dict[str, Any]:
         ys = quad[1::2]
         bboxes.append([min(xs), min(ys), max(xs), max(ys)])
     return {"quad_boxes": quad_boxes, "bboxes": bboxes, "labels": labels}
-
-
-class Florence2SP:
-    model_id: str
-    device: str | None
-
-    def __init__(self, model_id: str, device: str | None = None) -> None:
-        self.model_id = model_id
-        self.device = device
-
-    @subprocess
-    def ocr(self, images: list[Image]) -> list[str]:
-        return Florence2(self.model_id, self.device).ocr(images)
-
-    @subprocess
-    def caption(self, images: list[Image], level: CaptionLevel = CaptionLevel.NORMAL) -> list[str]:
-        return Florence2(self.model_id, self.device).caption(images, level)
-
-    @subprocess
-    def detect_objects(
-        self, images: list[Image], object_name: str, exclude_full_frame: bool = False
-    ) -> list[dict[str, Any]]:
-        return Florence2(self.model_id, self.device).detect_objects(images, object_name, exclude_full_frame)
-
-    @subprocess
-    def dense_region_caption(self, images: list[Image]) -> list[dict[str, Any]]:
-        return Florence2(self.model_id, self.device).dense_region_caption(images)
-
-    @subprocess
-    def ocr_with_regions(self, images: list[Image]) -> list[dict[str, Any]]:
-        return Florence2(self.model_id, self.device).ocr_with_regions(images)
-
-    @subprocess
-    def generate(self, prompt: str, images: list[Image]) -> list[str]:
-        return Florence2(self.model_id, self.device).generate(prompt, images)

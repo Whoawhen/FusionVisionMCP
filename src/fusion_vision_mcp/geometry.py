@@ -233,6 +233,9 @@ def relation(a: Mask, b: Mask) -> dict[str, Any]:
             "embed_depth": float("nan"),
         }
 
+    if a.shape != b.shape:
+        raise ValueError(f"masks must share a shape; got {a.shape} and {b.shape}")
+
     both = a & b
     if not both.any():
         gap = float(distance_transform_edt(~b)[a].min())
@@ -400,10 +403,17 @@ def _distance_lobes(work: Mask) -> dict[str, Any]:
         return {"by_distance": 1, "distance_support": float("nan"), "runs": [], "shattered": False, "peak": raw_peak}
 
     neighbourhood = generate_binary_structure(2, 2)
+    # Label only the mask's bounding box. `smoothed` is zeroed outside `work`, so every
+    # threshold is False out there and no component can exist -- cropping is exactly
+    # equivalent, and this loop runs a connected-component pass per level (76 of them),
+    # which dominates the cost of count_lobes.
+    rows, cols = np.nonzero(work)
+    region = smoothed[rows.min() : rows.max() + 1, cols.min() : cols.max() + 1]
+
     levels = np.arange(_LEVEL_HI, _LEVEL_LO - 1e-9, -_LEVEL_STEP)
     counts = []
     for level in levels:
-        parts, found = label(smoothed > level * peak, structure=neighbourhood)
+        parts, found = label(region > level * peak, structure=neighbourhood)
         if not found:
             counts.append(0)
             continue
@@ -484,7 +494,11 @@ def _radial_lobes(work: Mask) -> dict[str, Any]:
 
     ys, xs = np.nonzero(work)
     centre = np.array([xs.mean(), ys.mean()])
-    if elongation(work) > _MAX_ROSETTE_ELONGATION:
+    shape_elongation = elongation(work)
+    # `elongation` returns nan for a mask too small to measure, and `nan > x` is False --
+    # so testing it directly let a degenerate mask *pass* the rosette gate instead of
+    # being rejected by it. Reject on nan explicitly.
+    if not np.isfinite(shape_elongation) or shape_elongation > _MAX_ROSETTE_ELONGATION:
         return unmeasured
     # Deliberately no "centroid must lie inside the mask" test: a ring of petals has a
     # genuine hole at its centre, which is exactly the arrangement this estimator is
@@ -639,3 +653,29 @@ def rule_of_thirds(box: Sequence[float], image_size: tuple[int, int]) -> dict[st
         "center_offset": float(np.hypot(width / 2 - cx, height / 2 - cy)) / diagonal,
         "nearest_gridpoint": [nearest[0], nearest[1]],
     }
+
+
+def box_area(box: Sequence[float]) -> float:
+    """Area of an [x1, y1, x2, y2] box, clamped at zero for inverted coordinates."""
+    return max(0.0, box[2] - box[0]) * max(0.0, box[3] - box[1])
+
+
+def box_intersection_area(a: Sequence[float], b: Sequence[float]) -> float:
+    """Overlapping area of two [x1, y1, x2, y2] boxes."""
+    width = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+    height = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    return width * height
+
+
+def box_iou(a: Sequence[float], b: Sequence[float]) -> float:
+    """Intersection over union of two [x1, y1, x2, y2] boxes.
+
+    Lives here rather than in `grounding_dino` or `inspection`, which each carried their
+    own copy: this module is pure numpy and already on the package's eager import path,
+    so both callers can share one implementation without `inspection` picking up
+    `grounding_dino`'s module-level torch import (see CLAUDE.md, "Package import must
+    stay torch-free"). Two copies of the same four lines could drift; this one cannot.
+    """
+    intersection = box_intersection_area(a, b)
+    union = box_area(a) + box_area(b) - intersection
+    return intersection / union if union > 0 else 0.0

@@ -3,7 +3,14 @@ import json
 import asyncio
 from pathlib import Path
 from fusion_vision_mcp import app_lifespan, MCPServer
-from fusion_vision_mcp.cli import DEFAULT_MOONDREAM_MODEL, DEFAULT_MOONDREAM_REVISION, DEFAULT_SAM2_MODEL, DEFAULT_AESTHETIC_MODEL, DEFAULT_GROUNDING_DINO_MODEL, DEFAULT_GRANITE_DOCLING_MODEL
+from fusion_vision_mcp.cli import (
+    DEFAULT_AESTHETIC_MODEL,
+    DEFAULT_FLORENCE2_MODEL,
+    DEFAULT_GROUNDING_DINO_MODEL,
+    DEFAULT_MOONDREAM_MODEL,
+    DEFAULT_MOONDREAM_REVISION,
+    DEFAULT_SAM2_MODEL,
+)
 from mcp.server.mcpserver import Context
 import mcp.types as types
 
@@ -15,14 +22,12 @@ async def test_battery():
     
     async with app_lifespan(
         _server=None, # type: ignore
-        model_id="microsoft/Florence-2-base",
-        subprocess=False,
+        model_id=DEFAULT_FLORENCE2_MODEL,
         moondream_model_id=DEFAULT_MOONDREAM_MODEL,
         moondream_revision=DEFAULT_MOONDREAM_REVISION,
         sam2_model_id=DEFAULT_SAM2_MODEL,
         aesthetic_model_id=DEFAULT_AESTHETIC_MODEL,
         grounding_dino_model_id=DEFAULT_GROUNDING_DINO_MODEL,
-        granite_docling_model_id=DEFAULT_GRANITE_DOCLING_MODEL,
         reasoner_provider="none",
         reasoner_model="llama3",
         idle_timeout=0,

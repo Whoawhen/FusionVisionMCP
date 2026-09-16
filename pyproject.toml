@@ -4,9 +4,9 @@ requires = [ "hatchling" ]
 
 [project]
 name = "fusion-vision-mcp"
-version = "0.8.1"
+version = "0.8.2"
 description = """\
-    An MCP server for processing images using Florence-2, Moondream2, SAM2, CLIP, Grounding DINO, Granite-Docling, and ONNX IQA models for captioning, OCR, \
+    An MCP server for processing images using Florence-2, Moondream2, SAM2, CLIP, Grounding DINO, EasyOCR, and ONNX IQA models for captioning, OCR, \
     object detection/grounding, instance counting, visual question answering, spatial measurement and aesthetic scoring\
     """
 readme = "README.md"
@@ -25,7 +25,6 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Image Recognition",
 ]
 dependencies = [
-    "dill>=0.3.9",
     "einops>=0.8.1",
     "mcp>=2",
     "numpy>=2.1",
@@ -47,6 +46,9 @@ dependencies = [
     # Pinned to the narrow window where Florence2ForConditionalGeneration (added ~4.57) is
     # native AND vikhyatk/moondream2's trust_remote_code model still loads: transformers 5.x
     # renamed internals (`all_tied_weights_keys`) that moondream2's HfMoondream class relies on.
+    # The pin does not cover attention backends: HfMoondream rejects
+    # attn_implementation="sdpa" throughout this range and transformers names "eager"
+    # as the alternative, so moondream.py must pass "eager". Verified on 4.57.6.
     "transformers>=4.57.2,<5",
 ]
 scripts.fusion-vision-mcp = "fusion_vision_mcp.cli:main"
@@ -66,8 +68,19 @@ dev = [
     "pre-commit>=4.2",
     "pre-commit-uv>=4.1.4",
     "pytest>=8.3.4",
+    # ~70 tests are @pytest.mark.anyio; without this the suite errors at setup.
+    "anyio>=4.4",
+    # [tool.mypy] below is unusable without it.
+    "mypy>=1.11",
     "types-requests>=2.32.0.20250328",
 ]
+
+[tool.pytest.ini_options]
+# Bare `pytest` at the repo root used to walk `benchmarks/` and the root-level probe
+# scripts, whose module-level side effects (a real server spawn, a weights download)
+# aborted collection outright. Tests live in `tests/`; everything else is a script.
+testpaths = [ "tests" ]
+addopts = "--strict-markers"
 
 [tool.ruff]
 target-version = "py312"
@@ -81,13 +94,12 @@ disallow_untyped_defs = true
 warn_return_any = true
 warn_unused_configs = true
 overrides = [ { module = [
-    "dill",
     "pypdfium2",
     "transformers.*",
 ], ignore_missing_imports = true } ]
 
 [tool.bumpversion]
-current_version = "0.8.1"
+current_version = "0.8.2"
 commit = true
 files = [
     { replace = 'version = "{new_version}"', filename = "pyproject.toml", search = 'version = "{current_version}"' },

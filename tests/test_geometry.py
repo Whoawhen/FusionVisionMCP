@@ -339,3 +339,27 @@ def test_rule_of_thirds_prefers_the_gridpoint_over_the_center() -> None:
     on_gridpoint = geometry.rule_of_thirds([gx - 5, gx - 5, gx + 5, gx + 5], (SIZE, SIZE))
 
     assert on_gridpoint["thirds_offset"] < centered["thirds_offset"]
+
+
+def test_radial_lobes_rejects_a_mask_too_small_to_measure() -> None:
+    """`elongation` returns nan below 10 px, and `nan > threshold` is False.
+
+    Testing elongation directly therefore let a degenerate mask fall *through* the
+    rosette gate rather than be rejected by it.
+    """
+    mask = np.zeros((40, 40), dtype=bool)
+    mask[20:22, 20:22] = True  # 4 px: under the measurable floor
+
+    result = geometry.count_lobes(mask)
+
+    assert result["by_radial"] == 0
+
+
+def test_relation_rejects_mismatched_mask_shapes() -> None:
+    a = np.zeros((20, 20), dtype=bool)
+    b = np.zeros((30, 30), dtype=bool)
+    a[5:10, 5:10] = True
+    b[5:10, 5:10] = True
+
+    with pytest.raises(ValueError, match="share a shape"):
+        geometry.relation(a, b)

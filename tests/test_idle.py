@@ -130,3 +130,59 @@ def test_concurrent_use_builds_once() -> None:
 
     assert Counter.builds == 1
     assert all(item is seen[0] for item in seen)
+
+
+class SlowCounter:
+    """Stands in for a model whose call outlasts the idle timeout."""
+
+    builds = 0
+
+    def __init__(self) -> None:
+        type(self).builds += 1
+
+    def slow(self, seconds: float) -> str:
+        time.sleep(seconds)
+        return "done"
+
+
+def test_release_waits_for_a_call_that_outlasts_the_timeout() -> None:
+    """A release must not fire mid-inference.
+
+    The timer measures idle time, but a single call can run longer than the whole
+    timeout. Releasing then dropped the model and ran gc.collect() plus a Windows
+    working-set trim *while torch was executing*.
+    """
+    SlowCounter.builds = 0
+    cache = IdleReleased(SlowCounter, timeout=0.1, name="slow")
+    proxy = IdleProxy(cache)
+
+    assert proxy.slow(0.4) == "done"
+    # Still resident: the call was in flight the whole time the timer was due.
+    assert cache._value is not None
+    assert SlowCounter.builds == 1
+
+
+def test_repeated_lookups_do_not_spawn_a_timer_each_time() -> None:
+    """`__getattr__` runs per attribute lookup; each one used to build a new Timer."""
+    Counter.builds = 0
+    cache = IdleReleased(Counter, timeout=30, name="counter")
+    proxy = IdleProxy(cache)
+
+    before = threading.active_count()
+    for _ in range(25):
+        proxy.double(2)
+    after = threading.active_count()
+
+    assert after - before <= 1
+    cache.release()
+
+
+def test_proxy_release_does_not_load_the_object() -> None:
+    """`proxy.release()` used to go through __getattr__, loading the model to release it."""
+    Counter.builds = 0
+    cache = IdleReleased(Counter, timeout=60, name="counter")
+    proxy = IdleProxy(cache)
+
+    proxy.release()
+
+    assert Counter.builds == 0

@@ -42,7 +42,9 @@ class Moondream:
             revision=revision,
             trust_remote_code=True,
             torch_dtype=torch_dtype,
-            attn_implementation="sdpa",
+            # HfMoondream has no SDPA path: transformers raises ValueError on "sdpa"
+            # and names "eager" as the supported alternative. Verified against 4.57.6.
+            attn_implementation="eager",
         ).to(self.device)  # type: ignore[arg-type]
 
     def query(self, images: list[Image], question: str) -> list[str]:

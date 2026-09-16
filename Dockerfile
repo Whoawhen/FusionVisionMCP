@@ -30,6 +30,6 @@ COPY --from=uv --chown=app:app /app/.venv /app/.venv
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
 
-RUN huggingface-cli download florence-community/Florence-2-base
+RUN huggingface-cli download florence-community/Florence-2-large
 
 CMD ["fusion-vision-mcp", "--cache-model"]

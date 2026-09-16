@@ -87,31 +87,29 @@ def _count_line_bands(body: NDArray[np.uint8]) -> int:
     density = ink.sum(axis=1)
     has_text = density > max(1, int(_LINE_ROW_DENSITY_FRAC * body.shape[1]))
 
-    bands = 0
-    in_band = False
-    for row_has_text in has_text:
-        if row_has_text and not in_band:
-            bands += 1
-            in_band = True
-        elif not row_has_text:
-            in_band = False
-    return bands
+    # A band starts wherever a False->True edge occurs. Counting rising edges over the
+    # padded array is the same answer as the row-by-row state machine this replaces,
+    # without a Python-level iteration per image row.
+    padded = np.concatenate(([False], has_text))
+    return int(np.count_nonzero(~padded[:-1] & padded[1:]))
 
 
 def _close_thin_ink(is_gap: NDArray[np.bool_]) -> NDArray[np.bool_]:
     """Bridges thin ink runs (e.g. a ruled divider line) flanked by gutter on both sides."""
     closed = is_gap.copy()
     width = len(is_gap)
-    x = 0
-    while x < width:
-        if closed[x]:
-            x += 1
-            continue
-        start = x
-        while x < width and not closed[x]:
-            x += 1
-        if start > 0 and x < width and x - start <= _RULE_LINE_MAX_WIDTH_PX:
-            closed[start:x] = True
+    if width == 0:
+        return closed
+
+    # Find each maximal run of ink (False) by its edges, then fill the ones that are
+    # narrow enough to be a rule line *and* flanked by gutter on both sides. Same rule
+    # as the index-walking loop this replaces, expressed as two edge arrays.
+    padded = np.concatenate(([True], is_gap, [True]))
+    starts = np.flatnonzero(padded[:-1] & ~padded[1:])
+    ends = np.flatnonzero(~padded[:-1] & padded[1:])
+    for start, end in zip(starts, ends, strict=True):
+        if start > 0 and end < width and end - start <= _RULE_LINE_MAX_WIDTH_PX:
+            closed[start:end] = True
     return closed
 
 
@@ -143,18 +141,15 @@ def find_column_splits(image: Image) -> list[int]:
     min_gutter_width = max(4, int(_MIN_GUTTER_WIDTH_FRAC * width))
     edge_margin = _EDGE_MARGIN_FRAC * width
 
-    splits = []
-    start: int | None = None
-    for x in range(width + 1):
-        gap = x < width and is_gap[x]
-        if gap and start is None:
-            start = x
-        elif not gap and start is not None:
-            end = x
-            if end - start >= min_gutter_width and start > edge_margin and end < width - edge_margin:
-                splits.append((start + end) // 2)
-            start = None
-    return splits
+    # Same edge-pair scan as above, over gutter runs this time.
+    padded = np.concatenate(([False], is_gap, [False]))
+    starts = np.flatnonzero(~padded[:-1] & padded[1:])
+    ends = np.flatnonzero(padded[:-1] & ~padded[1:])
+    return [
+        (int(start) + int(end)) // 2
+        for start, end in zip(starts, ends, strict=True)
+        if end - start >= min_gutter_width and start > edge_margin and end < width - edge_margin
+    ]
 
 
 def split_columns(image: Image) -> list[Image]:

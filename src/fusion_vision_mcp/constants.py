@@ -48,6 +48,12 @@ DEFAULT_MOONDREAM_MODEL: Final[str] = "vikhyatk/moondream2"
 #: for them, while this one answers 10 and lists exactly 10.
 DEFAULT_MOONDREAM_REVISION: Final[str] = "2025-06-21"
 
+#: The `-large` checkpoint is the shipped default: it backs caption, OCR-with-region,
+#: grounding and dense-region-caption. `-base` is used only by the CI server test, where
+#: load time matters more than quality. Keep Dockerfile and benchmarks on this value, or
+#: they measure/cache a model that never actually ships.
+DEFAULT_FLORENCE2_MODEL: Final[str] = "florence-community/Florence-2-large"
+
 #: Measured on CPU over tiny/small/base-plus: `small` costs ~0.06s more per call
 #: and ~34MB more than `tiny` for a better mask, while `base-plus` roughly doubles
 #: inference time for a marginal gain. `small` is the middle that earns its keep.

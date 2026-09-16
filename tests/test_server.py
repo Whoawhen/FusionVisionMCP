@@ -25,7 +25,7 @@ COUNT_CLUTTERED_TARGET_FILEPATH = str(TEST_DIR / "count_cluttered_target.png")
 
 SERVER_PARAMS = StdioServerParameters(
     command="uv",
-    args=["run", "fusion-vision-mcp", "--cache-model", "--model", "florence-community/Florence-2-base"],
+    args=["run", "fusion-vision-mcp", "--memory-mode", "persistent", "--model", "florence-community/Florence-2-base"],
 )
 
 
@@ -95,7 +95,7 @@ async def test_caption(mcp_client_session: ClientSession) -> None:
 async def test_caption_url(mcp_client_session: ClientSession, static_file_server: str) -> None:
     res = await mcp_client_session.call_tool(
         "caption",
-        arguments={"src": static_file_server + "/sample.jpg"},
+        arguments={"src": static_file_server + "/layout_two_column.png"},
     )
     text = "\n".join(cast(TextContent, c).text for c in res.content)
 
@@ -151,19 +151,39 @@ async def test_caption_verify_text_returns_caption_and_text_regions(mcp_client_s
 async def test_ocr(mcp_client_session: ClientSession) -> None:
     res = await mcp_client_session.call_tool(
         "ocr",
-        arguments={"src": SAMPLE_IMAGE_FILEPATH},
+        arguments={"src": LAYOUT_TWO_COLUMN_FILEPATH},
     )
     text = "\n".join(cast(TextContent, c).text for c in res.content)
 
-    assert len(text) > 0
     assert not res.is_error
+    assert len(text) > 0
+    assert "Alice" in text
+
+
+@pytest.mark.anyio
+async def test_ocr_textless_image_returns_no_text(mcp_client_session: ClientSession) -> None:
+    """An image with no text must come back empty rather than inventing something.
+
+    `sample.jpg` is a paper flower carrying no text at all. Florence-2's OCR head used
+    to emit *something* here, which is why this assertion used to read `len(text) > 0`;
+    EasyOCR correctly returns nothing. Asserting non-empty text on a text-free image is
+    asserting a hallucination, so the expectation is inverted.
+    """
+    res = await mcp_client_session.call_tool(
+        "ocr",
+        arguments={"src": SAMPLE_IMAGE_FILEPATH},
+    )
+    text = "".join(cast(TextContent, c).text for c in res.content).strip()
+
+    assert not res.is_error
+    assert text == ""
 
 
 @pytest.mark.anyio
 async def test_ocr_url(mcp_client_session: ClientSession, static_file_server: str) -> None:
     res = await mcp_client_session.call_tool(
         "ocr",
-        arguments={"src": static_file_server + "/sample.jpg"},
+        arguments={"src": static_file_server + "/layout_two_column.png"},
     )
     text = "\n".join(cast(TextContent, c).text for c in res.content)
 
@@ -177,10 +197,11 @@ async def test_ocr_pdf(mcp_client_session: ClientSession) -> None:
         "ocr",
         arguments={"src": SAMPLE_PDF_FILEPATH},
     )
-    text = "\n".join(cast(TextContent, c).text for c in res.content)
 
-    assert len(text) > 0
+    # sample.pdf renders the same text-free image as sample.jpg, so this pins the PDF
+    # decode path (one page in, one result out) rather than the transcription itself.
     assert not res.is_error
+    assert len(res.content) == 1
 
 
 @pytest.mark.anyio
@@ -189,18 +210,18 @@ async def test_ocr_pdf_from_web(mcp_client_session: ClientSession, static_file_s
         "ocr",
         arguments={"src": static_file_server + "/sample.pdf"},
     )
-    text = "\n".join(cast(TextContent, c).text for c in res.content)
 
-    assert len(text) > 0
+    # Same rationale as test_ocr_pdf: this covers fetch + decode, not transcription.
     assert not res.is_error
+    assert len(res.content) == 1
 
 
 @pytest.mark.anyio
 async def test_ocr_with_regions_returns_text_and_boxes(mcp_client_session: ClientSession) -> None:
-    """`with_regions=true` returns each text span alongside its page-coordinate box."""
+    """`detail=true` returns each text span alongside its page-coordinate box."""
     res = await mcp_client_session.call_tool(
         "ocr",
-        arguments={"src": LAYOUT_TWO_COLUMN_FILEPATH, "with_regions": True},
+        arguments={"src": LAYOUT_TWO_COLUMN_FILEPATH, "detail": True},
     )
     pages = [json.loads(cast(TextContent, c).text) for c in res.content]
 
@@ -220,7 +241,7 @@ async def test_ocr_with_regions_returns_text_and_boxes(mcp_client_session: Clien
 
 @pytest.mark.anyio
 async def test_ocr_with_regions_false_keeps_string_shape(mcp_client_session: ClientSession) -> None:
-    """`with_regions=false` (default) keeps the original list[str] return shape."""
+    """`detail=false` (default) keeps the original list[str] return shape."""
     res = await mcp_client_session.call_tool(
         "ocr",
         arguments={"src": LAYOUT_TWO_COLUMN_FILEPATH},

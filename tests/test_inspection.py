@@ -5,7 +5,7 @@ arithmetic in isolation, using a `_StubDetector` that returns hand-placed synthe
 boxes rather than running any real detection. They can never see a real image and therefore can
 never catch a failure that only shows up on real detector output -- see
 `tests/test_inspection_coco.py` for that (a live, unmocked Grounding DINO regression test against
-real COCO photographs), added in Sprint 17 of `FusionVisionMCP_v0.8.1_Sprint_Plan.md` after this
+real COCO photographs), added in Sprint 17 of `docs/FusionVisionMCP_v0.8.1_Sprint_Plan.md` after this
 exact gap let a hardcoded `corroborated=True` and an untested global-tally heuristic ship in
 Sprint 10.
 

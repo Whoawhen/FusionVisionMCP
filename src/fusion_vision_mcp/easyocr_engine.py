@@ -1,9 +1,11 @@
-import torch
-import numpy as np
-from PIL.Image import Image
 from typing import Any
 
+import numpy as np
+import torch
+from PIL.Image import Image
+
 from fusion_vision_mcp.device import resolve_device
+
 
 class EasyOCREngine:
     """
@@ -16,24 +18,30 @@ class EasyOCREngine:
 
     def __init__(
         self,
-        device: torch.device | None = None,
+        device: str | None = None,
         languages: list[str] | None = None
     ) -> None:
-        self.device = device if device is not None else torch.device(resolve_device())
-        self.languages = languages or ['en', 'es', 'fr', 'de']
+        # A device *string*, like every other wrapper in this package. Taking a
+        # torch.device here used to force the package's entry point to import torch
+        # just to build one, which broke the torch-free-import invariant.
+        self.device = resolve_device(device)
+        # One language, one CRNN recognition model. Each extra language is another
+        # model downloaded and held in memory, so widen this deliberately via
+        # --ocr-languages rather than paying for four by default.
+        self.languages = languages or ['en']
         self._reader = None
 
     def release(self) -> None:
         if self._reader is not None:
             del self._reader
             self._reader = None
-        if self.device.type == "cuda":
+        if self.device.startswith("cuda"):
             torch.cuda.empty_cache()
 
     def _load(self) -> "Any":
         if self._reader is None:
             import easyocr
-            use_gpu = self.device.type == "cuda"
+            use_gpu = self.device.startswith("cuda")
             self._reader = easyocr.Reader(self.languages, gpu=use_gpu)
         return self._reader
 

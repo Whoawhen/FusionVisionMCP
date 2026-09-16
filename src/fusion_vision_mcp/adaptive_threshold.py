@@ -53,7 +53,12 @@ def _has_shallow_gradient(sorted_scores: list[float], min_gap_for_cliff: float =
         return _gaps(sorted_scores)[0] < min_gap_for_cliff
     g = _gaps(sorted_scores)
     max_gap = max(g)
-    other_gaps = [x for x in g if x != max_gap] or [0.0]
+    # Drop the largest gap by INDEX, not by value. Filtering `x != max_gap` also removed
+    # every gap that merely tied the maximum, so an evenly-spaced distribution -- the
+    # textbook shallow gradient -- emptied this list, forced median_other to 0.0, and
+    # made `max_gap / 0.01` clear the cliff test unconditionally.
+    max_index = g.index(max_gap)
+    other_gaps = [x for i, x in enumerate(g) if i != max_index] or [0.0]
     median_other = sorted(other_gaps)[len(other_gaps) // 2]
     return max_gap < min_gap_for_cliff * 1.5 or max_gap / max(median_other, 0.01) < 3.0
 

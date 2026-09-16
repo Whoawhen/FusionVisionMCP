@@ -1,6 +1,6 @@
 import json
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Final, Literal
 
 import requests
 
@@ -34,10 +34,34 @@ class ReasonerOutput:
             "measurements": self.measurements,
         }
 
+#: Ollama's default local endpoint. Overridable per instance so a non-default host
+#: or port does not require editing this module.
+DEFAULT_OLLAMA_URL: Final[str] = "http://localhost:11434/api/generate"
+
+#: (connect, read) seconds. Generation is the slow half, hence the asymmetry.
+DEFAULT_REASONER_TIMEOUT: Final[tuple[float, float]] = (5.0, 60.0)
+
+
+def _coerce_float(value: Any, default: float = 0.0) -> float:
+    """A confidence the model wrote as prose, or omitted, must not raise."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 class VisionReasoner:
-    def __init__(self, provider: ProviderMode = "none", model: str = "llama3"):
+    def __init__(
+        self,
+        provider: ProviderMode = "none",
+        model: str = "llama3",
+        url: str = DEFAULT_OLLAMA_URL,
+        timeout: tuple[float, float] = DEFAULT_REASONER_TIMEOUT,
+    ):
         self.provider = provider
         self.model = model
+        self.url = url
+        self.timeout = timeout
 
     def analyze(
         self,
@@ -89,39 +113,55 @@ class VisionReasoner:
         
         try:
             response = requests.post(
-                "http://localhost:11434/api/generate",
+                self.url,
                 json={
                     "model": self.model,
                     "prompt": prompt,
                     "stream": False,
                     "format": "json"
                 },
-                timeout=30
+                timeout=self.timeout,
             )
             response.raise_for_status()
             data = response.json()
             result = json.loads(data.get("response", "{}"))
-        except (requests.RequestException, json.JSONDecodeError):
+        except (requests.RequestException, json.JSONDecodeError, ValueError):
             # If Ollama fails or returns bad JSON, fallback gracefully rather than crashing.
             # Sprint 11: "don't chase reasoning quality yet", but we must enforce the contract.
-            result = {
-                "judgment": "Reasoning backend failed to produce a valid judgment.",
-                "confidence": 0.0,
-                "claims": []
-            }
-            
-        claims = [
-            ReasonerOutputClaim(
-                claim=c.get("claim", ""),
-                confidence=float(c.get("confidence", 0.0)),
-                evidence=c.get("evidence", [])
+            result = {}
+
+        # An LLM asked for JSON can return well-formed JSON of the wrong *shape* -- a list,
+        # a bare string, claims as strings rather than objects. That parses fine and then
+        # raises on the first `.get`, so every field is shape-checked rather than trusted.
+        if not isinstance(result, dict):
+            result = {}
+
+        raw_claims = result.get("claims", [])
+        if not isinstance(raw_claims, list):
+            raw_claims = []
+
+        claims = []
+        for c in raw_claims:
+            if not isinstance(c, dict):
+                continue
+            evidence = c.get("evidence", [])
+            if not isinstance(evidence, list):
+                evidence = [str(evidence)]
+            claims.append(
+                ReasonerOutputClaim(
+                    claim=str(c.get("claim", "")),
+                    confidence=_coerce_float(c.get("confidence")),
+                    evidence=[str(e) for e in evidence],
+                )
             )
-            for c in result.get("claims", [])
-        ]
-        
+
+        judgment = result.get("judgment")
+        if not isinstance(judgment, str):
+            judgment = "Reasoning backend failed to produce a valid judgment." if not result else ""
+
         return ReasonerOutput(
-            judgment=result.get("judgment", ""),
-            confidence=float(result.get("confidence", 0.0)),
+            judgment=judgment,
+            confidence=_coerce_float(result.get("confidence")),
             claims=claims,
             measurements=measurements
         )

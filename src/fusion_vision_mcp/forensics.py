@@ -1,5 +1,6 @@
 import logging
 from typing import Any
+
 from PIL import Image
 from PIL.ExifTags import TAGS
 
@@ -27,15 +28,24 @@ def extract_metadata(image: Image.Image) -> dict[str, Any]:
                 if isinstance(value, bytes):
                     continue
                 meta[tag_name] = value
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - EXIF parsing; a malformed tag must never fail the tool
         logger.debug(f"Failed to parse EXIF: {e}")
         
     return meta
 
 def analyze_metadata_anomalies(image: Image.Image) -> list[dict[str, str]]:
-    """
-    Checks for metadata signatures that indicate the image is AI generated.
+    """Checks for metadata signatures that indicate the image is AI generated.
+
     Returns a list of anomaly dicts (evidence).
+
+    A hit here is strong evidence; an empty result is **no evidence either way**, and must
+    not be reported as "not AI generated". This reads one tag (`Software`) against a fixed
+    keyword list, so it only catches a generator that labelled its own output and whose
+    label survived: re-saving, screenshotting, stripping EXIF, or any upload pipeline that
+    normalises metadata all defeat it, as does any generator not on the list. Recall is
+    therefore near zero and precision near total -- deliberately, since the alternative
+    (inferring synthesis from *missing* EXIF) produces false positives on every edited or
+    exported photograph.
     """
     anomalies = []
     meta = extract_metadata(image)
@@ -49,7 +59,7 @@ def analyze_metadata_anomalies(image: Image.Image) -> list[dict[str, str]]:
         for kw in SUSPICIOUS_SOFTWARE_KEYWORDS:
             if kw in lower_software:
                 anomalies.append({
-                    "claim": f"Image metadata indicates synthetic origin",
+                    "claim": "Image metadata indicates synthetic origin",
                     "evidence": f"Found '{software}' in EXIF Software tag.",
                     "source": "EXIF Forensics"
                 })

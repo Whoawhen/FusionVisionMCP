@@ -1,10 +1,10 @@
-"""OCR Fusion: combines Florence-2 captioning and OCR with Granite-Docling specialist OCR.
+"""OCR Fusion: combines Florence-2 captioning and OCR with EasyOCR specialist OCR.
 
 Implements:
 - Automatic caption text verification (Spec 13): detects likely text in captions
   and triggers specialist OCR cross-checking.
 - Small-text OCR crops (Spec 14): crops text regions from the full image,
-  upscales small text (2x/3x bicubic), and transcribes with Granite-Docling.
+  upscales small text (2x/3x bicubic), and transcribes with EasyOCR.
 - Text consensus: measures agreement between caption, Florence OCR, and specialist OCR,
   warning when the caption misreads embedded text and producing an actionable corrected caption.
 """
@@ -37,7 +37,7 @@ class TextConsensus:
     Attributes:
         caption: The candidate token as quoted/written in the caption prose.
         florence_ocr: The verbatim text transcribed by Florence-2's OCR head.
-        specialist_ocr: The verbatim text transcribed by Granite-Docling.
+        specialist_ocr: The verbatim text transcribed by EasyOCR.
         agreeing_sources: Number of sources agreeing on the correct reading (1 to 3).
     """
 

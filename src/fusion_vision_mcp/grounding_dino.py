@@ -18,6 +18,8 @@ import torch
 from PIL.Image import Image
 from transformers import AutoModelForZeroShotObjectDetection, AutoProcessor
 
+from fusion_vision_mcp import geometry
+
 from .adaptive_threshold import ThresholdResult, choose_threshold
 from .constants import DEFAULT_BOX_THRESHOLD, DEFAULT_GROUNDING_DINO_MODEL
 from .device import resolve_device
@@ -76,17 +78,8 @@ class GroundingDino:
         )
         self.model.eval()
 
-    @staticmethod
-    def _iou(a: list[float], b: list[float]) -> float:
-        ax1, ay1, ax2, ay2 = a
-        bx1, by1, bx2, by2 = b
-        iw = max(0.0, min(ax2, bx2) - max(ax1, bx1))
-        ih = max(0.0, min(ay2, by2) - max(ay1, by1))
-        inter = iw * ih
-        area_a = max(0.0, ax2 - ax1) * max(0.0, ay2 - ay1)
-        area_b = max(0.0, bx2 - bx1) * max(0.0, by2 - by1)
-        union = area_a + area_b - inter
-        return inter / union if union > 0 else 0.0
+    #: One shared implementation in `geometry`; `inspection` used to carry a second copy.
+    _iou = staticmethod(geometry.box_iou)
 
     @classmethod
     def _envelope_indices(cls, bboxes: list[list[float]]) -> set[int]:

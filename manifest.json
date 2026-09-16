@@ -3,8 +3,8 @@
   "manifest_version": "0.4",
   "name": "fusion-vision-mcp",
   "display_name": "FusionVisionMCP",
-  "version": "0.8.1",
-  "description": "An MCP server fusing Florence-2, Moondream2, SAM2, Grounding DINO, Granite-Docling, IQA and CLIP for image captioning, OCR, object detection/grounding, instance counting, visual question answering, spatial measurement and aesthetic scoring",
+  "version": "0.8.2",
+  "description": "An MCP server fusing Florence-2, Moondream2, SAM2, Grounding DINO, EasyOCR, IQA and CLIP for image captioning, OCR, object detection/grounding, instance counting, visual question answering, spatial measurement and aesthetic scoring",
   "author": {
     "name": "Whoawhen",
     "email": "warrens951@gmail.com",

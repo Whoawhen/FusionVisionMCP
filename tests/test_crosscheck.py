@@ -36,10 +36,10 @@ class _StubProcessor:
 
 
 class _StubApp:
-    def __init__(self, counter, segmenter=None, processor=None) -> None:
+    def __init__(self, counter, segmenter=None, florence2=None) -> None:
         self.counter = counter
         self.segmenter = segmenter
-        self.processor = processor
+        self.florence2 = florence2
 
 
 def _image() -> Image.Image:
@@ -59,7 +59,7 @@ class TestVqaCrossCheckCount:
 
 class TestVqaCrossCheckOcr:
     def test_ocr_route_returns_transcription(self) -> None:
-        app = _StubApp(counter=_StubCounter({}), processor=_StubProcessor(ocr_text="Hello"))
+        app = _StubApp(counter=_StubCounter({}), florence2=_StubProcessor(ocr_text="Hello"))
         cross = _vqa_cross_check(app, _image(), "What does the watermark say, exactly?")
         assert cross == {"tool": "ocr", "text": "Hello"}
 

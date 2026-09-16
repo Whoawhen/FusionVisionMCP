@@ -137,3 +137,25 @@ def test_custom_min_top_score() -> None:
     r_custom = choose_threshold(scores, min_top_score=0.40)
     assert r_default.used is False
     assert r_custom.used is True
+
+
+def test_evenly_spaced_scores_are_a_shallow_gradient_not_a_cliff() -> None:
+    """Tied maximal gaps must not read as a cliff.
+
+    `[0.9, 0.5, 0.1]` has gaps `[0.4, 0.4]` -- no gap dominates, which is the
+    definition of a shallow gradient. Filtering the "other" gaps by value rather than
+    by index removed both, leaving an empty list that forced the ratio test to pass.
+    """
+    result = choose_threshold([0.9, 0.5, 0.1])
+
+    assert not result.used
+    assert result.threshold == 0.15
+    assert "shallow gradient" in result.reason
+
+
+def test_a_genuine_cliff_still_registers() -> None:
+    """The fix must not suppress a real cliff: one dominant gap, the rest tight."""
+    result = choose_threshold([0.92, 0.90, 0.88, 0.20, 0.18])
+
+    assert result.used
+    assert result.threshold > 0.15

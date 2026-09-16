@@ -13,7 +13,10 @@ from typing import TYPE_CHECKING, Any, Literal
 from PIL import Image
 
 from fusion_vision_mcp import query_policy
-from fusion_vision_mcp.grounding_dino import DEFAULT_BOX_THRESHOLD
+
+# From constants, not grounding_dino: that module imports torch at its top level, and
+# this one is on the package's eager import path, which must stay torch-free.
+from fusion_vision_mcp.constants import DEFAULT_BOX_THRESHOLD
 from fusion_vision_mcp.routing import choose_count_backend
 
 if TYPE_CHECKING:
@@ -58,7 +61,7 @@ def execute_detection(
         # Florence-2's grounding head. We always pass exclude_full_frame based
         # on the query policy, fixing the bug where explicit clip_art=True
         # blindly dropped legitimate full-frame matches (like a close-up of wood).
-        detected = app.processor.detect_objects(images, object_name, exclude_full_frame=exclude_full_frame)
+        detected = app.florence2.detect_objects(images, object_name, exclude_full_frame=exclude_full_frame)
         results = [
             {
                 "count": len(d.get("bboxes", [])),

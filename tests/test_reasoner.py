@@ -69,3 +69,44 @@ def test_ollama_graceful_fallback_on_bad_json(monkeypatch: MonkeyPatch) -> None:
     assert result.confidence == 0.0
     assert result.claims == []
     assert "failed to produce" in result.judgment.lower()
+
+
+@pytest.mark.parametrize(
+    "bad_response",
+    [
+        '["a list, not an object"]',
+        '"a bare string"',
+        '{"claims": "not a list"}',
+        '{"claims": ["a string, not a claim object"]}',
+        '{"confidence": "very high", "claims": []}',
+        '{"claims": [{"claim": "x", "confidence": "high", "evidence": "not a list"}]}',
+        "42",
+    ],
+)
+def test_malformed_but_valid_json_degrades_instead_of_raising(
+    monkeypatch: MonkeyPatch, bad_response: str
+) -> None:
+    """An LLM told to emit JSON can emit valid JSON of entirely the wrong shape.
+
+    That parses cleanly and then blows up on the first `.get`, which the original
+    `except (RequestException, JSONDecodeError)` never caught.
+    """
+
+    def fake_post(*_args: Any, **_kwargs: Any) -> MockResponse:
+        return MockResponse({"response": bad_response})
+
+    monkeypatch.setattr("requests.post", fake_post)
+
+    reasoner = VisionReasoner(provider="ollama")
+    result = reasoner.analyze(question="What is this?", measurements={"count": 3})
+
+    assert isinstance(result, ReasonerOutput)
+    assert isinstance(result.confidence, float)
+    assert isinstance(result.claims, list)
+    # The invariant that matters most: direct measurements survive a garbage response.
+    assert result.measurements == {"count": 3}
+
+
+def test_endpoint_is_configurable() -> None:
+    reasoner = VisionReasoner(provider="ollama", url="http://elsewhere:9999/api/generate")
+    assert reasoner.url == "http://elsewhere:9999/api/generate"

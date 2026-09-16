@@ -1,9 +1,9 @@
 import os
 import tempfile
 import uuid
-from typing import Any
-import numpy as np
+
 from PIL import Image, ImageDraw, ImageFont
+
 
 def save_annotated_image(image: Image.Image, boxes: list[list[float]], labels: list[str] | None = None) -> str:
     """
@@ -26,7 +26,7 @@ def save_annotated_image(image: Image.Image, boxes: list[list[float]], labels: l
             # Try to get a default font, fallback if unavailable
             try:
                 font = ImageFont.load_default()
-            except:
+            except OSError:
                 font = None
             
             if font:

@@ -5,12 +5,19 @@ from typing import TYPE_CHECKING, Any, Final
 
 from PIL import Image
 
+from fusion_vision_mcp import geometry
+
 if TYPE_CHECKING:
     from fusion_vision_mcp.app import AppContext
 
 
 @dataclass
 class Observation:
+    #: True only where the claim survived the full structural chain: box dedup, strict
+    #: association to one person, and a violated anatomical ratio. Bare global tallies
+    #: (detection coverage) and raw VQA claims report False. The value is carried by the
+    #: control flow that reaches each construction site rather than by a separate
+    #: computation -- see `_check_anatomy`.
     claim: str
     source: str
     corroborated: bool
@@ -95,27 +102,12 @@ _PART_CONTAINMENT: Final[float] = 0.5
 _DUPLICATE_PART_IOU: Final[float] = 0.3
 
 
-def _box_area(box: list[float]) -> float:
-    return max(0.0, box[2] - box[0]) * max(0.0, box[3] - box[1])
-
-
-def _intersection_area(a: list[float], b: list[float]) -> float:
-    width = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
-    height = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
-    return width * height
-
-
-def _iou(a: list[float], b: list[float]) -> float:
-    """Intersection over union of two boxes, as in `grounding_dino.GroundingDino._iou`.
-
-    Deliberately re-stated here rather than imported: `grounding_dino` imports `torch` at module
-    level, and this module is imported eagerly by the package's `__init__`, which is required to
-    stay torch-free or every MCP client pays the import at connect time (see CLAUDE.md, "Package
-    import must stay torch-free"). Four lines of arithmetic is the cheaper of the two costs.
-    """
-    intersection = _intersection_area(a, b)
-    union = _box_area(a) + _box_area(b) - intersection
-    return intersection / union if union > 0 else 0.0
+#: Shared with `grounding_dino` via `geometry`, which is pure numpy and therefore safe to
+#: import from this eagerly-loaded module. These were two separate copies until they were
+#: consolidated; see `geometry.box_iou`.
+_box_area = geometry.box_area
+_intersection_area = geometry.box_intersection_area
+_iou = geometry.box_iou
 
 
 def _containment(part: list[float], person: list[float]) -> float:
@@ -221,8 +213,26 @@ def _check_anatomy(app: AppContext, image: Image.Image) -> tuple[list[Observatio
     containment cutoff dropped to 0.4 as well -- a setting picked by searching the negative control
     alone, with no positive control able to constrain it. See the Sprint 18 commit message.
 
-    `corroborated` stays hardcoded `True` on detector observations here; computing it is Sprint 19
-    of the v0.8.1 plan, which needs this association to exist before it has anything real to say.
+    `corroborated=True` on the anomaly observations below is not a constant standing in for an
+    unwritten check, despite reading like one at the call site: this line is reachable only after a
+    part box has survived IoU dedup, been strictly associated with one person box, and exceeded that
+    person's anatomical ratio. That is precisely the condition Sprint 19 defined for the flag, and
+    it is enforced by the branches above rather than recomputed here. Observations that do *not*
+    clear that chain -- coverage tallies, raw VQA claims -- construct with `corroborated=False`.
+
+    One query per part, deliberately -- batching them was measured and rejected. Grounding DINO
+    accepts a multi-phrase prompt ("person. arm. leg. hand. head. finger.") in a single forward
+    pass and it is ~5x faster (3.2s vs 16.4s on a COCO frame), but the results are not the same
+    detections and cannot back a per-part tally:
+
+    - It returns boxes whose text span maps to no single part, reported with an empty label --
+      22 of 31 boxes on `000000008021.jpg`, 8 of 12 on `000000017029.jpg`. There is nothing to
+      associate those with.
+    - Phrases compete inside one prompt, so weak parts vanish: `000000013659.jpg` goes from 35
+      detections across six parts to 4, all `person`, losing every limb.
+
+    The containment and dedup constants below were swept against the per-part behaviour, so
+    switching would invalidate that tuning as well as the tallies. Measured 2026-09-16.
     """
     detections = {}
     for part in _PARTS:

@@ -1,4 +1,5 @@
 import importlib.metadata
+import importlib.util
 import logging
 import math
 import os
@@ -9,13 +10,12 @@ from dataclasses import dataclass
 from functools import partial
 from io import BytesIO
 from pathlib import Path
-from typing import Annotated, Any, Final, Literal, Protocol, cast
+from typing import TYPE_CHECKING, Annotated, Any, Final, Literal, Protocol, cast
 
 import numpy as np
 
 logger = logging.getLogger(__name__)
 import requests
-import torch
 from mcp.server.mcpserver import Context, MCPServer
 from numpy.typing import NDArray
 from PIL.Image import Image
@@ -24,9 +24,11 @@ from pydantic import Field
 from pypdfium2 import PdfDocument
 
 from fusion_vision_mcp import geometry, layout, question, textmatch
+from fusion_vision_mcp.ambiguity import check_semantic_ambiguity
 from fusion_vision_mcp.constants import (
     DEFAULT_AESTHETIC_MODEL,
     DEFAULT_BOX_THRESHOLD,
+    DEFAULT_FLORENCE2_MODEL,
     DEFAULT_GROUNDING_DINO_MODEL,
     DEFAULT_MOONDREAM_MODEL,
     DEFAULT_MOONDREAM_REVISION,
@@ -34,26 +36,35 @@ from fusion_vision_mcp.constants import (
     MASK_DECODE_RESOLUTION,
     CaptionLevel,
 )
-from fusion_vision_mcp.aesthetic import Aesthetic
-from fusion_vision_mcp.ambiguity import check_semantic_ambiguity
 from fusion_vision_mcp.detection_policy import execute_detection
-from fusion_vision_mcp.device import resolve_device
-from fusion_vision_mcp.florence2 import Florence2, Florence2SP
-from fusion_vision_mcp.easyocr_engine import EasyOCREngine
-from fusion_vision_mcp.grounding_dino import GroundingDino
+from fusion_vision_mcp.forensics import analyze_metadata_anomalies
 from fusion_vision_mcp.idle import IdleProxy, IdleReleased
 from fusion_vision_mcp.inspection import Anomaly, Observation, analyze_inspection
-from fusion_vision_mcp.moondream import Moondream
 from fusion_vision_mcp.ocr_fusion import SpecialistOCR, fuse_caption_ocr
-from fusion_vision_mcp.sam2 import Sam2
-from fusion_vision_mcp.reasoner import VisionReasoner
 
-try:
+# Importing this package must not pull in torch. Every wrapper named below does
+# `import torch` (and transformers) at its own module level, which cost 4.5s warm and a
+# measured 14.1s cold at connect time and produced real CONNECT_TIMEOUT failures against
+# the 30s budget. These names are needed only for annotations; each is imported for real
+# inside its own factory in `app_lifespan`, which runs on first tool use rather than at
+# startup. Annotations on those factories must stay quoted -- this module has no
+# `from __future__ import annotations`, so an unquoted name is a NameError at `def` time
+# (and ruff TC004 flags it).
+if TYPE_CHECKING:
+    from fusion_vision_mcp.aesthetic import Aesthetic
+    from fusion_vision_mcp.easyocr_engine import EasyOCREngine
+    from fusion_vision_mcp.florence2 import Florence2
+    from fusion_vision_mcp.grounding_dino import GroundingDino
     from fusion_vision_mcp.image_quality import ImageQuality
-except ImportError:
-    ImageQuality = None  # type: ignore
+    from fusion_vision_mcp.moondream import Moondream
+    from fusion_vision_mcp.reasoner import VisionReasoner
+    from fusion_vision_mcp.sam2 import Sam2
 
 SERVER_NAME: Final[str] = "FusionVisionMCP"
+
+#: (connect, read) seconds for outbound image/PDF fetches. Without a timeout a hung
+#: host blocks the serving thread indefinitely and the MCP client sees a dead server.
+_HTTP_TIMEOUT: Final[tuple[float, float]] = (5.0, 30.0)
 
 #: Ceiling on objects compared in one `spatial_relations` call. Relations grow as
 #: n(n-1)/2, so an over-broad detection could otherwise return a huge payload.
@@ -71,7 +82,7 @@ _USER_AGENT: Final[str] = (
 def get_images(src: os.PathLike[str] | str) -> Iterator[list[Image]]:
     """Opens and returns a list of images from a file path or URL."""
     if isinstance(src, str) and src.startswith(("http://", "https://")):
-        res = requests.get(src, headers={"User-Agent": _USER_AGENT})
+        res = requests.get(src, headers={"User-Agent": _USER_AGENT}, timeout=_HTTP_TIMEOUT)
         res.raise_for_status()
 
         if res.headers["Content-Type"] == "application/pdf":
@@ -207,6 +218,10 @@ class AestheticScorer(Protocol):
         """Returns a {"score": float, "rating": str} dict per image."""
         ...
 
+    def score_and_classify(self, images: list[Image]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Both of the above off a single image encode."""
+        ...
+
     def classify_style(self, images: list[Image]) -> list[dict[str, Any]]:
         """Zero-shot medium/genre classification reusing the CLIP backbone.
 
@@ -235,7 +250,6 @@ class AppContext:
 async def app_lifespan(
     _server: MCPServer,
     model_id: str,
-    subprocess: bool,
     moondream_model_id: str,
     moondream_revision: str,
     sam2_model_id: str = DEFAULT_SAM2_MODEL,
@@ -243,6 +257,7 @@ async def app_lifespan(
     grounding_dino_model_id: str = DEFAULT_GROUNDING_DINO_MODEL,
     reasoner_provider: Literal["none", "ollama"] = "none",
     reasoner_model: str = "llama3",
+    ocr_languages: tuple[str, ...] = ("en",),
     idle_timeout: float = 0,
     device: str | None = None,
 ) -> AsyncIterator[AppContext]:
@@ -256,85 +271,117 @@ async def app_lifespan(
     releases each model that many seconds after its last use, while 0 leaves them
     resident for the process's lifetime -- the fastest, most memory-hungry setting.
     """
-    processor: Processor
     vqa: VqaProcessor
     segmenter: Segmenter
     aesthetic: AestheticScorer
+
+    # Each factory imports its own wrapper. `IdleReleased` calls these on first real
+    # use, so the torch/transformers cost lands then rather than during startup -- the
+    # lifespan runs before the MCP handshake is answered, so an import here would block
+    # the connect exactly as a module-level one did.
+    def _make_florence2() -> "Florence2":
+        from fusion_vision_mcp.florence2 import Florence2
+
+        return Florence2(model_id, device)
+
+    def _make_moondream() -> "Moondream":
+        from fusion_vision_mcp.moondream import Moondream
+
+        return Moondream(moondream_model_id, moondream_revision, device)
+
+    def _make_sam2() -> "Sam2":
+        from fusion_vision_mcp.sam2 import Sam2
+
+        return Sam2(sam2_model_id, device)
+
+    def _make_aesthetic() -> "Aesthetic":
+        from fusion_vision_mcp.aesthetic import Aesthetic
+
+        return Aesthetic(aesthetic_model_id, device)
+
+    def _make_grounding_dino() -> "GroundingDino":
+        from fusion_vision_mcp.grounding_dino import GroundingDino
+
+        return GroundingDino(grounding_dino_model_id, device)
+
+    def _make_easyocr() -> "EasyOCREngine":
+        from fusion_vision_mcp.easyocr_engine import EasyOCREngine
+
+        return EasyOCREngine(device, list(ocr_languages))
+
+    def _make_image_quality() -> "ImageQuality":
+        from fusion_vision_mcp.image_quality import ImageQuality
+
+        return ImageQuality()
+
+    def _make_reasoner() -> "VisionReasoner":
+        from fusion_vision_mcp.reasoner import VisionReasoner
+
+        return VisionReasoner(provider=reasoner_provider, model=reasoner_model)
+
     if idle_timeout > 0:
         # Keep each model in this process so repeat calls stay fast, and let the
         # idle timer hand its memory back once the work stops.
         florence2 = cast(
             Processor,
-            IdleProxy(IdleReleased(lambda: Florence2(model_id, device), idle_timeout, "Florence-2")),
+            IdleProxy(IdleReleased(_make_florence2, idle_timeout, "Florence-2")),
         )
         vqa = cast(
             VqaProcessor,
             IdleProxy(
-                IdleReleased(
-                    lambda: Moondream(moondream_model_id, moondream_revision, device),
-                    idle_timeout,
-                    "Moondream",
-                )
+                IdleReleased(_make_moondream, idle_timeout, "Moondream")
             ),
         )
     else:
-        if subprocess:
-            florence2 = Florence2SP(model_id, device)
-        else:
-            florence2 = Florence2(model_id, device)
-        vqa = Moondream(moondream_model_id, moondream_revision, device)
+        # timeout 0 never schedules a release, so this is a persistent in-process model
+        # that is still built lazily on first use.
+        florence2 = cast(Processor, IdleProxy(IdleReleased(_make_florence2, 0, "Florence-2")))
+        vqa = cast(VqaProcessor, IdleProxy(IdleReleased(_make_moondream, 0, "Moondream")))
 
     # Always lazy, on both paths. `IdleReleased` builds on first use and, with a
     # timeout of 0, simply never schedules a release — so a session that never
     # calls `spatial_relations` never pays for SAM2 at all.
     segmenter = cast(
         Segmenter,
-        IdleProxy(IdleReleased(lambda: Sam2(sam2_model_id, device), idle_timeout, "SAM2")),
+        IdleProxy(IdleReleased(_make_sam2, idle_timeout, "SAM2")),
     )
     # Same rationale as SAM2: always idle-wrapped regardless of idle_timeout, since only
     # score_aesthetics/critique_composition pay for the CLIP backbone, and most sessions
     # never call either.
     aesthetic = cast(
         AestheticScorer,
-        IdleProxy(IdleReleased(lambda: Aesthetic(aesthetic_model_id, device), idle_timeout, "Aesthetic")),
+        IdleProxy(IdleReleased(_make_aesthetic, idle_timeout, "Aesthetic")),
     )
     # Same rationale again: only count_objects loads Grounding DINO, so a session that
     # never counts never pays the ~690MB.
     counter = cast(
         InstanceDetector,
-        IdleProxy(IdleReleased(lambda: GroundingDino(grounding_dino_model_id, device), idle_timeout, "Grounding DINO")),
+        IdleProxy(IdleReleased(_make_grounding_dino, idle_timeout, "Grounding DINO")),
     )
     # Specialist OCR is also lazy: only auto_verify_text loads EasyOCR.
     ocr_specialist = cast(
         SpecialistOCR,
         IdleProxy(
-            IdleReleased(
-                lambda: EasyOCREngine(torch.device(resolve_device(device))),
-                idle_timeout,
-                "EasyOCR",
-            )
+            IdleReleased(_make_easyocr, idle_timeout, "EasyOCR")
         ),
     )
 
+    # `find_spec` answers "is onnxruntime installed?" without importing it, so the
+    # optional [iqa] extra stays genuinely optional and genuinely lazy.
     iqa = None
-    if ImageQuality is not None:
-        iqa = IdleProxy(IdleReleased(lambda: ImageQuality(), idle_timeout, "ImageQuality"))
+    if importlib.util.find_spec("onnxruntime") is not None:
+        iqa = IdleProxy(IdleReleased(_make_image_quality, idle_timeout, "ImageQuality"))
 
     reasoner = None
     if reasoner_provider != "none":
-        reasoner = IdleProxy(
-            IdleReleased(
-                lambda: VisionReasoner(provider=reasoner_provider, model=reasoner_model), idle_timeout, "VisionReasoner"
-            )
-        )
+        reasoner = IdleProxy(IdleReleased(_make_reasoner, idle_timeout, "VisionReasoner"))
 
     yield AppContext(florence2, vqa, segmenter, aesthetic, counter, ocr_specialist, iqa, reasoner)
 
 
 def server(
     name: str,
-    model_id: str,
-    subprocess: bool = True,
+    model_id: str = DEFAULT_FLORENCE2_MODEL,
     moondream_model_id: str = DEFAULT_MOONDREAM_MODEL,
     moondream_revision: str = DEFAULT_MOONDREAM_REVISION,
     sam2_model_id: str = DEFAULT_SAM2_MODEL,
@@ -342,6 +389,7 @@ def server(
     grounding_dino_model_id: str = DEFAULT_GROUNDING_DINO_MODEL,
     reasoner_provider: Literal["none", "ollama"] = "none",
     reasoner_model: str = "llama3",
+    ocr_languages: tuple[str, ...] = ("en",),
     idle_timeout: float = 0,
     device: str | None = None,
 ) -> MCPServer:
@@ -351,7 +399,6 @@ def server(
         lifespan=partial(
             app_lifespan,
             model_id=model_id,
-            subprocess=subprocess,
             moondream_model_id=moondream_model_id,
             moondream_revision=moondream_revision,
             sam2_model_id=sam2_model_id,
@@ -359,6 +406,7 @@ def server(
             grounding_dino_model_id=grounding_dino_model_id,
             reasoner_provider=reasoner_provider,
             reasoner_model=reasoner_model,
+            ocr_languages=ocr_languages,
             idle_timeout=idle_timeout,
             device=device,
         ),
@@ -445,7 +493,6 @@ def server(
             for image, columns in zip(images, per_page_columns, strict=True):
                 # Reconstruct column offsets for coordinate mapping
                 # Assuming horizontal splits, so y is always 0.
-                total_w = image.width
                 x_offset = 0
                 
                 page_text_regions = []
@@ -473,7 +520,7 @@ def server(
                         
                     x_offset += crop_w
                 
-                joined_text = "\\n".join(page_texts)
+                joined_text = "\n".join(page_texts)
                 flat_results.append(joined_text)
                 page_results.append({
                     "text": joined_text,
@@ -636,11 +683,7 @@ def server(
             )
             
             if return_annotated:
-                from fusion_vision_mcp.annotator import save_annotated_image
-                for img, res in zip(images, results):
-                    if "bboxes" in res and res["bboxes"]:
-                        filepath = save_annotated_image(img, res["bboxes"], res.get("labels"))
-                        res["annotated_image_path"] = filepath
+                _attach_annotated_images(images, results)
             
             return results
 
@@ -731,8 +774,8 @@ def server(
                 for image, answer in zip(images, answers, strict=True):
                     observations, anomalies = analyze_inspection(app, image, [answer])
                     
-                    # Metadata/EXIF Forensics
-                    from fusion_vision_mcp.forensics import analyze_metadata_anomalies
+                    # Metadata/EXIF forensics. A hit is strong evidence; an empty
+                    # result means nothing either way -- see the function's docstring.
                     meta_anomalies = analyze_metadata_anomalies(image)
                     for ma in meta_anomalies:
                         obs = Observation(
@@ -766,7 +809,7 @@ def server(
                                     observations=[obs]
                                 )
                                 anomalies.append(anom)
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 - third-party OCR; logged, never fatal
                         logger.warning(f"Failed to run EasyOCR text hallucination check: {e}")
 
                     results.append(
@@ -1022,15 +1065,7 @@ def server(
                     result["ambiguity"] = ambiguity_res.as_dict()
                     
             if return_annotated:
-                from fusion_vision_mcp.annotator import save_annotated_image
-                for img, res in zip(images, results):
-                    if "bboxes" in res and res["bboxes"]:
-                        # For counting, if labels are missing, generate them dynamically
-                        labels = res.get("labels")
-                        if not labels and "bboxes" in res:
-                            labels = [f"{object_name} {i+1}" for i in range(len(res["bboxes"]))]
-                        filepath = save_annotated_image(img, res["bboxes"], labels)
-                        res["annotated_image_path"] = filepath
+                _attach_annotated_images(images, results, fallback_label=object_name)
                         
             return results
 
@@ -1243,8 +1278,11 @@ def server(
         app = ctx.request_context.lifespan_context
         with get_images(src) as images:
             if compare_with is None:
-                results = app.aesthetic.score(images)
-                styles = app.aesthetic.classify_style(images) if style_context else [None] * len(images)
+                if style_context:
+                    results, styles = app.aesthetic.score_and_classify(images)
+                else:
+                    results = app.aesthetic.score(images)
+                    styles = [None] * len(images)
                 for image, result, style in zip(images, results, styles, strict=True):
                     if style is not None:
                         result["style"] = style["style"]
@@ -1683,8 +1721,11 @@ def _enrich_aesthetics(app: AppContext, image: Image, result: dict[str, Any], st
         try:
             iqa_res = app.iqa.score(image)
             result["technical_quality"] = iqa_res.get("technical_quality")
-        except Exception:
-            pass
+        except Exception as exc:
+            # Report the failure rather than omitting the field: an absent key is
+            # indistinguishable from "IQA not configured", which hides a broken backend.
+            logger.warning("Technical IQA scoring failed", exc_info=True)
+            result["technical_quality_error"] = str(exc)
 
     if app.reasoner is not None:
         try:
@@ -1705,12 +1746,34 @@ def _enrich_aesthetics(app: AppContext, image: Image, result: dict[str, Any], st
             )
             if r_out:
                 result["artistic_judgment"] = r_out.as_dict()
-        except Exception:
-            pass
+        except Exception as exc:
+            # Same rationale as the IQA branch above: surface the failure.
+            logger.warning("Artistic judgment via the reasoner failed", exc_info=True)
+            result["artistic_judgment_error"] = str(exc)
 
 
 #: Below this absolute delta, two scores are a tie (noise, not a preference).
 _COMPARE_TIE: Final[float] = 0.05
+
+
+def _attach_annotated_images(
+    images: list[Image], results: list[dict[str, Any]], fallback_label: str = ""
+) -> None:
+    """Render boxes onto each image and record the path on its result, in place.
+
+    `fallback_label` names the detections when the backend returned none -- counting
+    reports a tally without per-box labels, so the boxes would otherwise be unlabelled.
+    """
+    from fusion_vision_mcp.annotator import save_annotated_image
+
+    for img, res in zip(images, results, strict=False):
+        boxes = res.get("bboxes")
+        if not boxes:
+            continue
+        labels = res.get("labels")
+        if not labels and fallback_label:
+            labels = [f"{fallback_label} {i + 1}" for i in range(len(boxes))]
+        res["annotated_image_path"] = save_annotated_image(img, boxes, labels)
 
 
 def _aesthetic_comparison(
@@ -1725,13 +1788,23 @@ def _aesthetic_comparison(
     ``cross_medium_warning`` is added when they differ (cross-medium comparison is
     out of calibrated scope). The absolute scores are not recalibrated.
     """
-    img_scores = app.aesthetic.score(images)
-    ref_score = app.aesthetic.score(ref_images)[0]
-
-    img_styles = app.aesthetic.classify_style(images) if style_context else [None] * len(images)
-    ref_style = app.aesthetic.classify_style(ref_images)[0] if style_context else None
+    if style_context:
+        img_scores, img_styles = app.aesthetic.score_and_classify(images)
+        ref_scores, ref_styles = app.aesthetic.score_and_classify(ref_images)
+        ref_score, ref_style = ref_scores[0], ref_styles[0]
+    else:
+        img_scores = app.aesthetic.score(images)
+        ref_score = app.aesthetic.score(ref_images)[0]
+        img_styles = [None] * len(images)
+        ref_style = None
 
     _enrich_aesthetics(app, ref_images[0], ref_score, ref_style)
+
+    # The reference's style is the same for every page, so stamp it once here rather
+    # than re-applying it per iteration below.
+    if style_context and ref_style is not None:
+        ref_score["style"] = ref_style["style"]
+        ref_score["style_distribution"] = ref_style["distribution"]
 
     out: list[dict[str, Any]] = []
     for image, img, ist in zip(images, img_scores, img_styles, strict=True):
@@ -1746,15 +1819,15 @@ def _aesthetic_comparison(
 
         entry: dict[str, Any] = {
             "image": img,
-            "reference": ref_score,
+            # A copy per entry: a shared dict would let a consumer mutating one
+            # page's reference silently rewrite every other page's.
+            "reference": dict(ref_score),
             "delta": delta,
             "preferred": preferred,
         }
         if style_context and ist is not None and ref_style is not None:
             img["style"] = ist["style"]
             img["style_distribution"] = ist["distribution"]
-            ref_score["style"] = ref_style["style"]
-            ref_score["style_distribution"] = ref_style["distribution"]
             if ist["style"] != ref_style["style"]:
                 entry["cross_medium_warning"] = (
                     "the image and reference are different media; the score is calibrated "
@@ -1783,10 +1856,12 @@ def _critique_one(
     else:
         box = _pick_primary_subject(app.florence2.dense_region_caption([image])[0], (image.width, image.height))
 
-    aesthetics = app.aesthetic.score([image])[0]
     style: dict[str, Any] | None = None
     if style_context:
-        style = app.aesthetic.classify_style([image])[0]
+        scores, styles = app.aesthetic.score_and_classify([image])
+        aesthetics, style = scores[0], styles[0]
+    else:
+        aesthetics = app.aesthetic.score([image])[0]
 
     _enrich_aesthetics(app, image, aesthetics, style)
 

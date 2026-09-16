@@ -6,7 +6,7 @@ real-image `structured_analysis` test uses the flower fixture (`tests/sample.jpg
 people and returns before the anatomy check ever runs (`persons == 0`). Neither test could ever
 fail on real detector output, which is exactly how a hardcoded `corroborated=True` and an
 unassociated, undeduped part tally shipped in Sprint 10 without anything catching it (see "What
-the third vision pass measured" in `FusionVisionMCP_v0.8.1_Sprint_Plan.md`).
+the third vision pass measured" in `docs/FusionVisionMCP_v0.8.1_Sprint_Plan.md`).
 
 This module runs the real `analyze_inspection` -> `_check_anatomy` path against real Grounding
 DINO inference (no mocks, consistent with `tests/test_granite_docling.py`'s pattern of live model

@@ -5,6 +5,7 @@ import rich_click as click
 
 from . import (
     DEFAULT_AESTHETIC_MODEL,
+    DEFAULT_FLORENCE2_MODEL,
     DEFAULT_GROUNDING_DINO_MODEL,
     DEFAULT_MOONDREAM_MODEL,
     DEFAULT_MOONDREAM_REVISION,
@@ -51,11 +52,10 @@ def resolve_memory_mode(memory_mode: str) -> float:
 @click.command()
 @click.option(
     "--model",
-    default="florence-community/Florence-2-large",
+    default=DEFAULT_FLORENCE2_MODEL,
     show_default=True,
     help="Specifies the Florence-2 model to be used for caption/OCR/detection/grounding.",
 )
-@click.option("--cache-model", is_flag=True, help="Keeps the model in VRAM for faster subsequent operations if set.")
 @click.option(
     "--moondream-model",
     default=DEFAULT_MOONDREAM_MODEL,
@@ -99,6 +99,14 @@ def resolve_memory_mode(memory_mode: str) -> float:
     help="Model ID to request from the VisionReasoner backend (e.g. 'llama3' for ollama).",
 )
 @click.option(
+    "--ocr-languages",
+    multiple=True,
+    default=("en",),
+    show_default=True,
+    help="Languages EasyOCR should load, repeatable (e.g. --ocr-languages en --ocr-languages de). "
+    "Each one is an additional recognition model to download and hold in memory.",
+)
+@click.option(
     "--memory-mode",
     default=DEFAULT_MEMORY_MODE,
     show_default=True,
@@ -108,7 +116,7 @@ def resolve_memory_mode(memory_mode: str) -> float:
         "'aggressive' releases after 5 minutes idle (lowest memory); 'standard' after 10 minutes; "
         "'persistent' never releases (fastest, highest memory). Any number of minutes also works, "
         "e.g. '30' or '2.5'. Models always reload automatically on the next request, so no mode can "
-        "lose work -- only time. Implies --cache-model unless set to 'persistent'."
+        "lose work -- only time."
     ),
 )
 @click.option(
@@ -133,7 +141,6 @@ def resolve_memory_mode(memory_mode: str) -> float:
 @click.version_option()
 def main(
     model: str,
-    cache_model: bool,
     moondream_model: str,
     moondream_revision: str,
     sam2_model: str,
@@ -141,6 +148,7 @@ def main(
     grounding_dino_model: str,
     reasoner_provider: Literal["none", "ollama"],
     reasoner_model: str,
+    ocr_languages: tuple[str, ...],
     memory_mode: str,
     idle_timeout: float | None,
     device: str | None,
@@ -155,7 +163,6 @@ def main(
     s = server(
         SERVER_NAME,
         model,
-        subprocess=not cache_model,
         moondream_model_id=moondream_model,
         moondream_revision=moondream_revision,
         sam2_model_id=sam2_model,
@@ -163,6 +170,7 @@ def main(
         grounding_dino_model_id=grounding_dino_model,
         reasoner_provider=reasoner_provider,
         reasoner_model=reasoner_model,
+        ocr_languages=ocr_languages,
         idle_timeout=idle_minutes * 60,
         device=device,
     )
