@@ -663,8 +663,8 @@ task tokens this server does not expose as their own tool.
 ## Options
 
 - **--model**: The Florence-2 model used for captioning, OCR, detection and grounding.
-- **--cache-model**: Keep the Florence-2 model loaded between requests instead of running each one in a fresh
-  subprocess.
+- **--ocr-languages**: Languages EasyOCR loads, repeatable. Defaults to `en`; each extra language is another
+  recognition model downloaded and held in memory.
 - **--moondream-model** / **--moondream-revision**: The Moondream2 model and revision backing `query_image`.
 - **--sam2-model**: The SAM2 model backing `spatial_relations`. Defaults to `sam2.1-hiera-small`; measured on
   CPU, `tiny` is ~0.06s faster per call for a slightly worse mask, and `base-plus` roughly doubles inference

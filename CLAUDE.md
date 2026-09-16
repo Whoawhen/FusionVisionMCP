@@ -11,7 +11,14 @@ reference.
 
 `fusion-vision-mcp` is installed as an editable `uv` tool pointing at this checkout (`uv tool install --editable . --force ...`). The MCP server both Cline and Claude Code run **is whatever branch is checked out here**, live, with no reinstall needed to pick up source changes.
 
-This bit us once already: checking out `main` to catch up with upstream silently removed the idle-release option and the Moondream tools from the running server, and it came back as `✘ Failed to connect` in both clients because `main` doesn't accept that flag. The same trap now applies to `--memory-mode`, which is newer still. Always confirm you're on `feature/moondream-vqa-and-idle-release` (or a later feature branch) before assuming the server has this fork's tools, and re-run `uv tool install --editable . --force ...` after any change to `pyproject.toml` — source edits are live immediately, but dependency changes are not until reinstalled.
+This bit us once already: checking out a branch without this fork's work silently removed the idle-release option and the Moondream tools from the running server, and it came back as `✘ Failed to connect` in both clients because that branch didn't accept the flag. The same trap applies to `--memory-mode`. Work lands on `main` now (see Remotes below), so the branch check that used to be needed no longer is — but the reinstall rule still holds: **re-run `uv tool install --editable . --force ...` after any change to `pyproject.toml`**. Source edits are live immediately; dependency and version changes are not until reinstalled.
+
+Two practical notes from doing this in v0.8.2. The reinstall **deletes and recreates the tool's `Scripts`
+directory, so it fails with `Access is denied` while any client still has a server running** — VS Code/Cline and
+other agents hold `fusion-vision-mcp.exe` open. Stop those servers (or kill the `fusion-vision-mcp` processes)
+first. And because `pyproject.toml` pins `torch>=2.13` with no upper bound, a reinstall can quietly move the
+tool's torch (it went 2.13.0 → 2.14.0 in v0.8.2) while the project's own `.venv` — what the test suite runs
+against — stays where it was. Run `uv sync` if you want the two environments on the same torch.
 
 ## `pyvips` is required transitively, not by this package directly
 
@@ -30,8 +37,17 @@ uvx ruff@0.16.1 check src tests
 uvx ruff@0.16.1 format src tests
 uv run --with mypy --with types-requests --with scipy-stubs mypy src
 
-# Tests (integration tests spawn the real server and download Florence-2-base on first run)
+# Tests. `testpaths` is set, so bare `pytest` collects only tests/ -- benchmarks/ and the
+# root probe scripts are deliberately outside it (they spawn servers / download weights
+# at import, which used to abort collection entirely).
+# Integration tests spawn the real server and download Florence-2-base on first run.
 uv run --with pytest --with anyio pytest tests -q
+
+# Faster inner loop: skip the two suites that load real models (~12 min combined)
+.\.venv\Scripts\python.exe -m pytest tests -q --ignore=tests/test_server.py --ignore=tests/test_inspection_coco.py
+
+# The torch-free import invariant. This has broken twice; check it after touching imports.
+.\.venv\Scripts\python.exe -c "import sys, fusion_vision_mcp; assert 'torch' not in sys.modules"
 ```
 
 `uv run` and `uv tool install` can fail here in ways specific to the environment, not the code — see the OneDrive note below if this checkout is ever moved back under a synced folder.
@@ -49,16 +65,30 @@ fork-specific commits. Attribution to the original author is retained regardless
 `florence2.py` and the `authors` list in `pyproject.toml`, since this fork's `Florence2` wrapper class still
 descends from his original implementation even though it's since grown well past it.
 
-## Two OCR paths — pick by text type, don't default to `ocr`
+## `ocr` is EasyOCR, and it returns nothing rather than inventing text
 
-`ocr` (Florence2's `<OCR>` head) and `query_image` (Moondream2 VQA, asked to transcribe) both read text, but they fail differently, so route by what the text looks like rather than always reaching for `ocr`. This is now stated directly in both tools' MCP descriptions (see `src/fusion_vision_mcp/__init__.py`), since a calling agent reads those at tool-selection time, not this file:
+`ocr` runs **EasyOCR** (CRAFT detection + CRNN recognition). It replaced Florence-2's `<OCR>` head in the
+Granite-Docling → EasyOCR swap; Florence-2 no longer backs this tool at all. It handles both of the cases that
+used to need separate routing — dense printed text *and* stylized/logo/cursive/low-contrast text — and returns
+a per-span confidence score, which the old head could not.
 
-- **`ocr` (Florence2)** for dense, printed, document-style text — receipts, scanned pages, paragraphs. It's built for verbatim character-level transcription over a lot of text.
-- **`query_image` (Moondream2)**, e.g. `question="What does the text/watermark say, exactly?"`, for stylized/logo/cursive/low-contrast text — photo watermarks, signage, logotypes. Florence2's OCR head misreads these; it read a real watermark reading "Ride the Sky / Equine Photography / ridetheskyequine.com" as "SQUINT PHOTOGRAPHY / squentphotography.com" (2026-08-20 test on `testpette.jpg`). Moondream2 read the same image correctly.
+`detail=true` returns `{text, text_regions}` per page, each region carrying `{text, confidence, box}` in page
+coordinates. Confidence is load-bearing beyond OCR: `query_image(structured_analysis=true)` flags spans below
+0.20 as likely generative text hallucination.
 
-Don't hard-route `ocr` to always call Moondream instead — Moondream is a VQA model, not a transcription specialist, and is more prone to paraphrasing rather than verbatim-transcribing long or dense text blocks. Keep both tools and choose per call.
+**An image with no text returns empty, and that is correct.** This is worth stating because the repo's own test
+suite asserted the opposite for four tests: they ran against `tests/sample.jpg` (a paper flower, no text at all)
+and asserted `len(text) > 0`. That passed only because Florence-2's OCR head emitted *something* for a text-free
+image — the assertions were pinning a hallucination. EasyOCR returns 0 regions there (11 on
+`tests/layout_two_column.png`). `tests/test_server.py::test_ocr_textless_image_returns_no_text` now pins the
+correct behaviour. Do not "fix" an empty OCR result by routing to a VLM; an empty result is an answer.
 
-There's a third path that is not a text tool at all and must not be used as one: **`caption` describes text, it does not transcribe it.** Tested live on this repo's own banner (2026-08-25): `caption` rendered the logo "FusionVisionMCP" as "FusionVisionMP" mid-sentence, while `ocr` and `query_image` both read the same image exactly right. A caption quoting a name, brand or label is not evidence of what it says — confirm it with `ocr` or `query_image` per the routing above. This is now stated in `caption`'s MCP description, for the same reason the OCR routing is.
+**`caption` describes text, it does not transcribe it.** Tested live on this repo's own banner (2026-08-25):
+`caption` rendered the logo "FusionVisionMCP" as "FusionVisionMP" mid-sentence, while the OCR path read it
+exactly right. A caption quoting a name, brand or label is not evidence of what it says — confirm it with `ocr`.
+This is stated in `caption`'s MCP description, since a calling agent reads that at tool-selection time and not
+this file. `caption(verify_text=true)` still uses Florence-2's `<OCR_WITH_REGION>` head for that cross-check —
+the one remaining place Florence-2 reads text.
 
 ## Multi-column layouts are handled by geometry, not by asking the model harder
 
@@ -335,8 +365,15 @@ Sprints 6 through 16 shifted the project from raw model wrappers to "agentic" ca
 We needed `count_objects` to handle both real photographs and flat vector art without the caller explicitly passing `clip_art=True`. We originally tried zero-shot CLIP (SigLIP2, Sprint 4) for domain routing, but found it confidently misclassified real photographs as clip art. The fix was model-free (Sprint 15): a simple pixel-statistics check (unique RGB colors per 1,000 pixels) cleanly separates the two domains.
 Similarly, `count_objects` using Grounding DINO on photographs originally used a static threshold (`0.30`). On dense scenes (like a flock of birds), it failed entirely. Sprint 6 introduced adaptive thresholding: it sweeps the threshold down to `0.10` if no boxes are found at `0.30`. This introduces a known risk (the "danger zone" of hallucinated boxes), so it is strictly gated: the lower thresholds are only accepted if `score_aesthetics` (or rather, its internal confidence) confirms the image is actually densely populated. We measure, we don't blindly lower the bar.
 
-**Granite-Docling OCR & Text Fusion (Sprints 7 & 8)**
-Florence-2's caption head paraphrases and misspells text in the image. We integrated `ibm-granite/granite-docling-258M` as a standalone OCR specialist (loaded lazily to save ~515MB). We did not replace Florence-2; instead, `caption` now uses `auto_verify_text=true` to scan the generated prose for signage words. If found, it crops and upscales the text regions, cross-checks against Docling, and substitutes the verbatim text back into the caption. This avoids loading the heavy OCR model for non-text images.
+**Specialist OCR & Text Fusion (Sprints 7 & 8; specialist replaced in v0.8.1)**
+Florence-2's caption head paraphrases and misspells text in the image, so `caption(auto_verify_text=true)` scans
+the generated prose for signage words and, if it finds any, crops and upscales those regions, cross-checks them
+against a specialist OCR model, and substitutes the verbatim text back into the caption. The heavy model is
+loaded lazily, so a non-text image never pays for it.
+
+The specialist was originally `ibm-granite/granite-docling-258M`; it is now **EasyOCR** (`easyocr_engine.py`),
+and the `granite_docling` module is gone. If you find a reference to Granite-Docling anywhere, it is stale — two
+test files importing the deleted module survived the swap and broke `pytest` collection outright until v0.8.2.
 
 **Ground-Truth Suites (Sprints 15 & 16)**
 We historically relied on synthetic, geometric fixtures. We realized this was a massive blind spot. We pulled 35 real photographs from COCO val2017 and 24 from Open Images v7 into `benchmarks/`. Every structural change is now regression-tested against real-world complexity, not just white backgrounds.
@@ -349,9 +386,37 @@ We needed to split aesthetics into `photographic_aesthetic`, `technical_quality`
 **Structured Visual Inspection (Sprint 10)**
 VLMs are notoriously blind to generative AI artifacts (e.g., humans with 3 arms). We built `structured_analysis` into `query_image` to physically measure anatomy using Grounding DINO (`person`, `arm`, `leg`, etc.) and evaluate against physiological ratios (e.g., `arm > persons * 2 + 1`). If the ratio fails, it raises an `Anomaly` backed by a physical `Observation`, overriding the VLM's hallucination. (Sprints 17-19 later refined this by enforcing strict part-to-person association and bounding-box deduplication to ensure the anomaly flags aren't just detector noise).
 
+## The idle timer measures completed calls, not attribute lookups
+
+`IdleProxy.__getattr__` runs on every *attribute lookup*, and `get()` used to cancel and recreate a
+`threading.Timer` — a fresh OS thread — on each one. A loop touching a proxy per page or per part paid that many
+times over; `inspection._check_anatomy` alone does six lookups.
+
+Worse, the countdown measured time since the last lookup, not since the call *returned*. Any inference longer
+than the timeout was released while still running: `_value = None`, then `gc.collect()` and a Windows
+`SetProcessWorkingSetSize` trim executing while torch was mid-forward-pass. The live local reference prevented a
+use-after-free, but the working-set trim during inference is a real stall.
+
+What ships now (`idle.py`): one self-rearming timer instead of one per lookup, `_last_used` updated when a call
+*completes*, and an in-flight counter so `release()` defers while any call is running. `gc.collect()` moved
+inside the lock — it was outside, so a concurrent `get()` could rebuild the model while the old one was still
+being collected, briefly doubling resident memory on the exact path that exists to reduce it. `IdleProxy` also
+grew its own `release()`: `proxy.release()` previously went through `__getattr__` and therefore *loaded* the
+model in order to release it.
+
+Regression tests in `tests/test_idle.py` cover all three: a call outlasting the timeout, thread count across 25
+lookups, and `proxy.release()` on an unloaded proxy.
+
 ## Package import must stay torch-free, or MCP clients time out on connect
 
-`__init__.py` used to import `Aesthetic`/`Florence2`/`Florence2SP`/`GroundingDino`/`Moondream`/`Sam2` at module
+**This invariant has now been broken twice and restored twice. Check it before assuming it holds** — there is a
+regression test (`'torch' not in sys.modules` after `import fusion_vision_mcp`) precisely because a prose note
+here was not enough to hold it. The second break was found in the v0.8.2 review, with two causes beyond the
+obvious one: `detection_policy.py` (on the eager path) imported `DEFAULT_BOX_THRESHOLD` from `grounding_dino`
+rather than `constants`, and `EasyOCREngine.__init__` took a `torch.device`, forcing `__init__.py` to import
+torch just to construct one. It now takes a device *string*, like every other wrapper.
+
+`__init__.py` used to import `Aesthetic`/`Florence2`/`GroundingDino`/`Moondream`/`Sam2` at module
 level, purely to get their names for use inside lazy `IdleProxy(IdleReleased(lambda: ...))` wrappers in
 `app_lifespan`. Every one of those five wrapper modules does `import torch` (and `transformers`) at its own top
 level, so the package import paid that cost regardless of whether any model was ever actually used — 4.5s warm,
@@ -364,7 +429,9 @@ Fixed by moving every constant/enum `__init__.py` needs as a function-signature 
 `MASK_DECODE_RESOLUTION`, `CaptionLevel`) into a new `constants.py` with no torch dependency, and deferring the
 six heavy imports entirely. Each wrapper module still imports its own constant(s) back from `constants.py` and
 re-exports them, so `from fusion_vision_mcp.grounding_dino import DEFAULT_BOX_THRESHOLD` (used by
-`tests/test_grounding_dino.py`) keeps working unchanged.
+`tests/test_grounding_dino.py`) keeps working unchanged. **Anything on the eager import path must take that
+constant from `constants` instead** — importing it from `grounding_dino` drags torch in, which is exactly how
+the invariant broke the second time.
 
 **The first attempt at deferring the six class imports was wrong, and it is worth recording why.** Hoisting them
 from module level to the *top of `app_lifespan`* measurably made no difference — `initialize` still took 15s.
@@ -385,11 +452,13 @@ exist under a `TYPE_CHECKING` guard now, the annotations have to be quoted forwa
 — ruff's `TC004` catches the unquoted form as "used at runtime" and it would otherwise be a `NameError` the
 first time `app_lifespan` runs.
 
-This also fixed something that was arguably already broken independent of the timeout: with the default config
-(no `--cache-model`, so `subprocess=True`), every model call already ran in a spawned child process
-(`multiprocessing`, start method `spawn` on Windows) that reimports `fusion_vision_mcp` from scratch and pays its
-own torch import regardless of what the parent already imported. The parent's eager import bought nothing for
-inference in that mode — it was pure waste layered on top of the timeout risk.
+Historical note, since it explains a mode that no longer exists: there used to be a `Florence2SP` subprocess
+path (`--cache-model` / `subprocess=True`) in which every model call ran in a spawned child process that
+reimported `fusion_vision_mcp` from scratch and reloaded the full model *per call*. It was selected only when
+`idle_timeout == 0`, i.e. `--memory-mode persistent` — so the mode documented as fastest was the one reloading
+Florence-2 on every request. `Florence2SP`, `subprocess.py`, the `dill` dependency and the `--cache-model` flag
+were all removed in v0.8.2; `IdleReleased` with a timeout of 0 already gives a persistent in-process model.
+Use `--memory-mode persistent` where `--cache-model` used to appear.
 
 ## A note on where this lives
 

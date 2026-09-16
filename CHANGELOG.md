@@ -1,5 +1,123 @@
 # Changelog
 
+## v0.8.2
+
+A correctness and cost release. The test suite could not be collected at all, which is how
+three runtime-breaking defects reached a tagged release unnoticed; fixing collection came
+first, and everything below was verified against a suite that actually runs.
+
+### Fixed: tools that could not run
+
+- **`detect_objects` raised `AttributeError` on every call.** `detection_policy` called
+  `app.processor`, a field renamed to `app.florence2` some time earlier. `count_objects`
+  hit the same branch whenever routing chose Florence-2, and `IdleProxy` loaded the model
+  before raising, so the failure cost a full model load.
+- **`query_image` could not load Moondream.** `attn_implementation="sdpa"` is rejected by
+  `HfMoondream` across the whole supported transformers range; it now passes `"eager"`, as
+  the error itself prescribes. Every VQA consumer was affected.
+- **`ocr` emitted literal `
+` characters** instead of newlines, corrupting every
+  multi-line transcription in both the plain and `detail=true` payloads.
+- **`pytest` aborted during collection** (3 errors, 0 tests run). Added
+  `[tool.pytest.ini_options]` with `testpaths`, deleted two tests importing the removed
+  `granite_docling` module, and renamed the root/benchmark probe scripts off the `test_*`
+  prefix so collection no longer spawns a server or downloads weights.
+
+### Fixed: five OCR tests asserted a hallucination
+
+`test_ocr`, `test_ocr_url` and both PDF tests ran against a text-free fixture and asserted
+`len(text) > 0` -- which passed under Florence-2's OCR head only because it emitted
+something. EasyOCR correctly returns nothing. The text assertions now run against a
+text-bearing fixture, the PDF tests pin the decode path, and a new
+`test_ocr_textless_image_returns_no_text` locks in the anti-hallucination behaviour.
+
+### Connect time: the torch-free import invariant, restored
+
+Importing the package pulled in torch and all six model wrappers, reintroducing the
+4.5s-warm/14.1s-cold connect cost that the invariant exists to prevent. Wrapper imports
+moved back under `TYPE_CHECKING` with per-factory local imports; `detection_policy` now
+takes `DEFAULT_BOX_THRESHOLD` from `constants` rather than from torch-importing
+`grounding_dino`; `EasyOCREngine` takes a device *string* like every other wrapper.
+Package import is now ~0.86s with torch absent from `sys.modules`, pinned by a
+regression test.
+
+### Removed: `Florence2SP` subprocess mode
+
+Every call reconstructed the full model inside a fresh process, and it was selected only
+by `--memory-mode persistent` -- so the mode documented as fastest reloaded Florence-2 on
+every request. Removed along with `subprocess.py`, the `dill` dependency and the
+`--cache-model` flag (**breaking**: use `--memory-mode persistent`). `IdleReleased` with
+timeout 0 already provides a persistent in-process model.
+
+### Idle release no longer fires mid-inference
+
+The idle timer measured time since the last *attribute lookup* and was rebuilt -- a fresh
+OS thread -- on every one. A call longer than the timeout was released while still
+running, dropping the model and running `gc.collect()` plus a Windows working-set trim
+during inference. One self-rearming timer now measures time since the last *completed*
+call, an in-flight guard defers release, and `IdleProxy.release()` no longer loads the
+model in order to release it.
+
+### Other correctness
+
+- `adaptive_threshold` filtered competing gaps by value, so tied maximal gaps both
+  vanished and any evenly-spaced score list read as a confidence cliff. Now filtered by
+  index.
+- `geometry`: a mask too small to measure returned `nan` from `elongation`, and
+  `nan > threshold` is False, so it *passed* the rosette gate instead of being rejected.
+  `relation` now rejects mismatched mask shapes instead of raising a raw broadcast error.
+- The reasoner treated any well-formed JSON as well-shaped; a list, a bare string, or a
+  string confidence raised out of the tool. All fields are now shape-checked, and the
+  endpoint and timeout are configurable.
+- `score_aesthetics`/`critique_composition` encoded the same image twice when
+  `style_context=true`, and re-encoded all 16 style prompts on every call. Both heads now
+  share one encode (scores verified bit-identical) and the prompt embeddings are cached.
+- Technical IQA and the reasoner failed silently behind `except Exception: pass`; failures
+  are now logged and reported as explicit error fields.
+- `_aesthetic_comparison` shared one mutable reference dict across every page.
+- Florence-2 ran float32 on CUDA, unlike the four other wrappers -- 2x memory for no gain.
+- Outbound image/PDF fetches had no timeout.
+
+### Performance
+
+- `geometry.count_lobes` ran 76 connected-component passes over the whole frame; they are
+  now restricted to the mask's bounding box, which is exactly equivalent since the field
+  is zeroed outside it.
+- `layout.py`'s three hand-rolled per-row/per-column Python scanners are vectorised. All
+  fixtures split identically, negative controls included.
+- EasyOCR loaded four language models by default; now one, with `--ocr-languages` to widen.
+
+### Measured and rejected
+
+- **Batching the six anatomy detector passes into one multi-phrase prompt.** ~5x faster
+  (3.2s vs 16.4s) but not the same detections: Grounding DINO returns boxes whose text
+  span maps to no part, reported with an empty label (22 of 31 boxes on one COCO frame),
+  and competing phrases suppress weak parts entirely (another frame went from 35
+  detections across six parts to 4, all `person`, losing every limb). Per-part tallies
+  cannot be built from that, and the containment/dedup constants were swept against the
+  per-part behaviour.
+- **MUSIQ preprocessing was suspected of mismatching the exported graph.** It does not:
+  the ONNX signature declares a fixed `['batch', 3, 224, 224]` input, and the score falls
+  monotonically under increasing blur (41.1 -> 39.4 -> 21.8 -> 20.6). Recorded so it is
+  not re-investigated. The loader now prefers an available accelerator and fails with an
+  actionable message when the weights cannot be fetched.
+- **`ocr` column-offset drift.** Reported as a defect; it is not. `split_columns` crops at
+  gutter midpoints over `[0, *splits, width]`, so the crops tile the full width and the
+  running offset is correct.
+
+### Housekeeping
+
+- Consolidated two copies of `_iou` into `geometry.box_iou`.
+- `corroborated` documented: it is carried by control flow, not hardcoded. The comment
+  claiming Sprint 19 was still pending was stale.
+- `forensics` documents that a negative result is no evidence either way.
+- Granite-Docling prose removed from the package description, manifest and `ocr_fusion`.
+- Version reconciled to 0.8.2 across `pyproject.toml`, `manifest.json` and `server.json`;
+  the v0.8.2 release commit had landed without it.
+- Dockerfile and `run_battery.py` pre-cached and benchmarked `Florence-2-base` while the
+  shipped default is `-large`; both now use the default, centralised as
+  `DEFAULT_FLORENCE2_MODEL`.
+
 ## v0.8.1
 
 This is a correctness release replacing fabricated anomalies with real defect measurements.

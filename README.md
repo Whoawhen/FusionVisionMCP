@@ -7,7 +7,7 @@
 
 🚧 **Work in progress** — see [README_DETAILED.md](README_DETAILED.md) for current limits and measured results before relying on this for anything important.
 
-An MCP server that fuses local, CPU-capable vision models — Florence-2, Moondream2, SAM2, Grounding DINO, Granite-Docling, IQA, and CLIP/LAION — behind eleven tools: OCR, captioning, object detection/grounding, instance counting, visual question answering, spatial measurement (touch/gap/containment), and aesthetic scoring (including technical quality and artistic judgment via Ollama).
+An MCP server that fuses local, CPU-capable vision models — Florence-2, Moondream2, SAM2, Grounding DINO, EasyOCR, IQA, and CLIP/LAION — behind eleven tools: OCR, captioning, object detection/grounding, instance counting, visual question answering, spatial measurement (touch/gap/containment), and aesthetic scoring (including technical quality and artistic judgment via Ollama).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="FusionVisionMCP-Dark.jpg">
