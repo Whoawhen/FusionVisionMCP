@@ -54,18 +54,22 @@ uv run --with pytest --with anyio pytest tests -q
 
 ## Remotes, and why attribution stays even though this is no longer a fork
 
-**This checkout currently has no git remotes configured.** `git remote -v` is empty. The history was
-deliberately flattened (root commit `44377fd`, "Flattened from v0.8.1") to sever the fork lineage from
-`jkawamoto/mcp-florence2`, which by then meant nothing: 11 tools across five local models here against
-upstream's three on Florence-2 alone, and the `mcp_florence2` package deleted outright early on and replaced by
-this repo's own `fusion_vision_mcp`. Commit directly to `main`; there is no upstream to keep history clean for.
+`origin` is `https://github.com/Whoawhen/FusionVisionMCP` and `main` tracks `origin/main`. There is no
+`upstream` remote and should not be: **this is no longer a fork.** The history was deliberately flattened (root
+commit `44377fd`, "Flattened from v0.8.1") to sever the lineage from `jkawamoto/mcp-florence2`, which by then
+meant nothing: 11 tools across five local models here against upstream's three on Florence-2 alone, and the
+`mcp_florence2` package deleted outright early on and replaced by this repo's own `fusion_vision_mcp`.
 
-A `Whoawhen/FusionVisionMCP` repo exists on GitHub but its history is **unrelated** to this checkout's (it stops
-at v0.8.0, 2026-09-12) and it is still flagged by GitHub as a fork (`isFork: true`, parent
-`jkawamoto/mcp-florence2`). Note that force-pushing flattened history would *not* clear that flag — the fork
-relationship is repo metadata, not git history. Detaching it means either asking GitHub Support or recreating
-the repo as a standalone one. A full mirror of the old repo (259 commits) is bundled at
-`C:\AI\MCP\_backups\FusionVisionMCP-github-20260916.bundle` before any of that happens.
+**How that was done, because the obvious approach does not work.** Force-pushing flattened history does *not*
+clear GitHub's fork flag — the fork relationship is repo metadata, not git history, so the "forked from" badge,
+the fork network membership and the contribution-graph exclusion all survive it. What actually worked
+(2026-09-16): rename the old repo to `Whoawhen/FusionVisionMCP-fork-archive`, create a fresh standalone repo
+under the original name (so every URL in `manifest.json`, `server.json`, `README.md` and `_USER_AGENT` stays
+valid), and push. The new repo verifies as `isFork: false` with no parent. Deleting rather than renaming would
+work too but needs the `delete_repo` scope, which the local `gh` token does not carry.
+
+The old 259-commit history survives in two independent places: the `FusionVisionMCP-fork-archive` repo, and a
+verified bundle at `C:\AI\MCP\_backups\FusionVisionMCP-github-20260916.bundle`.
 
 **Severing the fork relationship is not the same as dropping attribution, and the second one is not optional.**
 Measured 2026-09-16 against upstream rather than assumed: `src/fusion_vision_mcp/florence2.py` still contains
