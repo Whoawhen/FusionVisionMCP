@@ -39,15 +39,15 @@ def register(mcp: MCPServer) -> None:
         """Process an image file or URL using OCR to extract text.
 
         Uses EasyOCR for robust scene-text extraction. Excels at photos, signage,
-        watermarks, logos, and printed text. 
+        watermarks, logos, and printed text.
 
         A page laid out in side-by-side columns (a form, meeting notes, a
         resume) is detected automatically: each column is OCR'd separately and
         joined in reading order, so fields from different columns don't get
         interleaved.
 
-        Set `detail=true` to get confidence scores and bounding boxes. This is 
-        highly recommended for checking generative image artifacts: if an image 
+        Set `detail=true` to get confidence scores and bounding boxes. This is
+        highly recommended for checking generative image artifacts: if an image
         contains gibberish text, the confidence scores will drop significantly.
         """
         easyocr = ctx.request_context.lifespan_context.ocr_specialist
@@ -60,15 +60,15 @@ def register(mcp: MCPServer) -> None:
                 # Reconstruct column offsets for coordinate mapping
                 # Assuming horizontal splits, so y is always 0.
                 x_offset = 0
-                
+
                 page_text_regions = []
                 page_texts = []
-                
+
                 for crop in columns:
                     crop_w = crop.width
                     # run EasyOCR on the crop
                     crop_results = easyocr.readtext(crop)
-                    
+
                     for r in crop_results:
                         text = r["text"]
                         conf = r["confidence"]
@@ -76,22 +76,15 @@ def register(mcp: MCPServer) -> None:
                         # offset box [x1, y1, x2, y2]
                         box[0] += x_offset
                         box[2] += x_offset
-                        
+
                         page_texts.append(text)
-                        page_text_regions.append({
-                            "text": text,
-                            "confidence": conf,
-                            "box": box
-                        })
-                        
+                        page_text_regions.append({"text": text, "confidence": conf, "box": box})
+
                     x_offset += crop_w
-                
+
                 joined_text = "\n".join(page_texts)
                 flat_results.append(joined_text)
-                page_results.append({
-                    "text": joined_text,
-                    "text_regions": page_text_regions
-                })
+                page_results.append({"text": joined_text, "text_regions": page_text_regions})
 
             return page_results if detail else flat_results
 

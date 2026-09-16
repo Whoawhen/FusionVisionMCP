@@ -1,6 +1,7 @@
 """Aesthetic tools: `score_aesthetics` and `critique_composition`."""
 
 import os
+from collections.abc import Sequence
 from typing import Annotated, Any
 
 from mcp.server.mcpserver import Context, MCPServer
@@ -100,6 +101,7 @@ def register(mcp: MCPServer) -> None:
         app = ctx.request_context.lifespan_context
         with get_images(src) as images:
             if compare_with is None:
+                styles: Sequence[dict[str, Any] | None]
                 if style_context:
                     results, styles = app.aesthetic.score_and_classify(images)
                 else:

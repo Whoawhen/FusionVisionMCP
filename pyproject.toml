@@ -6,8 +6,9 @@ requires = [ "hatchling" ]
 name = "fusion-vision-mcp"
 version = "0.8.2"
 description = """\
-    An MCP server for processing images using Florence-2, Moondream2, SAM2, CLIP, Grounding DINO, EasyOCR, and ONNX IQA models for captioning, OCR, \
-    object detection/grounding, instance counting, visual question answering, spatial measurement and aesthetic scoring\
+    An MCP server for processing images using Florence-2, Moondream2, SAM2, CLIP, Grounding DINO, EasyOCR, and ONNX \
+    IQA models for captioning, OCR, object detection/grounding, instance counting, visual question answering, spatial \
+    measurement and aesthetic scoring\
     """
 readme = "README.md"
 authors = [
@@ -34,7 +35,7 @@ dependencies = [
     # Required by vikhyatk/moondream2's trust_remote_code module, not by this package
     # directly. The [binary] extra ships the libvips shared libraries in the wheel, so no
     # system-wide libvips install or PATH entry is needed.
-    "pyspellchecker>=0.9.0",
+    "pyspellchecker>=0.9",
     "pyvips[binary]>=2.2",
     "requests>=2.32.3",
     "rich-click>=1.8.8",
@@ -51,40 +52,38 @@ dependencies = [
     # as the alternative, so moondream.py must pass "eager". Verified on 4.57.6.
     "transformers>=4.57.2,<5",
 ]
-scripts.fusion-vision-mcp = "fusion_vision_mcp.cli:main"
-
-[project.optional-dependencies]
-ocr-specialist = [
+optional-dependencies.iqa = [ "huggingface-hub>=0.23", "onnxruntime>=1.15" ]
+optional-dependencies.ocr-specialist = [
     "easyocr>=1.7.2",
 ]
-iqa = [
-    "onnxruntime>=1.15.0",
-    "huggingface-hub>=0.23.0"
-]
+scripts.fusion-vision-mcp = "fusion_vision_mcp.cli:main"
 
 [dependency-groups]
 dev = [
+    # ~70 tests are @pytest.mark.anyio; without this the suite errors at setup.
+    "anyio>=4.4",
     "bump-my-version>=1.1.1",
+    # [tool.mypy] below is unusable without it.
+    "mypy>=1.11",
     "pre-commit>=4.2",
     "pre-commit-uv>=4.1.4",
     "pytest>=8.3.4",
-    # ~70 tests are @pytest.mark.anyio; without this the suite errors at setup.
-    "anyio>=4.4",
-    # [tool.mypy] below is unusable without it.
-    "mypy>=1.11",
     "types-requests>=2.32.0.20250328",
 ]
-
-[tool.pytest.ini_options]
-# Bare `pytest` at the repo root used to walk `benchmarks/` and the root-level probe
-# scripts, whose module-level side effects (a real server spawn, a weights download)
-# aborted collection outright. Tests live in `tests/`; everything else is a script.
-testpaths = [ "tests" ]
-addopts = "--strict-markers"
 
 [tool.ruff]
 target-version = "py312"
 line-length = 120
+# `benchmarks/` holds exploratory sweeps and probe scripts, several of which are kept
+# only to make a documented negative result reproducible (see CLAUDE.md). They catch
+# broadly on purpose -- a sweep reports the case that failed and keeps going rather than
+# aborting partway -- and do blocking I/O inside async probes because they are scripts,
+# not a server. These rules are about shipped code; `src/` and `tests/` still enforce them.
+lint.per-file-ignores."benchmarks/**" = [
+    "ASYNC230",
+    "BLE001",
+    "SIM117",
+]
 
 [tool.pyproject-fmt]
 indent = 4
@@ -93,10 +92,22 @@ indent = 4
 disallow_untyped_defs = true
 warn_return_any = true
 warn_unused_configs = true
-overrides = [ { module = [
-    "pypdfium2",
-    "transformers.*",
-], ignore_missing_imports = true } ]
+overrides = [
+    { module = [
+        "easyocr",
+        "huggingface_hub",
+        "onnxruntime",
+        "pypdfium2",
+        "transformers.*",
+    ], ignore_missing_imports = true },
+]
+
+[tool.pytest]
+# Bare `pytest` at the repo root used to walk `benchmarks/` and the root-level probe
+# scripts, whose module-level side effects (a real server spawn, a weights download)
+# aborted collection outright. Tests live in `tests/`; everything else is a script.
+ini_options.testpaths = [ "tests" ]
+ini_options.addopts = "--strict-markers"
 
 [tool.bumpversion]
 current_version = "0.8.2"
@@ -111,4 +122,3 @@ pre_commit_hooks = [
     "uv sync",
     "git add uv.lock",
 ]
-

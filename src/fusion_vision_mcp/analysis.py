@@ -354,9 +354,7 @@ def _enrich_aesthetics(app: AppContext, image: Image, result: dict[str, Any], st
 _COMPARE_TIE: Final[float] = 0.05
 
 
-def _attach_annotated_images(
-    images: list[Image], results: list[dict[str, Any]], fallback_label: str = ""
-) -> None:
+def _attach_annotated_images(images: list[Image], results: list[dict[str, Any]], fallback_label: str = "") -> None:
     """Render boxes onto each image and record the path on its result, in place.
 
     `fallback_label` names the detections when the backend returned none -- counting
@@ -386,6 +384,8 @@ def _aesthetic_comparison(
     ``cross_medium_warning`` is added when they differ (cross-medium comparison is
     out of calibrated scope). The absolute scores are not recalibrated.
     """
+    img_styles: Sequence[dict[str, Any] | None]
+    ref_style: dict[str, Any] | None
     if style_context:
         img_scores, img_styles = app.aesthetic.score_and_classify(images)
         ref_scores, ref_styles = app.aesthetic.score_and_classify(ref_images)

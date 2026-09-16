@@ -1,11 +1,13 @@
 import sys
 from pathlib import Path
+
 from PIL import Image
 
 sys.path.insert(0, "src")
-from fusion_vision_mcp.moondream import Moondream
-from fusion_vision_mcp.grounding_dino import GroundingDino
 from fusion_vision_mcp.florence2 import Florence2
+from fusion_vision_mcp.grounding_dino import GroundingDino
+from fusion_vision_mcp.moondream import Moondream
+
 
 def main():
     img_path = "tests/defect_test6.jpg"
@@ -39,6 +41,6 @@ def main():
         results = florence.detect_objects([img], obj)
         print(f"Target '{obj}': found {results[0]['count']} instances.")
 
+
 if __name__ == "__main__":
     main()
-

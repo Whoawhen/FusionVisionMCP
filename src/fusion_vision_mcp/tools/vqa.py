@@ -104,22 +104,18 @@ def register(mcp: MCPServer) -> None:
                 results = []
                 for image, answer in zip(images, answers, strict=True):
                     observations, anomalies = analyze_inspection(app, image, [answer])
-                    
+
                     # Metadata/EXIF forensics. A hit is strong evidence; an empty
                     # result means nothing either way -- see the function's docstring.
                     meta_anomalies = analyze_metadata_anomalies(image)
                     for ma in meta_anomalies:
                         obs = Observation(
-                            claim=ma["claim"],
-                            source=ma["source"],
-                            corroborated=False,
-                            evidence=[ma["evidence"]]
+                            claim=ma["claim"], source=ma["source"], corroborated=False, evidence=[ma["evidence"]]
                         )
-                        anomalies.append(Anomaly(
-                            description="Generative metadata signature detected.",
-                            observations=[obs]
-                        ))
-                    
+                        anomalies.append(
+                            Anomaly(description="Generative metadata signature detected.", observations=[obs])
+                        )
+
                     # Spec 20: Auto-check for generative text hallucinations
                     try:
                         easyocr = app.ocr_specialist
@@ -132,12 +128,12 @@ def register(mcp: MCPServer) -> None:
                                     corroborated=False,
                                     evidence=[
                                         f"Confidence score {r['confidence']:.2f} is abnormally low indicating structural hallucination.",
-                                        f"Box: {r['box']}"
-                                    ]
+                                        f"Box: {r['box']}",
+                                    ],
                                 )
                                 anom = Anomaly(
                                     description=f"Generative text hallucination detected (gibberish/malformed): '{r['text']}'",
-                                    observations=[obs]
+                                    observations=[obs],
                                 )
                                 anomalies.append(anom)
                     except Exception as e:  # noqa: BLE001 - third-party OCR; logged, never fatal

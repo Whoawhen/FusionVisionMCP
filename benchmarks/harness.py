@@ -39,7 +39,7 @@ def peak_rss_mb() -> float:
             import resource
 
             return float(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss) / 1024
-        except Exception:  # noqa: BLE001 - any failure here just means no number
+        except Exception:
             return float("nan")
 
     class PMC(ctypes.Structure):
@@ -102,7 +102,7 @@ def run(
             failure = ""
             try:
                 out = detector.detect_objects([fixture.image], prompt)[0]
-            except Exception as exc:  # noqa: BLE001 - a failed backend is a datum, not a crash
+            except Exception as exc:
                 out, failure = {"count": -1, "bboxes": [], "points": [], "scores": []}, f"{type(exc).__name__}: {exc}"
             elapsed = time.time() - started
 

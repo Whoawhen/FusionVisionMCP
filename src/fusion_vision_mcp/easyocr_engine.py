@@ -11,16 +11,12 @@ class EasyOCREngine:
     """
     Specialist OCR model using EasyOCR (CRAFT + CRNN).
 
-    This model is optimized for extracting text in the wild (scene text, 
+    This model is optimized for extracting text in the wild (scene text,
     watermarks, stylized fonts, logos) and returns explicit confidence scores.
     It is loaded lazily and respects the central idle-release mechanism.
     """
 
-    def __init__(
-        self,
-        device: str | None = None,
-        languages: list[str] | None = None
-    ) -> None:
+    def __init__(self, device: str | None = None, languages: list[str] | None = None) -> None:
         # A device *string*, like every other wrapper in this package. Taking a
         # torch.device here used to force the package's entry point to import torch
         # just to build one, which broke the torch-free-import invariant.
@@ -28,7 +24,7 @@ class EasyOCREngine:
         # One language, one CRNN recognition model. Each extra language is another
         # model downloaded and held in memory, so widen this deliberately via
         # --ocr-languages rather than paying for four by default.
-        self.languages = languages or ['en']
+        self.languages = languages or ["en"]
         self._reader = None
 
     def release(self) -> None:
@@ -41,13 +37,14 @@ class EasyOCREngine:
     def _load(self) -> "Any":
         if self._reader is None:
             import easyocr
+
             use_gpu = self.device.startswith("cuda")
             self._reader = easyocr.Reader(self.languages, gpu=use_gpu)
         return self._reader
 
     def ocr(self, image: Image, max_new_tokens: int = 256) -> str:
         """
-        Extracts verbatim text from an image. 
+        Extracts verbatim text from an image.
         Returns a flat string to satisfy the SpecialistOCR protocol for fusion.
         """
         results = self.readtext(image)
@@ -61,7 +58,7 @@ class EasyOCREngine:
         img_np = np.array(image.convert("RGB"))
         # We pass batch_size=2 to enforce a strict memory cap on CPU execution
         results = reader.readtext(img_np, batch_size=2)
-        
+
         output = []
         for bbox, text, prob in results:
             # bbox is [[x1,y1], [x2,y1], [x2,y2], [x1,y2]]
@@ -70,11 +67,6 @@ class EasyOCREngine:
             y1 = int(min(pt[1] for pt in bbox))
             x2 = int(max(pt[0] for pt in bbox))
             y2 = int(max(pt[1] for pt in bbox))
-            
-            output.append({
-                "text": text,
-                "confidence": float(prob),
-                "box": [x1, y1, x2, y2]
-            })
-        return output
 
+            output.append({"text": text, "confidence": float(prob), "box": [x1, y1, x2, y2]})
+        return output

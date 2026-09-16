@@ -48,9 +48,7 @@ def trim_working_set() -> None:
     if _KERNEL32 is None:
         return
     try:
-        _KERNEL32.SetProcessWorkingSetSize(
-            _KERNEL32.GetCurrentProcess(), ctypes.c_size_t(-1), ctypes.c_size_t(-1)
-        )
+        _KERNEL32.SetProcessWorkingSetSize(_KERNEL32.GetCurrentProcess(), ctypes.c_size_t(-1), ctypes.c_size_t(-1))
     except Exception:  # pragma: no cover - diagnostics only
         logger.debug("Could not trim the working set", exc_info=True)
 

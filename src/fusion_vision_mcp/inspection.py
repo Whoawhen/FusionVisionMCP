@@ -8,7 +8,7 @@ from PIL import Image
 from fusion_vision_mcp import geometry
 
 if TYPE_CHECKING:
-    from fusion_vision_mcp.app import AppContext
+    from fusion_vision_mcp.protocols import AppContext
 
 
 @dataclass

@@ -156,6 +156,9 @@ class AppContext:
     segmenter: Segmenter
     aesthetic: AestheticScorer
     counter: InstanceDetector
-    ocr_specialist: SpecialistOCR | None = None
+    # Always provided by `app_lifespan` -- it is an IdleProxy that builds EasyOCR on
+    # first use, not an optional backend. It was typed optional, which forced every
+    # `.readtext(...)` call site to fail type-checking against a None that cannot occur.
+    ocr_specialist: SpecialistOCR
     iqa: Any | None = None
     reasoner: Any | None = None

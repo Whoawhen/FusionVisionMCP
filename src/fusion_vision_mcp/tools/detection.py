@@ -35,9 +35,7 @@ def register(mcp: MCPServer) -> None:
         return_annotated: Annotated[
             bool,
             Field(
-                description=(
-                    "If true, returns a local temp file path to an annotated image with drawn bounding boxes."
-                )
+                description=("If true, returns a local temp file path to an annotated image with drawn bounding boxes.")
             ),
         ] = False,
     ) -> list[dict[str, Any]] | dict[str, Any]:
@@ -75,13 +73,11 @@ def register(mcp: MCPServer) -> None:
         """
         app = ctx.request_context.lifespan_context
         with get_images(src) as images:
-            results = execute_detection(
-                app, images, object_name, backend_preference="florence2"
-            )
-            
+            results = execute_detection(app, images, object_name, backend_preference="florence2")
+
             if return_annotated:
                 _attach_annotated_images(images, results)
-            
+
             return results
 
     @mcp.tool()
@@ -178,10 +174,7 @@ def register(mcp: MCPServer) -> None:
             ),
         ] = False,
         return_annotated: Annotated[
-            bool,
-            Field(
-                description="If true, saves an annotated image with counting boxes and returns the file path."
-            )
+            bool, Field(description="If true, saves an annotated image with counting boxes and returns the file path.")
         ] = False,
     ) -> list[dict[str, Any]]:
         """Count how many instances of a named object an image contains.
@@ -316,10 +309,10 @@ def register(mcp: MCPServer) -> None:
                 result["count_semantics"] = count_semantics
                 if ambiguity_res.ambiguous:
                     result["ambiguity"] = ambiguity_res.as_dict()
-                    
+
             if return_annotated:
                 _attach_annotated_images(images, results, fallback_label=object_name)
-                        
+
             return results
 
     @mcp.tool()

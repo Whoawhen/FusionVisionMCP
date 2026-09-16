@@ -29,6 +29,15 @@ class SpecialistOCR(Protocol):
 
     def ocr(self, image: PILImage, max_new_tokens: int = 256) -> str: ...
 
+    def readtext(self, image: PILImage) -> list[dict[str, Any]]: ...
+
+    """Spans with their boxes and confidences: {text, confidence, box}[].
+
+    Part of the contract, not an extra: the `ocr` tool's `detail=true` payload and
+    `query_image`'s text-hallucination check both call this, and typing the field as
+    a protocol without it made those two call sites fail type-checking.
+    """
+
 
 @dataclass(frozen=True)
 class TextConsensus:

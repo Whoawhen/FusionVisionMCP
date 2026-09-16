@@ -404,7 +404,7 @@ test files importing the deleted module survived the swap and broke `pytest` col
 We historically relied on synthetic, geometric fixtures. We realized this was a massive blind spot. We pulled 35 real photographs from COCO val2017 and 24 from Open Images v7 into `benchmarks/`. Every structural change is now regression-tested against real-world complexity, not just white backgrounds.
 
 **Technical IQA & Reasoner (Sprints 11 & 12)**
-We needed to split aesthetics into `photographic_aesthetic`, `technical_quality`, and `artistic_judgment`. 
+We needed to split aesthetics into `photographic_aesthetic`, `technical_quality`, and `artistic_judgment`.
 - `technical_quality` uses MUSIQ via ONNX. We chose MUSIQ over CLIP-IQA because it produces a native 0-100 score and uses 20% less memory, and we siloed it behind an `[iqa]` optional dependency so we don't force ONNX binaries on everyone.
 - `artistic_judgment` uses `VisionReasoner` (`reasoner.py`), an optional Ollama-backed LLM backend. A strict invariant here: the LLM is allowed to interpret, but it is explicitly forbidden from silently overriding direct physical measurements (like object counts). The code discards LLM-fabricated measurements and re-attaches the raw deterministic ones.
 

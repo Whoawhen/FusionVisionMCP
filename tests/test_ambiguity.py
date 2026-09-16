@@ -104,4 +104,3 @@ class TestCheckSemanticAmbiguity:
         assert res.ambiguous is False
         assert count_semantics == "unverified_tally"
         assert res.reason is None
-

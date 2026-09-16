@@ -142,9 +142,7 @@ async def app_lifespan(
         )
         vqa = cast(
             VqaProcessor,
-            IdleProxy(
-                IdleReleased(_make_moondream, idle_timeout, "Moondream")
-            ),
+            IdleProxy(IdleReleased(_make_moondream, idle_timeout, "Moondream")),
         )
     else:
         # timeout 0 never schedules a release, so this is a persistent in-process model
@@ -175,9 +173,7 @@ async def app_lifespan(
     # Specialist OCR is also lazy: only auto_verify_text loads EasyOCR.
     ocr_specialist = cast(
         SpecialistOCR,
-        IdleProxy(
-            IdleReleased(_make_easyocr, idle_timeout, "EasyOCR")
-        ),
+        IdleProxy(IdleReleased(_make_easyocr, idle_timeout, "EasyOCR")),
     )
 
     # `find_spec` answers "is onnxruntime installed?" without importing it, so the

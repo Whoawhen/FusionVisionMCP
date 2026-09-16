@@ -1,7 +1,7 @@
 # FusionVisionMCP v0.8.0 — Adaptive Vision Routing & Reasoning
 
-**Repository:** `https://github.com/Whoawhen/FusionVisionMCP`  
-**Starting version:** `0.7.1`  
+**Repository:** `https://github.com/Whoawhen/FusionVisionMCP`
+**Starting version:** `0.7.1`
 **Target version:** `0.8.0`
 
 ## Mission

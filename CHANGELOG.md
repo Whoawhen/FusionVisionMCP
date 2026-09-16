@@ -162,8 +162,8 @@ This is a correctness release replacing fabricated anomalies with real defect me
 The initial `structured_analysis` implementation counted anatomy globally across the frame and tallied overlapping detector boxes as separate parts, creating false positives on real, unaltered photographs.
 - **Real-photograph baseline (Sprint 17):** Added a measured negative control against 35 person-bearing COCO photographs.
 - **Bounding Box Deduplication:** Overlapping box detections for the same part (e.g., Grounding DINO detecting the same arm multiple times) are now merged via an IoU-based envelope dedup.
-- **Strict Spatial Association:** Anatomy parts are now strictly associated with the smallest containing person box via `_containment()` bounding-box math, rather than pooled globally. 
-- These changes dropped the false anomaly rate on the COCO negative controls from 7/24 down to 1/24 (a single documented, accepted residual involving a sheep). 
+- **Strict Spatial Association:** Anatomy parts are now strictly associated with the smallest containing person box via `_containment()` bounding-box math, rather than pooled globally.
+- These changes dropped the false anomaly rate on the COCO negative controls from 7/24 down to 1/24 (a single documented, accepted residual involving a sheep).
 
 ### Computed Corroboration and Payload Cleanup (Sprint 19)
 - **Breaking Change**: The unmeasured `severity_estimate` field was removed from the `Anomaly` object returned by `structured_analysis` in the `query_image` tool.
