@@ -1,31 +1,28 @@
 name: Release
+# Builds the .mcpb bundle and attaches it to a GitHub release. It deliberately does
+# NOT publish to the public MCP Registry. It used to: one tag push both cut the
+# release and listed the server publicly. The registry has no hard delete -- the most
+# you can do is mark an entry `deleted`, and the name stays claimed -- so listing is
+# close to a one-way door and should not ride along with an ordinary tag. Registry
+# publishing lives in `registry-publish.yml`, which only runs when someone triggers
+# it deliberately. Runbook: docs/Registry_Publish.md
 on:
   push:
     tags:
       - "v*.*.*"
 permissions:
-  id-token: write
   contents: write
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - name: Create package artifact
         run: npx @anthropic-ai/mcpb pack
+      # A tag carrying a pre-release suffix (v0.8.2-rc.1) is marked as a prerelease,
+      # so it does not become the "Latest" release the README points at.
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
           files: "*.mcpb"
-      - name: Update fileSha256 in server.json
-        run: |
-          SHA256_HASH=$(sha256sum "fusion-vision-mcp.mcpb" | awk '{print $1}')
-          jq --arg hash "$SHA256_HASH" '.packages[0].fileSha256 = $hash' server.json > server_tmp.json
-          mv server_tmp.json server.json
-      - name: Install MCP Publisher
-        run: |
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
-      - name: Login to MCP Registry
-        run: ./mcp-publisher login github-oidc
-      - name: Publish to MCP Registry
-        run: ./mcp-publisher publish
+          prerelease: ${{ contains(github.ref_name, '-') }}

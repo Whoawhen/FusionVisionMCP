@@ -1,7 +1,8 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.Whoawhen/fusion-vision-mcp",
-  "description": "An MCP server fusing Florence-2, Moondream2, SAM2, Grounding DINO, EasyOCR, IQA and CLIP for image captioning, OCR, object detection/grounding, instance counting, visual question answering, spatial measurement and aesthetic scoring",
+  "description": "Local, CPU-capable vision MCP server: OCR, captioning, detection, counting, VQA and measurement",
+  "title": "FusionVisionMCP",
   "status": "active",
   "repository": {
     "url": "https://github.com/Whoawhen/FusionVisionMCP",
@@ -18,5 +19,6 @@
         "type": "stdio"
       }
     }
-  ]
+  ],
+  "websiteUrl": "https://github.com/Whoawhen/FusionVisionMCP#readme"
 }

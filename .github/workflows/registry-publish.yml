@@ -1,0 +1,86 @@
+name: Publish to MCP Registry
+# Lists this server in the public MCP Registry. Manual trigger only, split out of
+# `release.yml` on purpose. The registry has no delete endpoint: the strongest
+# retraction available is PATCHing an entry to `deleted`, and the name
+# `io.github.Whoawhen/fusion-vision-mcp` stays claimed regardless. That makes
+# publishing effectively permanent, which is not something an ordinary `git tag`
+# should trigger as a side effect. Run it from the Actions tab, or:
+#   gh workflow run registry-publish.yml -f tag=v0.8.2 -f dry_run=true
+# Full runbook, including what to check first and what retraction actually gets
+# you: docs/Registry_Publish.md
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (must already exist, with its .mcpb asset)"
+        required: true
+        type: string
+      dry_run:
+        description: "Validate and stop before publishing"
+        required: false
+        default: true
+        type: boolean
+permissions:
+  id-token: write # mcp-publisher authenticates via GitHub OIDC
+  contents: read # gh release download
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+      - name: Download the released bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "${{ inputs.tag }}" --pattern "*.mcpb" --repo "${{ github.repository }}"
+      - name: Stamp the bundle's checksum into server.json
+        run: |
+          SHA256_HASH=$(sha256sum "fusion-vision-mcp.mcpb" | awk '{print $1}')
+          jq --arg hash "$SHA256_HASH" '.packages[0].fileSha256 = $hash' server.json > server_tmp.json
+          mv server_tmp.json server.json
+      # Everything past this point is irreversible, so the cheap checks run first.
+      # These are the two that have actually been wrong here: the description sat
+      # at 231 characters against a 100-character cap, and fileSha256 was empty.
+      - name: Check server.json against the registry's constraints
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$1"; exit 1; }
+
+          DESC_LEN=$(jq -r '.description | length' server.json)
+          [ "$DESC_LEN" -le 100 ] || fail "description is $DESC_LEN characters; the schema caps it at 100"
+          [ "$DESC_LEN" -ge 1 ] || fail "description is empty"
+
+          SHA=$(jq -r '.packages[0].fileSha256' server.json)
+          echo "$SHA" | grep -Eq '^[a-f0-9]{64}$' || fail "fileSha256 is not a 64-character hex digest: '$SHA'"
+
+          # The tag, the document version and the package version must agree, or the
+          # registry lists a version whose download URL points somewhere else.
+          TAG_VERSION="${{ inputs.tag }}"
+          TAG_VERSION="${TAG_VERSION#v}"
+          DOC_VERSION=$(jq -r '.version' server.json)
+          PKG_VERSION=$(jq -r '.packages[0].version' server.json)
+          [ "$DOC_VERSION" = "$TAG_VERSION" ] || fail "server.json version ($DOC_VERSION) != tag ($TAG_VERSION)"
+          [ "$PKG_VERSION" = "$TAG_VERSION" ] || fail "package version ($PKG_VERSION) != tag ($TAG_VERSION)"
+
+          # The identifier must point at the asset this run actually hashed.
+          IDENTIFIER=$(jq -r '.packages[0].identifier' server.json)
+          case "$IDENTIFIER" in
+            *"/download/${{ inputs.tag }}/"*) ;;
+            *) fail "package identifier does not reference ${{ inputs.tag }}: $IDENTIFIER" ;;
+          esac
+
+          echo "server.json passes local checks:"
+          jq '{name, version, description, status: (.status // "<absent: not part of the 2025-12-11 schema>")}' server.json
+      - name: Install MCP Publisher
+        run: curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+      - name: Login to MCP Registry
+        run: ./mcp-publisher login github-oidc
+      - name: Dry run -- stopping before publish
+        if: ${{ inputs.dry_run }}
+        run: |
+          echo "::notice::Validation passed and authentication succeeded. Nothing was published."
+          echo "::notice::Re-run with dry_run=false to list this server publicly."
+      - name: Publish to MCP Registry
+        if: ${{ !inputs.dry_run }}
+        run: ./mcp-publisher publish
