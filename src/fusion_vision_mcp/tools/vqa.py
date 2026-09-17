@@ -41,8 +41,9 @@ def register(mcp: MCPServer) -> None:
             Field(
                 description=(
                     "When true, also ask a rephrased control question and report whether the "
-                    "two answers agree, flagging short default-looking answers ('None', 'Yes', "
-                    "'No', 'Nothing', ...) as low confidence. Moondream2 is a small VLM that "
+                    "two answers agree. `confidence` is 'low' in two cases: the answers agree "
+                    "on a short default-looking token ('None', 'Yes', 'No', 'Nothing', ...), "
+                    "or they substantively contradict each other. Moondream2 is a small VLM that "
                     "answers open-ended judgment questions ('describe anything wrong') with a "
                     "flat 'None' on images that all had real visible defects -- this layer makes "
                     "that default-answer behavior visible instead of presenting it as reliable. "
@@ -80,10 +81,13 @@ def register(mcp: MCPServer) -> None:
         observation. Set `check_consistency=true` to make that visible: the tool also
         asks a rephrased control question and returns, per image,
         `{answer, control_answer, consistent, confidence}`. `confidence` is `"low"`
-        when both answers are short default-looking strings that agree -- the
-        signature of a flat default rather than a genuine observation -- and
-        `"normal"` otherwise. A `low` result on a judgment question means you should
-        not trust the answer without independent confirmation. When the answer is
+        in either of two failure modes: the two answers agree on a short
+        default-looking token ("None", "Yes", "Nothing", ...), which is the
+        signature of a flat default rather than a genuine observation; or they
+        substantively contradict each other, which makes either answer weaker
+        evidence than it looks alone. `"normal"` requires substantive answers that
+        agree. A `low` result on a judgment question means you should not trust the
+        answer without independent confirmation. When the answer is
         low-confidence, the tool also tries to route to the measurement that
         actually answers the question: it classifies the question's wording and,
         if a measurable category applies and the object names parse from the

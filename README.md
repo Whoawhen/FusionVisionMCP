@@ -55,7 +55,7 @@ root-caused against the exact fixture that exposed it, not patched at the sympto
 
 | Capability | How it's provided |
 |---|---|
-| OCR & document text | Florence-2's OCR head, or Moondream2 for stylized/logo text (see [routing notes](README_DETAILED.md)) |
+| OCR & document text | EasyOCR (CRAFT detection + CRNN recognition) — printed, stylized, cursive and low-contrast text through one tool, with a per-span confidence score |
 | Captioning | Florence-2, whole-scene or per-region |
 | Object detection / grounding | Florence-2's grounding head — boxes and center points for a named object |
 | Instance counting | Grounding DINO — parallel object queries, not a sequential emission, so overlapping-but-separate instances don't collapse into one |
@@ -69,13 +69,13 @@ root-caused against the exact fixture that exposed it, not patched at the sympto
 
 | Tool | Model(s) | Description |
 |---|---|---|
-| `ocr` | Florence-2 | Transcribe dense, printed, document-style text from an image or PDF. |
+| `ocr` | EasyOCR | Transcribe any text in an image or PDF — printed, stylized, cursive or low-contrast alike — with a per-span confidence score. Multi-column pages are split by geometry and read in reading order. |
 | `caption` | Florence-2 | Describe what an image shows as one detailed prose caption of the whole scene. `verify_text=true` also corrects close text misses against a verbatim OCR pass. |
 | `detect_objects` | Florence-2 | Locate a named object, returning bounding boxes, center points and labels. |
 | `dense_region_caption` | Florence-2 | Caption every salient region of an image at once, without naming objects first. |
 | `query_image` | Moondream2 | Ask a free-form question about an image (visual question answering). `check_consistency=true` routes a low-confidence answer to the measurement that actually answers it, when one applies. |
 | `count_objects` | Grounding DINO | Count how many instances of a named object an image contains. Use this, not `detect_objects`, for "how many" questions. On a collapse, adds an actionable outline estimate. |
-| `spatial_relations` | Florence-2 + SAM2 | Measure contact, gaps, containment depth and shape between two named objects. |
+| `spatial_relations` | Grounding DINO + SAM2 | Measure contact, gaps, containment depth and shape between two named objects. |
 | `score_aesthetics` | CLIP + LAION | Rate how aesthetically pleasing an image looks on a 1-10 scale. `compare_with` switches to a calibrated like-with-like comparison against a reference image. |
 | `critique_composition` | Florence-2 + CLIP/LAION + Moondream2 | Check framing against the rule of thirds; for low-scoring shots, explain what looks off. Also supports `compare_with`. |
 | `batch_analyze_images` | (routes to any tool above) | Run one operation across many images in a single call, isolating failures per image. |
@@ -187,8 +187,10 @@ Runs on CPU by default; uses a GPU automatically if one is available. Because in
 data leaves the machine, and the CPU/RAM budget it uses is generally idle capacity rather than resources
 competing with a GPU-bound workload.
 
-Fork of [jkawamoto/mcp-florence2](https://github.com/jkawamoto/mcp-florence2), which provides three tools —
-`ocr`, `caption`, `process` — against Florence-2 alone.
+Originally derived from [jkawamoto/mcp-florence2](https://github.com/jkawamoto/mcp-florence2) (MIT), which
+provides three tools — `ocr`, `caption`, `process` — against Florence-2 alone. This is no longer a fork: the
+history was severed and the original `mcp_florence2` package replaced outright. Parts of `florence2.py` are
+still that project's code, so its copyright notice travels with them — see [LICENSE](LICENSE).
 
 ---
 

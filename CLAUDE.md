@@ -1,7 +1,7 @@
 # FusionVisionMCP
 
-Fork of [jkawamoto/mcp-florence2](https://github.com/jkawamoto/mcp-florence2), renamed and rebranded as
-**FusionVisionMCP** (Python package `fusion-vision-mcp`, module `fusion_vision_mcp`, binary
+Originally derived from [jkawamoto/mcp-florence2](https://github.com/jkawamoto/mcp-florence2), renamed and
+rebranded as **FusionVisionMCP** (and no longer a fork of it — see Remotes below) (Python package `fusion-vision-mcp`, module `fusion_vision_mcp`, binary
 `fusion-vision-mcp.exe`), adding Moondream2 VQA and counting (`query_image`, `count_objects`), object grounding
 (`detect_objects`, `dense_region_caption`), CLIP/LAION aesthetic scoring, batch analysis, and a `--memory-mode`
 that controls how long models stay resident after use. See [README.md](README.md) for the tool and option

@@ -8,14 +8,16 @@
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 [![GitHub License](https://img.shields.io/github/license/Whoawhen/FusionVisionMCP)](https://github.com/Whoawhen/FusionVisionMCP/blob/main/LICENSE)
 
-An MCP server fusing [Florence-2](https://huggingface.co/microsoft/Florence-2-large),
+An MCP server fusing [Florence-2](https://huggingface.co/florence-community/Florence-2-large),
 [Moondream2](https://huggingface.co/vikhyatk/moondream2), [SAM2](https://huggingface.co/facebook/sam2.1-hiera-small),
 [Grounding DINO](https://huggingface.co/IDEA-Research/grounding-dino-tiny) and a
 [CLIP](https://huggingface.co/openai/clip-vit-large-patch14)-backed
 [LAION aesthetic predictor](https://github.com/christophschuhmann/improved-aesthetic-predictor) into one
-computer-vision toolset. Fork of [jkawamoto/mcp-florence2](https://github.com/jkawamoto/mcp-florence2), which
-provides exactly three tools — `ocr`, `caption`, `process` — all against Florence-2. This fork adds everything
-else: Florence-2's other task heads exposed as their own tools (`detect_objects`,
+computer-vision toolset. Originally derived from
+[jkawamoto/mcp-florence2](https://github.com/jkawamoto/mcp-florence2) (MIT), which provides exactly three
+tools — `ocr`, `caption`, `process` — all against Florence-2; this is no longer a fork of it, though its
+copyright notice stays with what remains of its code. Everything else was added here: Florence-2's other
+task heads exposed as their own tools (`detect_objects`,
 `dense_region_caption`), Moondream2 for open-ended visual question answering (`query_image`, since Florence-2 has
 no VQA head), Grounding DINO for instance counting (`count_objects`, since Florence-2's grounding head's region
 count is not a tally), a CLIP/LAION aesthetic scorer (`score_aesthetics`), a batch dispatch convenience
@@ -25,7 +27,7 @@ SAM2 masks, and a from-scratch geometry module; and no model combines localizati
 judgment into one answer, so `critique_composition` combines Florence-2, a rule-of-thirds geometry function, the
 aesthetic predictor, and (for low-scoring images) Moondream2. See the tags on each tool below.
 
-**Legend:** 🔼 upstream (unchanged from `mcp-florence2`) · ➕ added in this fork (wraps a model already in the
+**Legend:** 🔼 inherited from `mcp-florence2` · ➕ added here (wraps a model already in the
 stack) · ✦ novel (new capability — see [spatial_relations](#spatial_relations-) and
 [critique_composition](#critique_composition-)).
 
@@ -47,10 +49,14 @@ downloads from the Hugging Face Hub on first use and is cached locally by `trans
 Hugging Face model; the small aesthetic head downloads separately from a pinned commit of its original GitHub
 repository and is cached locally after the first request, with its checksum verified on every download.
 
-> **OCR vs. query_image**: Florence-2's OCR head is built for dense, printed, document-style text and can
-> confidently misread stylized, cursive, or low-contrast text (watermarks, logos, signage) rather than failing
-> visibly. For that kind of text, prefer `query_image` with a question like *"What does the text/watermark say,
-> exactly?"* — see the routing note in each tool's description below.
+> **`ocr` handles every kind of text, and there is no longer a second path.** This used to be a routing
+> decision: Florence-2's OCR head was built for dense printed text and would confidently misread stylized,
+> cursive or low-contrast text (watermarks, logos, signage) rather than fail visibly, so that kind of text
+> was sent to `query_image` instead. EasyOCR replaced that head and handles both cases, and it returns a
+> per-span confidence score the old head could not. Send text to `ocr`; `query_image` paraphrases rather
+> than transcribing, so it is not an OCR fallback. **An image with no text returns an empty result, and
+> that is the correct answer** — this repository's own test suite once asserted the opposite and was
+> pinning a hallucination.
 
 ## Installation
 
@@ -117,7 +123,9 @@ configuration above.
 
 ### ocr 🔼
 
-Process an image file or URL using OCR to extract text.
+Process an image file or URL using OCR to extract text. The tool name is inherited from `mcp-florence2`, but
+nothing under it is: Florence-2's `<OCR>` head was replaced by EasyOCR, and column splitting and per-span
+confidence scores were added here.
 
 > **Multi-column layouts are detected automatically.** A page laid out in side-by-side columns (a form, meeting
 > notes, a resume) breaks naive raster-order OCR: reading strictly left-to-right interleaves unrelated fields
@@ -145,11 +153,12 @@ Process an image file or URL using OCR to extract text.
 #### Arguments:
 
 - **src**: A file path or URL to the image file that needs to be processed.
-- **with_regions**: When `true`, return verbatim text *and* the box each span occupies (Florence-2's
-  `<OCR_WITH_REGION>` head), instead of flat strings. Output becomes one `{text, text_regions}` dict per page,
-  `text_regions` being `[{text, box}, ...]` in page coordinates — offset back out of any column crop, so a box
-  indexes directly into the original image. Defaults to `false`. Use this to point at a phrase, or to cross-check
-  text a `caption` call quoted (see below).
+- **detail**: When `true`, return verbatim text *and* the box and confidence score for each span, instead of
+  flat strings. Output becomes one `{text, text_regions}` dict per page, `text_regions` being
+  `[{text, confidence, box}, ...]` in page coordinates — offset back out of any column crop, so a box indexes
+  directly into the original image. Defaults to `false`. Use this to point at a phrase, to cross-check text a
+  `caption` call quoted (see below), or to spot generated gibberish, whose confidence scores collapse.
+  (This argument was called `with_regions` while Florence-2's `<OCR_WITH_REGION>` head backed the tool.)
 
 ### caption 🔼
 
@@ -160,9 +169,9 @@ specific, and `ocr` to transcribe text rather than describe it. Returns one capt
 > **Don't trust text a caption quotes back.** A caption that mentions a name, brand or label is *describing*
 > it, not transcribing it, and Florence-2 misspells text here that it reads correctly elsewhere. Tested live
 > on this repository's own banner image: `caption` rendered the logo "FusionVisionMCP" as **"FusionVisionMP"**
-> mid-sentence, while `ocr` and `query_image` both read the identical image exactly right. When a specific
-> piece of text matters, confirm it with `ocr` (printed, document-style) or `query_image` (stylized, cursive,
-> low-contrast) rather than quoting the caption. Same routing principle as the OCR note above, one level up.
+> mid-sentence, while `ocr` read the identical image exactly right. When a specific piece of text matters,
+> confirm it with `ocr` — which handles stylized and cursive text as well as printed text — rather than
+> quoting the caption.
 >
 > **`verify_text=true` does this cross-check in the same call.** It runs the OCR-with-region head alongside
 > the caption and returns each verbatim span with its box, so a name the caption quoted can be checked without
@@ -214,7 +223,7 @@ box) and `labels`, all index-aligned.
 > Boxes cannot tell you whether two objects actually touch, or whether one is inside another — they overlap the
 > moment one object is merely in front of another. Use [`spatial_relations`](#spatial_relations-) for that.
 
-> **Merged in this fork.** Centre points used to be a separate `point_objects` tool. It ran the identical
+> **Merged here.** Centre points used to be a separate `point_objects` tool. It ran the identical
 > Florence-2 grounding call and only averaged the boxes afterwards, so a caller who wanted points paid for a
 > second, redundant model pass. The centres now ride along with the boxes at no extra cost.
 >

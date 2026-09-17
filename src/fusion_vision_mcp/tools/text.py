@@ -10,7 +10,8 @@ from typing import Annotated, Any
 from mcp.server.mcpserver import Context, MCPServer
 from pydantic import Field
 
-from fusion_vision_mcp import layout, textmatch
+from fusion_vision_mcp import textmatch
+from fusion_vision_mcp.analysis import ocr_pages
 from fusion_vision_mcp.constants import CaptionLevel
 from fusion_vision_mcp.images import get_images
 from fusion_vision_mcp.ocr_fusion import fuse_caption_ocr
@@ -41,52 +42,29 @@ def register(mcp: MCPServer) -> None:
         Uses EasyOCR for robust scene-text extraction. Excels at photos, signage,
         watermarks, logos, and printed text.
 
+        This is the right tool for *any* text in an image. EasyOCR handles both
+        of the cases that used to need separate routing -- dense printed text and
+        stylized, cursive, logo or low-contrast text -- so there is no longer a
+        reason to send the second kind to `query_image`, which paraphrases rather
+        than transcribing.
+
         A page laid out in side-by-side columns (a form, meeting notes, a
         resume) is detected automatically: each column is OCR'd separately and
         joined in reading order, so fields from different columns don't get
         interleaved.
 
+        An image with no text returns an empty result, and that is the correct
+        answer rather than a failure -- do not re-ask a captioning or VQA model
+        to produce text for it, which is how invented text gets into a payload.
+
         Set `detail=true` to get confidence scores and bounding boxes. This is
         highly recommended for checking generative image artifacts: if an image
         contains gibberish text, the confidence scores will drop significantly.
         """
-        easyocr = ctx.request_context.lifespan_context.ocr_specialist
+        app = ctx.request_context.lifespan_context
         with get_images(src) as images:
-            per_page_columns = [layout.split_columns(image) for image in images]
-            page_results: list[dict[str, Any]] = []
-            flat_results: list[str] = []
-
-            for image, columns in zip(images, per_page_columns, strict=True):
-                # Reconstruct column offsets for coordinate mapping
-                # Assuming horizontal splits, so y is always 0.
-                x_offset = 0
-
-                page_text_regions = []
-                page_texts = []
-
-                for crop in columns:
-                    crop_w = crop.width
-                    # run EasyOCR on the crop
-                    crop_results = easyocr.readtext(crop)
-
-                    for r in crop_results:
-                        text = r["text"]
-                        conf = r["confidence"]
-                        box = r["box"]
-                        # offset box [x1, y1, x2, y2]
-                        box[0] += x_offset
-                        box[2] += x_offset
-
-                        page_texts.append(text)
-                        page_text_regions.append({"text": text, "confidence": conf, "box": box})
-
-                    x_offset += crop_w
-
-                joined_text = "\n".join(page_texts)
-                flat_results.append(joined_text)
-                page_results.append({"text": joined_text, "text_regions": page_text_regions})
-
-            return page_results if detail else flat_results
+            pages = ocr_pages(app, images)
+            return pages if detail else [page["text"] for page in pages]
 
     @mcp.tool()
     def caption(
@@ -134,10 +112,10 @@ def register(mcp: MCPServer) -> None:
         Do not trust any text this quotes back. A caption that mentions a name,
         brand or label is describing it, not transcribing it, and Florence-2
         misspells text here that it reads correctly under `ocr` -- it rendered a
-        logo reading "FusionVisionMCP" as "FusionVisionMP" mid-caption while both
-        `ocr` and `query_image` read the same image exactly. When a specific piece
-        of text matters, confirm it with `ocr` (printed, document-style) or
-        `query_image` (stylized, cursive, low-contrast) rather than quoting this.
+        logo reading "FusionVisionMCP" as "FusionVisionMP" mid-caption while `ocr`
+        read the same image exactly. When a specific piece of text matters,
+        confirm it with `ocr`, which handles stylized and cursive text as well as
+        printed text, rather than quoting this.
 
         Set `verify_text=true` to have this confirmation done for you: the tool
         also runs the OCR-with-region head and returns each verbatim text span

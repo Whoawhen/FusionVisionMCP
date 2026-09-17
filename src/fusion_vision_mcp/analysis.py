@@ -16,7 +16,7 @@ from typing import Any, Final, cast
 
 from PIL.Image import Image
 
-from fusion_vision_mcp import geometry, question
+from fusion_vision_mcp import geometry, layout, question
 from fusion_vision_mcp.constants import CaptionLevel
 from fusion_vision_mcp.protocols import AppContext, Processor
 
@@ -233,7 +233,7 @@ def _vqa_cross_check(app: AppContext, image: Image, question_text: str) -> dict[
             "separable": _separability(result),
         }
     if category == question.OCR:
-        return {"tool": "ocr", "text": app.florence2.ocr([image])[0]}
+        return {"tool": "ocr", "text": ocr_pages(app, [image])[0]["text"]}
     if category == question.SIZE:
         return _size_measurement(app, image, names[0], question_text)
     return None
@@ -490,12 +490,47 @@ def _critique_one(
     return result
 
 
+def ocr_pages(app: AppContext, images: Sequence[Image]) -> list[dict[str, Any]]:
+    """Transcribe each page with EasyOCR, splitting side-by-side columns first.
+
+    This is the `ocr` tool's whole implementation, factored out so the other two
+    places that transcribe text cannot drift from it. Both used to call
+    `app.florence2.ocr` -- the head EasyOCR replaced -- so the same named operation
+    returned different text depending on how it was reached, and on a text-free
+    image the Florence-2 path invented some. `tests/test_server.py::
+    test_ocr_textless_image_returns_no_text` pins the correct behaviour for the
+    direct tool; routing everything through here extends it to the other two.
+
+    Returns one `{"text", "text_regions"}` dict per page. Boxes are in page
+    coordinates: a column crop's boxes are shifted right by the crop's origin,
+    which is why the offset is accumulated here rather than inside `split_columns`.
+    """
+    pages: list[dict[str, Any]] = []
+    for image in images:
+        x_offset = 0
+        page_texts: list[str] = []
+        page_text_regions: list[dict[str, Any]] = []
+
+        for crop in layout.split_columns(image):
+            for region in app.ocr_specialist.readtext(crop):
+                box = region["box"]
+                box[0] += x_offset
+                box[2] += x_offset
+                page_texts.append(region["text"])
+                page_text_regions.append({"text": region["text"], "confidence": region["confidence"], "box": box})
+            x_offset += crop.width
+
+        pages.append({"text": "\n".join(page_texts), "text_regions": page_text_regions})
+    return pages
+
+
 def _dispatch(app: AppContext, operation: str, images: list[Image], *, question: str, object_name: str) -> Any:
     """Routes a `batch_analyze_images` operation to the right processor call."""
     if operation == "caption":
         return app.florence2.caption(images, CaptionLevel.MORE_DETAILED)
     if operation == "ocr":
-        return app.florence2.ocr(images)
+        # Must match the `ocr` tool exactly -- see `ocr_pages`.
+        return [page["text"] for page in ocr_pages(app, images)]
     if operation == "detect":
         if not object_name:
             raise ValueError("object_name is required for the 'detect' operation")

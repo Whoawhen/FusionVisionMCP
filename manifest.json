@@ -39,7 +39,7 @@
   "tools": [
     {
       "name": "ocr",
-      "description": "Transcribe dense printed text from an image or PDF. Set with_regions=true to also get the box each text span occupies. Use query_image instead for watermarks, logos and stylized text."
+      "description": "Transcribe text from an image or PDF, backed by EasyOCR. Handles printed, stylized, cursive and low-contrast text alike, so there is no second tool to route to. Set detail=true to also get the bounding box and confidence score for each text span. Multi-column pages are split by geometry and read in reading order. An image with no text returns an empty result, which is the correct answer, not a failure."
     },
     {
       "name": "caption",
@@ -55,7 +55,7 @@
     },
     {
       "name": "query_image",
-      "description": "Ask a free-form question about an image (visual question answering), backed by Moondream2. Set check_consistency=true to flag flat default answers ('None'/'Yes') that a small VLM emits without actually looking; on a low-confidence answer it also routes to the measurement that answers the question (spatial_relations/count_objects/ocr) as cross_check when one applies."
+      "description": "Ask a free-form question about an image (visual question answering), backed by Moondream2. Set check_consistency=true to re-ask a rephrased control question and flag the answer 'low' confidence when the two agree on a flat default ('None'/'Yes') or contradict each other; on a low-confidence answer it also routes to the measurement that answers the question (spatial_relations/count_objects/ocr) as cross_check when one applies."
     },
     {
       "name": "count_objects",

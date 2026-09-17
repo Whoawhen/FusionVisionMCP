@@ -8,7 +8,7 @@ app objects and synthetic masks, so no model has to download to run them.
 import numpy as np
 from PIL import Image
 
-from fusion_vision_mcp.analysis import _vqa_cross_check
+from fusion_vision_mcp.analysis import _dispatch, _vqa_cross_check, ocr_pages
 
 
 class _StubCounter:
@@ -27,19 +27,29 @@ class _StubSegmenter:
         return self.masks
 
 
-class _StubProcessor:
-    def __init__(self, ocr_text: str = "transcribed text") -> None:
-        self.ocr_text = ocr_text
+class _StubOcrSpecialist:
+    """Stands in for EasyOCR, which now backs every OCR path including this one.
 
-    def ocr(self, images: list) -> list[str]:
-        return [self.ocr_text]
+    The cross-check used to call `app.florence2.ocr`; it goes through
+    `analysis.ocr_pages` now so that the `ocr` tool, `batch_analyze_images` and this
+    route cannot return different text for the same image.
+    """
+
+    def __init__(self, text: str) -> None:
+        self._text = text
+
+    def readtext(self, image) -> list[dict]:
+        if not self._text:
+            return []
+        return [{"text": self._text, "confidence": 0.99, "box": [0, 0, 10, 10]}]
 
 
 class _StubApp:
-    def __init__(self, counter, segmenter=None, florence2=None) -> None:
+    def __init__(self, counter, segmenter=None, florence2=None, ocr_text="") -> None:
         self.counter = counter
         self.segmenter = segmenter
         self.florence2 = florence2
+        self.ocr_specialist = _StubOcrSpecialist(ocr_text)
 
 
 def _image() -> Image.Image:
@@ -59,9 +69,31 @@ class TestVqaCrossCheckCount:
 
 class TestVqaCrossCheckOcr:
     def test_ocr_route_returns_transcription(self) -> None:
-        app = _StubApp(counter=_StubCounter({}), florence2=_StubProcessor(ocr_text="Hello"))
+        app = _StubApp(counter=_StubCounter({}), ocr_text="Hello")
         cross = _vqa_cross_check(app, _image(), "What does the watermark say, exactly?")
         assert cross == {"tool": "ocr", "text": "Hello"}
+
+
+class TestOcrPathsAgree:
+    """Every OCR path must go through `ocr_pages`, or they return different text.
+
+    They genuinely did: the `ocr` tool was switched to EasyOCR in the
+    Granite-Docling swap, but `batch_analyze_images` and the VQA cross-check kept
+    calling Florence-2's `<OCR>` head. Nothing covered either, so the divergence
+    was invisible -- including the part that matters most, which is that the
+    Florence-2 head invents text for a text-free image where EasyOCR returns none.
+    """
+
+    def test_batch_ocr_operation_matches_the_ocr_tool(self) -> None:
+        app = _StubApp(counter=_StubCounter({}), ocr_text="Hello")
+        assert _dispatch(app, "ocr", [_image()], question="", object_name="") == [
+            page["text"] for page in ocr_pages(app, [_image()])
+        ]
+
+    def test_a_text_free_image_stays_empty_on_every_path(self) -> None:
+        app = _StubApp(counter=_StubCounter({}), ocr_text="")
+        assert _dispatch(app, "ocr", [_image()], question="", object_name="") == [""]
+        assert ocr_pages(app, [_image()])[0]["text_regions"] == []
 
 
 class TestVqaCrossCheckSpatial:
