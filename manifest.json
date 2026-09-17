@@ -20,7 +20,7 @@
       "command": "uvx",
       "args": [
         "--from",
-        "${__dirname}",
+        "${__dirname}[${user_config.device}]",
         "fusion-vision-mcp",
         "--memory-mode",
         "${user_config.memory_mode}"
@@ -33,6 +33,13 @@
       "title": "Memory mode",
       "description": "How long the vision models stay in memory after their last use, trading memory against speed. \"aggressive\" releases them after 5 minutes idle (lowest memory). \"standard\" releases them after 10 minutes. \"persistent\" never releases them (fastest, highest memory). You can also enter a number of minutes, such as 30. Models always reload automatically on the next request, so no setting can lose work -- only time.",
       "default": "standard",
+      "required": false
+    },
+    "device": {
+      "type": "string",
+      "title": "Compute device",
+      "description": "Which torch build to install. \"cpu\" runs everything on the processor and is the default -- it works everywhere and downloads about 2 GB less. \"cu130\" installs the CUDA 13 build for an NVIDIA GPU (Linux or Windows; requires a driver supporting CUDA 13, and pulls roughly 2 GB of CUDA runtime). Verified on an RTX 5060 (Blackwell, sm_120). macOS uses its own CPU/MPS build regardless, so leave this at \"cpu\" there.",
+      "default": "cpu",
       "required": false
     }
   },

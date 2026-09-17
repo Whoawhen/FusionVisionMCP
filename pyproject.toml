@@ -42,8 +42,6 @@ dependencies = [
     # Distance transforms behind the contact/containment measurements in geometry.py.
     "scipy>=1.14",
     "timm>=1.0.15",
-    "torch>=2.13",
-    "torchvision>=0.18",
     # Pinned to the narrow window where Florence2ForConditionalGeneration (added ~4.57) is
     # native AND vikhyatk/moondream2's trust_remote_code model still loads: transformers 5.x
     # renamed internals (`all_tied_weights_keys`) that moondream2's HfMoondream class relies on.
@@ -52,6 +50,8 @@ dependencies = [
     # as the alternative, so moondream.py must pass "eager". Verified on 4.57.6.
     "transformers>=4.57.2,<5",
 ]
+optional-dependencies.cpu = [ "torch>=2.13", "torchvision>=0.18" ]
+optional-dependencies.cu130 = [ "torch>=2.13", "torchvision>=0.18" ]
 optional-dependencies.iqa = [ "huggingface-hub>=0.23", "onnxruntime>=1.15" ]
 optional-dependencies.ocr-specialist = [
     "easyocr>=1.7.2",
@@ -69,6 +69,31 @@ dev = [
     "pre-commit-uv>=4.1.4",
     "pytest>=8.3.4",
     "types-requests>=2.32.0.20250328",
+]
+
+[tool.uv]
+# easyocr depends on torch and torchvision too, so these redirects have to hold for
+# a transitive requirement, not just a direct one -- verify with
+# `uv sync --extra cpu --extra ocr-specialist` that no nvidia-* package appears.
+sources.torch = [
+    # No macOS wheels exist on the CPU index; falling through to PyPI there gets the
+    # CPU/MPS build, which is what a Mac wants anyway.
+    { index = "pytorch-cpu", extra = "cpu", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu130", extra = "cu130" },
+]
+sources.torchvision = [
+    { index = "pytorch-cpu", extra = "cpu", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu130", extra = "cu130" },
+]
+index = [
+    { name = "pytorch-cpu", url = "https://download.pytorch.org/whl/cpu", explicit = true },
+    { name = "pytorch-cu130", url = "https://download.pytorch.org/whl/cu130", explicit = true },
+]
+# One or the other, never both. Declaring the conflict is what lets a single
+# uv.lock hold both resolutions. It also means `uv sync --all-extras` fails by
+# design -- CI and the Dockerfile name the extras they want instead.
+conflicts = [
+    [ { extra = "cpu" }, { extra = "cu130" } ],
 ]
 
 [tool.ruff]

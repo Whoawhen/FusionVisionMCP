@@ -63,7 +63,7 @@ root-caused against the exact fixture that exposed it, not patched at the sympto
 | Spatial measurement | SAM2 masks plus a from-scratch geometry module — touch, gap, containment depth, shape |
 | Aesthetic scoring | CLIP + a LAION-trained aesthetic head |
 | Memory footprint | Configurable idle-release timers, per model, chosen at install time |
-| Hardware | Runs on CPU; uses a GPU automatically if one is available |
+| Hardware | CPU by default; an NVIDIA GPU is opt-in at install time via the `cu130` extra, and is then auto-detected at runtime |
 
 ## Tools
 
@@ -117,6 +117,7 @@ stack answers these on its own:
 1. Download the latest MCP bundle `fusion-vision-mcp.mcpb` from [Releases](https://github.com/Whoawhen/FusionVisionMCP/releases)
 2. Open the downloaded `.mcpb` file, or drag it into Claude Desktop's Settings window
 3. Pick a **Memory mode** (or leave it on *Standard* and change it later)
+4. Leave **Compute device** on *cpu* unless you have an NVIDIA GPU — see [CPU or GPU](#cpu-or-gpu)
 
 Also connectable from Cursor, Windsurf, VS Code, or any other MCP-compatible client via manual configuration below.
 
@@ -131,8 +132,43 @@ Also connectable from Cursor, Windsurf, VS Code, or any other MCP-compatible cli
 ```bash
 git clone https://github.com/Whoawhen/FusionVisionMCP.git
 cd FusionVisionMCP
-pip install -e ".[ocr-specialist,iqa]"
+uv sync --extra cpu --extra ocr-specialist --extra iqa
 ```
+
+Use `--extra cu130` in place of `--extra cpu` for an NVIDIA GPU. Exactly one of the two is
+required — see [CPU or GPU](#cpu-or-gpu) for why, and why this needs `uv` rather than `pip`.
+
+#### CPU or GPU
+
+`torch` is not a plain dependency here. It sits behind two mutually exclusive extras, so the
+build is chosen at install time:
+
+| Extra | Installs | Use it when |
+|---|---|---|
+| `cpu` | `torch+cpu` from PyTorch's CPU index | The default. Works everywhere, and downloads ~2 GB less. |
+| `cu130` | `torch+cu130` (CUDA 13) plus the CUDA runtime | You have an NVIDIA GPU and a driver supporting CUDA 13. |
+
+**Naming neither installs no torch, and the server will not load a model.** That is the cost of
+making the choice explicit; `uv` will not guess for you.
+
+Why it is worth the friction: `torch` from the default index pulls 15 NVIDIA runtime packages
+totalling **2.09 GB** on Linux — cuDNN alone is 527 MB — into what is otherwise a CPU-only
+server. Windows and macOS never saw this, because torch gates those packages on
+`sys_platform == 'linux'`, which is why the waste went unnoticed.
+
+**This requires `uv`, not `pip`.** The index routing lives in `[tool.uv.sources]` and
+`[tool.uv.index]`, which `pip` ignores entirely — a `pip install -e ".[cpu]"` resolves `torch`
+from PyPI and silently defeats the whole arrangement.
+
+**macOS** takes its usual CPU/MPS build from PyPI either way: PyTorch's CPU index publishes only
+`manylinux_2_28_x86_64` and `win_amd64` wheels, so the `cpu` extra deliberately does not apply
+there. Use `--extra cpu`; you will get the right thing.
+
+`cu130` rather than `cu128`, for anyone wondering: the `cu128` index stops at torch 2.9.1 and
+this project requires `torch>=2.13`. Verified end to end on an RTX 5060 Laptop (Blackwell,
+`sm_120`) — the wheel ships real `sm_120` kernels, and fp16 matmul, cuDNN convolution and
+scaled-dot-product attention all run correctly on it, which matters because every model wrapper
+selects fp16 on a non-CPU device.
 
 #### Configuration
 ```json
@@ -183,7 +219,7 @@ Five models, each loaded on-demand and released on its own idle timer:
 - **Grounding DINO** (IDEA-Research) — open-vocabulary detection backing `count_objects`
 - **CLIP + LAION aesthetic head** — aesthetic quality scoring
 
-Runs on CPU by default; uses a GPU automatically if one is available. Because inference happens locally, no image
+Runs on CPU by default. An NVIDIA GPU is opt-in at install time (the `cu130` extra) and is then detected and used automatically; `--device` pins it either way. Because inference happens locally, no image
 data leaves the machine, and the CPU/RAM budget it uses is generally idle capacity rather than resources
 competing with a GPU-bound workload.
 

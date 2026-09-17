@@ -18,7 +18,7 @@ directory, so it fails with `Access is denied` while any client still has a serv
 other agents hold `fusion-vision-mcp.exe` open. Stop those servers (or kill the `fusion-vision-mcp` processes)
 first. And because `pyproject.toml` pins `torch>=2.13` with no upper bound, a reinstall can quietly move the
 tool's torch (it went 2.13.0 → 2.14.0 in v0.8.2) while the project's own `.venv` — what the test suite runs
-against — stays where it was. Run `uv sync` if you want the two environments on the same torch.
+against — stays where it was. Run `uv sync --extra cpu --extra ocr-specialist --extra iqa` if you want the two environments on the same torch.
 
 ## `pyvips` is required transitively, not by this package directly
 
@@ -30,7 +30,10 @@ The fix already applied here: `pyproject.toml` declares `pyvips[binary]`, which 
 
 ```powershell
 # Reinstall after a dependency change (not needed for source-only edits)
-uv tool install --editable . --force --extra-index-url https://download.pytorch.org/whl/cpu --index-strategy unsafe-best-match
+# `[cpu]` is required: torch lives behind mutually exclusive cpu/cu130 extras, and naming
+# neither installs no torch at all. The old --extra-index-url/--index-strategy flags are gone;
+# pyproject's [tool.uv.sources] routes the index now, so every install path agrees.
+uv tool install --editable ".[cpu,ocr-specialist,iqa]" --force
 
 # Lint / format / type-check
 uvx ruff@0.16.1 check src tests

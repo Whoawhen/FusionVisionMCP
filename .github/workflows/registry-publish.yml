@@ -1,13 +1,6 @@
 name: Publish to MCP Registry
-# Lists this server in the public MCP Registry. Manual trigger only, split out of
-# `release.yml` on purpose. The registry has no delete endpoint: the strongest
-# retraction available is PATCHing an entry to `deleted`, and the name
-# `io.github.Whoawhen/fusion-vision-mcp` stays claimed regardless. That makes
-# publishing effectively permanent, which is not something an ordinary `git tag`
-# should trigger as a side effect. Run it from the Actions tab, or:
-#   gh workflow run registry-publish.yml -f tag=v0.8.2 -f dry_run=true
-# Full runbook, including what to check first and what retraction actually gets
-# you: docs/Registry_Publish.md
+# Lists this server publicly. Manual only, because the registry has no delete endpoint. Runbook: docs/Registry_Publish.md.
+
 on:
   workflow_dispatch:
     inputs:
@@ -39,10 +32,7 @@ jobs:
           SHA256_HASH=$(sha256sum "fusion-vision-mcp.mcpb" | awk '{print $1}')
           jq --arg hash "$SHA256_HASH" '.packages[0].fileSha256 = $hash' server.json > server_tmp.json
           mv server_tmp.json server.json
-      # Everything past this point is irreversible, so the cheap checks run first.
-      # These are the two that have actually been wrong here: the description sat
-      # at 231 characters against a 100-character cap, and fileSha256 was empty.
-      - name: Check server.json against the registry's constraints
+      - name: Check server.json (everything past here is irreversible)
         run: |
           set -euo pipefail
           fail() { echo "::error::$1"; exit 1; }

@@ -1,11 +1,6 @@
 name: Release
-# Builds the .mcpb bundle and attaches it to a GitHub release. It deliberately does
-# NOT publish to the public MCP Registry. It used to: one tag push both cut the
-# release and listed the server publicly. The registry has no hard delete -- the most
-# you can do is mark an entry `deleted`, and the name stays claimed -- so listing is
-# close to a one-way door and should not ride along with an ordinary tag. Registry
-# publishing lives in `registry-publish.yml`, which only runs when someone triggers
-# it deliberately. Runbook: docs/Registry_Publish.md
+# Builds the .mcpb bundle and attaches it to a GitHub release. Deliberately does NOT publish to the MCP Registry -- see docs/Registry_Publish.md.
+
 on:
   push:
     tags:
@@ -19,9 +14,10 @@ jobs:
       - uses: actions/checkout@v7
       - name: Create package artifact
         run: npx @anthropic-ai/mcpb pack
-      # A tag carrying a pre-release suffix (v0.8.2-rc.1) is marked as a prerelease,
-      # so it does not become the "Latest" release the README points at.
       - name: Release
+        # A tag carrying a pre-release suffix (v0.8.2-rc.1) is marked as a prerelease,
+
+        # so it does not become the "Latest" release the README points at.
         uses: softprops/action-gh-release@v2
         with:
           files: "*.mcpb"
