@@ -12,12 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Create package artifact
-        run: npx @anthropic-ai/mcpb pack
-      - name: Release
-        # A tag carrying a pre-release suffix (v0.8.2-rc.1) is marked as a prerelease,
-
-        # so it does not become the "Latest" release the README points at.
+      - name: Create package artifact (named explicitly -- pack's default uses the working dir's basename, not the package name)
+        run: npx @anthropic-ai/mcpb pack . fusion-vision-mcp.mcpb
+      - name: Release (prerelease auto-set for a suffixed tag, e.g. v0.8.2-rc.1)
         uses: softprops/action-gh-release@v2
         with:
           files: "*.mcpb"
