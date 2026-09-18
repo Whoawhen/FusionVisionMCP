@@ -99,16 +99,6 @@ conflicts = [
 [tool.ruff]
 target-version = "py312"
 line-length = 120
-# `benchmarks/` holds exploratory sweeps and probe scripts, several of which are kept
-# only to make a documented negative result reproducible (see CLAUDE.md). They catch
-# broadly on purpose -- a sweep reports the case that failed and keeps going rather than
-# aborting partway -- and do blocking I/O inside async probes because they are scripts,
-# not a server. These rules are about shipped code; `src/` and `tests/` still enforce them.
-lint.per-file-ignores."benchmarks/**" = [
-    "ASYNC230",
-    "BLE001",
-    "SIM117",
-]
 
 [tool.pyproject-fmt]
 indent = 4

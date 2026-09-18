@@ -7,6 +7,21 @@ rebranded as **FusionVisionMCP** (and no longer a fork of it — see Remotes bel
 that controls how long models stay resident after use. See [README.md](README.md) for the tool and option
 reference.
 
+## Benchmarking and evaluation live in a separate project now
+
+As of 2026-09-18, `benchmarks/` (the native Python harnesses, synthetic fixtures, JSON annotations,
+COCO/Open Images directories, `run_visionbench.py`) moved to `C:\AI\Projects\VisionBench`, ported
+verbatim (verified byte-for-byte identical at move time) and now developed independently there. This
+repo keeps only what unit and smoke tests need: `tests/` still holds the fixture images
+(`sample.jpg`, `defect_test6.jpg`, the `layout_*`/`spatial_*` synthetic PNGs, etc.) that the real unit
+suite exercises. The three test files that depended on `benchmarks/` itself for ground-truth
+evaluation (`test_coco_fixtures.py`, `test_inspection_coco.py`, `test_open_images_fixtures.py`) moved
+with it — they live on in `VisionBench/tests` alongside the harness they test.
+
+References to `benchmarks/` elsewhere in this file (constants tuning rationale, the counting and
+spatial-relations sections below) describe *where a measurement was made*, not a path that still
+exists in this checkout — treat them as historical citations pointing at VisionBench now.
+
 ## This is an editable install — checking out a branch changes the running server
 
 `fusion-vision-mcp` is installed as an editable `uv` tool pointing at this checkout (`uv tool install --editable . --force ...`). The MCP server both Cline and Claude Code run **is whatever branch is checked out here**, live, with no reinstall needed to pick up source changes.
@@ -40,14 +55,12 @@ uvx ruff@0.16.1 check src tests
 uvx ruff@0.16.1 format src tests
 uv run --with mypy --with types-requests --with scipy-stubs mypy src
 
-# Tests. `testpaths` is set, so bare `pytest` collects only tests/ -- benchmarks/ and the
-# root probe scripts are deliberately outside it (they spawn servers / download weights
-# at import, which used to abort collection entirely).
+# Tests. `testpaths` is set, so bare `pytest` collects only tests/.
 # Integration tests spawn the real server and download Florence-2-base on first run.
 uv run --with pytest --with anyio pytest tests -q
 
-# Faster inner loop: skip the two suites that load real models (~12 min combined)
-.\.venv\Scripts\python.exe -m pytest tests -q --ignore=tests/test_server.py --ignore=tests/test_inspection_coco.py
+# Faster inner loop: skip the suite that loads real models (~ several minutes)
+.\.venv\Scripts\python.exe -m pytest tests -q --ignore=tests/test_server.py
 
 # The torch-free import invariant. This has broken twice; check it after touching imports.
 .\.venv\Scripts\python.exe -c "import sys, fusion_vision_mcp; assert 'torch' not in sys.modules"
