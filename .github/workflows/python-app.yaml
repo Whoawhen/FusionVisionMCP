@@ -21,3 +21,15 @@ jobs:
         run: uv sync --extra cpu --extra iqa --extra ocr-specialist --dev
       - name: Check files
         run: uv run pre-commit run -a
+  docker-deps:
+    # Builds only the Dockerfile's first stage (the uv sync layer), never reaching the
+    # `RUN huggingface-cli download` step -- so this catches a broken --extra/sync flag,
+    # same as today's torch-extras split, without downloading the 1.5GB Florence-2-large
+    # weights on every push. It cannot catch a broken CMD flag, since CMD is never run
+    # during a build; the Release workflow's manual docker-full job covers that instead.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Build the dependency layer only
+        run: docker build --target uv .

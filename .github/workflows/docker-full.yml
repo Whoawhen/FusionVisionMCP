@@ -1,0 +1,35 @@
+name: Docker Full Build
+# Full image build plus a CLI smoke check. Manual only -- see docker-deps in python-app.yaml for the cheap always-on check. Run from the Actions tab, or: gh workflow run docker-full.yml
+
+on:
+  workflow_dispatch:
+jobs:
+  build-and-smoke:
+    # Builds the complete image, including the ~1.5GB Florence-2-large weights the
+    # Dockerfile's `RUN huggingface-cli download` bakes in at build time, then
+    # smoke-checks that CMD's own arguments still parse.
+    #
+    # The smoke check exists because a broken CMD flag has shipped before and nothing
+    # caught it: v0.8.2's CMD passed --cache-model, a flag removed from the CLI in that
+    # same release, and the image could not start. A `docker build` alone can't catch
+    # that kind of bug -- CMD is metadata, never executed at build time -- so this
+    # actually runs the built image with CMD's exact arguments plus --help appended.
+    # Click validates every token before dispatching (confirmed directly:
+    # `fusion-vision-mcp --cache-model` failed with "No such option" with no --help
+    # needed), so an unrecognized flag fails this step the same way it would have
+    # failed a real container start, without waiting on stdio or needing a model
+    # loaded -- model loading is lazy, so --help exits long before that.
+    #
+    # The check below relies on the exit code, not the output: Click's usage-error
+    # framing prints "Usage:" too (confirmed directly), so grepping for it would pass
+    # either way. GitHub Actions runs `run:` steps with `bash -eo pipefail`, so the
+    # nonzero exit a bad flag produces (2, confirmed directly against --cache-model)
+    # fails the step with no extra check needed.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Build the full image (downloads Florence-2-large, ~1.5GB)
+        run: docker build -t fusion-vision-mcp:smoke .
+      - name: Smoke-check that CMD's arguments still parse
+        run: docker run --rm --entrypoint fusion-vision-mcp fusion-vision-mcp:smoke --memory-mode persistent --help
