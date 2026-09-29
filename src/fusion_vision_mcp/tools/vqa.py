@@ -11,23 +11,10 @@ from fusion_vision_mcp.analysis import _dispatch, _vqa_consistency, _vqa_cross_c
 from fusion_vision_mcp.forensics import analyze_metadata_anomalies
 from fusion_vision_mcp.images import get_images
 from fusion_vision_mcp.inspection import Anomaly, Observation, analyze_inspection
-from fusion_vision_mcp.params import ImagePath
+from fusion_vision_mcp.params import ImagePath, Operation
 from fusion_vision_mcp.protocols import AppContext
 
 logger = logging.getLogger(__name__)
-
-Operation = Annotated[
-    str,
-    Field(
-        description=(
-            "One of: 'caption', 'ocr', 'detect', 'count', 'dense_caption', 'query'. Use 'query' "
-            "(with `question`) rather than 'ocr' for watermarks, logos, signage, or "
-            "stylized/cursive text -- 'ocr' misreads that kind of text confidently. Use 'count' "
-            "(with `object_name`) rather than 'detect' for 'how many' -- 'detect' returns "
-            "regions, which are not a tally."
-        )
-    ),
-]
 
 
 def register(mcp: MCPServer) -> None:
@@ -60,19 +47,25 @@ def register(mcp: MCPServer) -> None:
             bool,
             Field(
                 description=(
-                    "When true, bypasses the simple VQA return and returns structured Observation and "
-                    "Anomaly payloads per image. Corroborates VLM claims against physical Grounding DINO measurements "
-                    "to proactively detect anatomical and structural AI generation artifacts (e.g. extra/missing body parts)."
+                    "When true, return structured `observations` and `anomalies` per image instead of "
+                    "a plain answer. Counts body parts with Grounding DINO to flag extra or missing "
+                    "limbs in generated images, checks metadata for generator signatures, and flags "
+                    "low-confidence text as likely generated gibberish. Measured on 25 anatomy "
+                    "fixtures, it caught 6 of 13 defective images and cleared 10 of 12 clean ones: "
+                    "an anomaly is worth investigating, but no anomaly does not mean the image is clean. "
+                    "It checks counts, not shape, so a fused or malformed hand with the right number "
+                    "of parts passes."
                 )
             ),
         ] = False,
     ) -> list[Any]:
         """Ask a free-form question about an image (visual question answering).
 
-        This is the right tool for reading photo watermarks, logos, signage,
-        or any cursive/stylized/low-contrast text — ask e.g. "What does the
-        text/watermark say, exactly?". The `ocr` tool misreads that kind of
-        text confidently; prefer this one for it instead.
+        Answers come back as free text, often a sentence rather than a single
+        word, and the model paraphrases. To read text in the image -- signage,
+        logos, watermarks, stylized or cursive lettering included -- use `ocr`,
+        which transcribes verbatim and returns an empty result when there is
+        no text, rather than asking this tool what the text says.
 
         Moondream2 is a small model and is documented to answer open-ended judgment
         questions ("describe anything wrong in this image") with a flat "None" on
@@ -196,6 +189,11 @@ def register(mcp: MCPServer) -> None:
         Failures are isolated per image: a missing file or an unreachable URL is
         reported as its own {"src", "success": false, "error"} entry and the rest
         of the batch still runs. Results come back in the order given.
+
+        Batch results are the raw model output, not the full named-tool payload:
+        'count' returns the detector's tally without the `silhouette`, `consensus`
+        or `separable` fields `count_objects` adds, and none of the opt-in flags
+        (`verify_text`, `check_consistency`, ...) are available here.
 
         For a single image, call the named tool directly -- its arguments are
         checked up front rather than depending on `operation`.

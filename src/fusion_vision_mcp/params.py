@@ -42,11 +42,10 @@ Operation = Annotated[
     str,
     Field(
         description=(
-            "One of: 'caption', 'ocr', 'detect', 'count', 'dense_caption', 'query'. Use 'query' "
-            "(with `question`) rather than 'ocr' for watermarks, logos, signage, or "
-            "stylized/cursive text -- 'ocr' misreads that kind of text confidently. Use 'count' "
-            "(with `object_name`) rather than 'detect' for 'how many' -- 'detect' returns "
-            "regions, which are not a tally."
+            "One of: 'caption', 'ocr', 'detect', 'count', 'dense_caption', 'query'. Use 'ocr' "
+            "for any text in the image, including logos, signage and stylized text -- 'query' "
+            "paraphrases rather than transcribing. Use 'count' (with `object_name`) rather than "
+            "'detect' for 'how many' -- 'detect' returns regions, which are not a tally."
         )
     ),
 ]

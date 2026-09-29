@@ -54,6 +54,15 @@ def register(mcp: MCPServer) -> None:
         'wing'), or a single result spanning two touching instances (two fused
         blades labelled once as 'sword blade'). Prefer a more specific
         `object_name`, and treat results as candidates to inspect, not a tally.
+
+        A returned box does not confirm the object is present. The label is the
+        query echoed back, not a classification: asked for "elephant" on a photo of
+        a dog, it returns a box on the dog labelled "elephant". When presence is the
+        question, confirm it another way, e.g. with `caption` or `query_image`.
+
+        It usually returns a few boxes, not one per instance. On real photographs
+        (COCO) its boxes matched 58% of the objects in scenes with 3 or fewer
+        instances, but only 24% in crowded scenes, where most instances go unboxed.
         Use `count_objects` when you actually need "how many" -- it runs a
         detection head that emits one region per instance, which this head does
         not. Neither can separate heavily overlapping instances, so a count of 1
@@ -89,6 +98,12 @@ def register(mcp: MCPServer) -> None:
         objects itself. That is the difference from `detect_objects`, which needs
         you to name the object you are looking for, and from `caption`, which
         describes the whole scene in prose with no coordinates.
+
+        Good at finding what is there, loose about where: against reference region
+        annotations it found about three quarters of the regions, but its boxes
+        overlapped them by only about 25% IoU on average. Use it to learn what an
+        image contains, then `spatial_relations`, which segments each named
+        object, when its exact extent matters.
         """
         with get_images(src) as images:
             return ctx.request_context.lifespan_context.florence2.dense_region_caption(images)
@@ -134,8 +149,9 @@ def register(mcp: MCPServer) -> None:
             float,
             Field(
                 description=(
-                    "Box confidence floor passed to Grounding DINO (default 0.15, the value "
-                    "measured against benchmarks/ to hold every negative control -- see CLAUDE.md). "
+                    "Box confidence floor passed to Grounding DINO (default 0.15: the lowest value "
+                    "at which every single-object control in the project's fixture suite still "
+                    "counts as 1). "
                     "Raise it for a visually cluttered scene with distractor shapes near the target: "
                     "on one measured case (a target star among 18 muted-color distractors) the "
                     "default threshold counted every distractor, while 0.5 separated the true "
@@ -191,12 +207,17 @@ def register(mcp: MCPServer) -> None:
         detections is visible rather than implied. `group_boxes_dropped` counts
         detections that enclosed the whole arrangement rather than one instance.
 
-        Accuracy is measured, not assumed: against a fixture suite whose synthetic
-        counts are exact by construction, this is right on 9 of 10 positive cases with
-        a mean error of 0.1, while holding all 8 single-object controls. Separated,
-        touching, dense, two-instance and awkwardly-named cases are reliable.
+        Accuracy depends heavily on the scene. On synthetic shapes whose counts are
+        exact by construction it is right on 9 of 10 cases (mean error 0.1) and
+        holds all 8 single-object controls. On real photographs it is reliable for
+        a few instances and weak for many: on COCO scenes it was exact on 11 of 15
+        images with 3 or fewer instances, but on only 1 of 9 with more than 3, where
+        it was off by about 10 on average. Treat a count above a handful on a real
+        photo as a rough estimate.
 
-        Two measured limits, worth checking before trusting a count:
+        Three measured limits, worth checking before trusting a count:
+
+        Crowded real scenes (see above) are the biggest one.
 
         Heavy overlap undercounts. Eight identical shapes in a ring count as 8 when
         separated or touching, but 6 once they overlap by roughly two-thirds of their
@@ -239,7 +260,10 @@ def register(mcp: MCPServer) -> None:
         don't judge". `count` is never overwritten; `estimates.outline` is the
         number the outline supports, with a `basis` string saying so. Set
         `vqa_estimate=true` to also ask Moondream2 "how many <name>?" and attach
-        Additionally, every result reports `semantic_ambiguity` (bool) and
+        its answer as `estimates.vqa`, marked as a judgment estimate rather than a
+        tally.
+
+        Every result also reports `semantic_ambiguity` (bool) and
         `count_semantics` ("measured_tally", "minimum_visible_instances", or
         "unverified_tally"). When `semantic_ambiguity` is true, an `ambiguity`
         payload is attached detailing why the count represents a collapsed or

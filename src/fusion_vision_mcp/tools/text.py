@@ -39,8 +39,10 @@ def register(mcp: MCPServer) -> None:
     ) -> list[Any]:
         """Process an image file or URL using OCR to extract text.
 
-        Uses EasyOCR for robust scene-text extraction. Excels at photos, signage,
-        watermarks, logos, and printed text.
+        Uses EasyOCR. Strongest on documents, screenshots and clear printed or
+        stylized text; weaker on small, angled or distant text in busy photos --
+        on scene photos from TextVQA, the answer's text appeared in its output
+        for 44% of images.
 
         This is the right tool for *any* text in an image. EasyOCR handles both
         of the cases that used to need separate routing -- dense printed text and
@@ -56,6 +58,8 @@ def register(mcp: MCPServer) -> None:
         An image with no text returns an empty result, and that is the correct
         answer rather than a failure -- do not re-ask a captioning or VQA model
         to produce text for it, which is how invented text gets into a payload.
+        On a busy photo, though, an empty or partial result can also mean small
+        text was missed, so treat it as weaker evidence there than on a document.
 
         Set `detail=true` to get confidence scores and bounding boxes. This is
         highly recommended for checking generative image artifacts: if an image
@@ -82,7 +86,8 @@ def register(mcp: MCPServer) -> None:
                     "logo as 'FusionVisionMP'); the OCR head transcribes verbatim, so any text the "
                     "caption quotes can be confirmed against `text_regions` and the corrected caption "
                     "used directly. Default false keeps the original list[str] return shape; true "
-                    "returns one dict per page ({caption, text_regions, corrections, caption_corrected})."
+                    "returns one dict per page ({caption, text_regions, corrections, caption_corrected, "
+                    "caption_text_warning, text_consensus})."
                 )
             ),
         ] = False,
@@ -90,11 +95,12 @@ def register(mcp: MCPServer) -> None:
             bool,
             Field(
                 description=(
-                    "When true, automatically detect embedded text, quotation, or signage tokens "
-                    "in the caption or image, running specialist OCR (EasyOCR) with "
-                    "small-text upscale crops to cross-check text verbatim (Spec 13 & 14). "
-                    "Returns `caption_text_warning`, `text_consensus`, and `caption_corrected` "
-                    "with consensus text fused across models."
+                    "When true, run the `verify_text` check only if the caption's wording suggests "
+                    "it quotes text (signage, labels, quotation marks), and additionally cross-check "
+                    "each text region with EasyOCR on an upscaled crop, which is what fills in "
+                    "`text_consensus` and `caption_text_warning`. When the caption "
+                    "does not look like it quotes text, nothing extra runs and the plain list[str] "
+                    "is returned -- so check the return shape rather than assuming dicts."
                 )
             ),
         ] = False,
@@ -127,15 +133,17 @@ def register(mcp: MCPServer) -> None:
         `corrections` (with the quoted-in-caption token, the verbatim OCR text,
         the box and the similarity) so the substitution is auditable. The
         return shape becomes one dict per page
-        (`{caption, text_regions, corrections, caption_corrected}`) when this
+        (`{caption, text_regions, corrections, caption_corrected, ...}`) when this
         is set. The correction is best-effort and only fires for high-similarity
         same-word matches; the raw `corrections` list is always present so a
         caller can audit or reject any change.
 
-        Set `auto_verify_text=true` to automatically detect when a caption quotes
-        embedded text or signage and run specialist OCR (EasyOCR) on
-        upscaled crops of the text regions, providing consensus metrics (`text_consensus`)
-        and warnings (`caption_text_warning`).
+        Set `auto_verify_text=true` to pay for that check only when it is needed:
+        it fires when the caption's wording suggests quoted text, and adds an
+        EasyOCR cross-check on upscaled crops (`text_consensus`,
+        `caption_text_warning`). The trigger reads the caption, not the image, so
+        text the caption never mentions is not checked; when it does not fire the
+        return stays the plain list[str].
         """
         app = ctx.request_context.lifespan_context
         with get_images(src) as images:

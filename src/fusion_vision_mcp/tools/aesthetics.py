@@ -63,14 +63,18 @@ def register(mcp: MCPServer) -> None:
         matches a prompt. A technically accurate but flatly-lit, cluttered photo can
         score low; a blurry but beautifully lit one can score comparatively higher.
 
-        In v0.8.0, the returned payload is enriched. The legacy `score` is duplicated
-        as `photographic_aesthetic`. If a Reasoner is configured at the server level,
-        an `artistic_judgment` is generated. If the server is installed with the `[iqa]`
-        extra, a `technical_quality` score (0-100) is included via the MUSIQ ONNX model.
+        Returns one dict per page/image. `score` is roughly on a 1-10 scale;
+        `rating` buckets it coarsely for quick triage -- read `score` for anything
+        comparative. `photographic_aesthetic` repeats `score`, and
+        `photographic_aesthetic_applicable` is false when `style_context=true`
+        classified the image as something other than a photograph. Two fields
+        appear only when the server has the backend for them: `technical_quality`
+        (0-100, sharpness/noise/exposure via MUSIQ) and `artistic_judgment` (an
+        interpretation from a configured LLM reasoner).
 
-        Returns one {"score": float, "rating": str} object per page/image. `score`
-        is roughly on a 1-10 scale; `rating` buckets it coarsely for quick triage —
-        read `score` for anything comparative.
+        Against reference ratings from frontier vision models its ranking correlates moderately
+        (Spearman rho about 0.5): it orders images plausibly, but two scores a few
+        tenths apart are not a reliable preference.
 
         Its training set was photographic, so it rates photographs, not fine art:
         celebrated paintings and illustrations score middling (Hokusai's "The Great
