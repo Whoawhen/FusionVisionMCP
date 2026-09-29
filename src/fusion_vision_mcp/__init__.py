@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     from fusion_vision_mcp.grounding_dino import GroundingDino
     from fusion_vision_mcp.image_quality import ImageQuality
     from fusion_vision_mcp.moondream import Moondream
+    from fusion_vision_mcp.ppocr_engine import PPOCREngine
     from fusion_vision_mcp.reasoner import VisionReasoner
     from fusion_vision_mcp.sam2 import Sam2
 
@@ -123,6 +124,11 @@ async def app_lifespan(
 
         return EasyOCREngine(device, list(ocr_languages))
 
+    def _make_ppocr() -> "PPOCREngine":
+        from fusion_vision_mcp.ppocr_engine import PPOCREngine
+
+        return PPOCREngine()
+
     def _make_image_quality() -> "ImageQuality":
         from fusion_vision_mcp.image_quality import ImageQuality
 
@@ -170,11 +176,17 @@ async def app_lifespan(
         InstanceDetector,
         IdleProxy(IdleReleased(_make_grounding_dino, idle_timeout, "Grounding DINO")),
     )
-    # Specialist OCR is also lazy: only auto_verify_text loads EasyOCR.
+    # Both OCR engines are lazy too. EasyOCR now loads only for structured_analysis's
+    # gibberish check -- or for everything, when non-English languages are requested,
+    # because the PP-OCRv6 recognizer here is English-only.
     ocr_specialist = cast(
         SpecialistOCR,
         IdleProxy(IdleReleased(_make_easyocr, idle_timeout, "EasyOCR")),
     )
+    if tuple(ocr_languages) == ("en",):
+        ocr_engine = cast(SpecialistOCR, IdleProxy(IdleReleased(_make_ppocr, idle_timeout, "PP-OCRv6")))
+    else:
+        ocr_engine = ocr_specialist
 
     # `find_spec` answers "is onnxruntime installed?" without importing it, so the
     # optional [iqa] extra stays genuinely optional and genuinely lazy.
@@ -186,7 +198,7 @@ async def app_lifespan(
     if reasoner_provider != "none":
         reasoner = IdleProxy(IdleReleased(_make_reasoner, idle_timeout, "VisionReasoner"))
 
-    yield AppContext(florence2, vqa, segmenter, aesthetic, counter, ocr_specialist, iqa, reasoner)
+    yield AppContext(florence2, vqa, segmenter, aesthetic, counter, ocr_specialist, ocr_engine, iqa, reasoner)
 
 
 def server(

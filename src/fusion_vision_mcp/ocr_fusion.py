@@ -1,10 +1,13 @@
-"""OCR Fusion: combines Florence-2 captioning and OCR with EasyOCR specialist OCR.
+"""OCR Fusion: combines Florence-2 captioning and OCR with the specialist OCR engine.
+
+The specialist is `AppContext.ocr_engine` -- PP-OCRv6 English, or EasyOCR for
+non-English --ocr-languages.
 
 Implements:
 - Automatic caption text verification (Spec 13): detects likely text in captions
   and triggers specialist OCR cross-checking.
 - Small-text OCR crops (Spec 14): crops text regions from the full image,
-  upscales small text (2x/3x bicubic), and transcribes with EasyOCR.
+  upscales small text (2x/3x bicubic), and transcribes with the specialist.
 - Text consensus: measures agreement between caption, Florence OCR, and specialist OCR,
   warning when the caption misreads embedded text and producing an actionable corrected caption.
 """
@@ -46,7 +49,7 @@ class TextConsensus:
     Attributes:
         caption: The candidate token as quoted/written in the caption prose.
         florence_ocr: The verbatim text transcribed by Florence-2's OCR head.
-        specialist_ocr: The verbatim text transcribed by EasyOCR.
+        specialist_ocr: The verbatim text transcribed by the specialist OCR engine.
         agreeing_sources: Number of sources agreeing on the correct reading (1 to 3).
     """
 

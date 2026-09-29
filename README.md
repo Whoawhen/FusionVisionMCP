@@ -7,7 +7,7 @@
 
 🚧 **Work in progress** — see [README_DETAILED.md](README_DETAILED.md) for current limits and measured results before relying on this for anything important.
 
-An MCP server that fuses local, CPU-capable vision models — Florence-2, Moondream2, SAM2, Grounding DINO, EasyOCR, IQA, and CLIP/LAION — behind eleven tools: OCR, captioning, object detection/grounding, instance counting, visual question answering, spatial measurement (touch/gap/containment), and aesthetic scoring (including technical quality and artistic judgment via Ollama).
+An MCP server that fuses local, CPU-capable vision models — Florence-2, Moondream2, SAM2, Grounding DINO, PP-OCRv6, EasyOCR, IQA, and CLIP/LAION — behind eleven tools: OCR, captioning, object detection/grounding, instance counting, visual question answering, spatial measurement (touch/gap/containment), and aesthetic scoring (including technical quality and artistic judgment via Ollama).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="FusionVisionMCP-Dark.jpg">
@@ -55,7 +55,7 @@ root-caused against the exact fixture that exposed it, not patched at the sympto
 
 | Capability | How it's provided |
 |---|---|
-| OCR & document text | EasyOCR (CRAFT detection + CRNN recognition) — printed, stylized, cursive and low-contrast text through one tool, with a per-span confidence score |
+| OCR & document text | PaddleOCR PP-OCRv6 English via RapidOCR (ONNX, CPU) — printed, stylized and low-contrast text through one tool, with a per-span confidence score. EasyOCR covers non-English languages and the generated-gibberish check |
 | Captioning | Florence-2, whole-scene or per-region |
 | Object detection / grounding | Florence-2's grounding head — boxes and center points for a named object |
 | Instance counting | Grounding DINO — parallel object queries, not a sequential emission, so overlapping-but-separate instances don't collapse into one |
@@ -69,7 +69,7 @@ root-caused against the exact fixture that exposed it, not patched at the sympto
 
 | Tool | Model(s) | Description |
 |---|---|---|
-| `ocr` | EasyOCR | Transcribe any text in an image or PDF — printed, stylized, cursive or low-contrast alike — with a per-span confidence score. Multi-column pages are split by geometry and read in reading order. |
+| `ocr` | PP-OCRv6 English | Transcribe any text in an image or PDF — printed, stylized or low-contrast alike — with a per-span confidence score. Multi-column pages are split by geometry and read in reading order. Text-free images return nothing. |
 | `caption` | Florence-2 | Describe what an image shows as one detailed prose caption of the whole scene. `verify_text=true` also corrects close text misses against a verbatim OCR pass. |
 | `detect_objects` | Florence-2 | Locate a named object, returning bounding boxes, center points and labels. |
 | `dense_region_caption` | Florence-2 | Caption every salient region of an image at once, without naming objects first. |

@@ -106,22 +106,42 @@ So attribution is retained in four places, and none of them should be "cleaned u
 `__init__.py` and `cli.py` share only two or three generic boilerplate lines with upstream (`import rich_click
 as click`, a logger assignment) — not copyrightable expression, and they carry no header for that reason.
 
-## `ocr` is EasyOCR, and it returns nothing rather than inventing text
+## `ocr` is PP-OCRv6 English, and it returns nothing rather than inventing text
 
-`ocr` runs **EasyOCR** (CRAFT detection + CRNN recognition). It replaced Florence-2's `<OCR>` head in the
-Granite-Docling → EasyOCR swap; Florence-2 no longer backs this tool at all. It handles both of the cases that
-used to need separate routing — dense printed text *and* stylized/logo/cursive/low-contrast text — and returns
-a per-span confidence score, which the old head could not.
+`ocr` runs **PaddleOCR's PP-OCRv6 English models through RapidOCR** on ONNX Runtime (`ppocr_engine.py`, no
+torch). It replaced EasyOCR on 2026-09-29, which had replaced Florence-2's `<OCR>` head before that. Measured
+on VisionBench's 200-photo TextVQA set before shipping (`VisionBench/benchmarks/ocr_param_sweep.py`, results in
+`benchmarks/results/ocr_engine_*.json`): answer-text recall 37.5% → **53.0%** end to end through the server,
+58.6% vs 40.3% on text questions without column splitting. It also reads the invoice fixture exactly, where
+EasyOCR produced `812.50` for $12.50 and `S11.00` for $11.00.
+
+Four things about that swap are load-bearing:
+
+- **No EasyOCR setting would have closed the gap.** Magnification (1.5x, 2x), beam-search decoding and turning
+  off column splitting were all swept first: none beat EasyOCR's defaults on photos, and beam search dropped a
+  third of a paragraph's words. The limit was the recognition model.
+- **The recognizer must be the English one.** RapidOCR's default PP-OCRv4 model is Chinese/English and drops
+  the spaces between English words ("Thisisasinglewideparagraph"). `ppocr_engine.py` pins `LangRec.EN` +
+  `PP-OCRv6`; v4/v5 English are not valid combinations in rapidocr 3.9.
+- **The 0.75 confidence floor (`OCR_MIN_CONFIDENCE`) is what keeps a text-free image empty.** Unfiltered,
+  PP-OCRv6 read "S" (0.52) on `tests/sample.jpg` and "0" (0.57) on a shapes fixture, and garbled the last line
+  of `layout_small_text_paragraph.png` at 0.70. Recall is flat from no floor to 0.70 and loses one item at 0.80.
+  With the floor that last line is *missing* rather than garbled — the right failure, but still a gap.
+- **EasyOCR is still installed, for two reasons.** `query_image(structured_analysis=true)` flags spans below
+  0.20 as likely generated gibberish, and that threshold is calibrated to EasyOCR's scores (PP-OCRv6 gave real
+  garbage 0.70), so it stays on `AppContext.ocr_specialist`. And the PP-OCRv6 recognizer is English-only, so
+  any non-English `--ocr-languages` routes `ocr` back to EasyOCR (`AppContext.ocr_engine` is then the same proxy).
+
+easyocr needs `opencv-python-headless` and rapidocr needs `opencv-python`; both install `cv2`, so
+`[tool.uv] override-dependencies` drops `opencv-python`. Keep that override if either dependency moves.
 
 `detail=true` returns `{text, text_regions}` per page, each region carrying `{text, confidence, box}` in page
-coordinates. Confidence is load-bearing beyond OCR: `query_image(structured_analysis=true)` flags spans below
-0.20 as likely generative text hallucination.
+coordinates. Because of the floor, low-confidence spans never reach it, so `detail` is not a gibberish detector.
 
 **An image with no text returns empty, and that is correct.** This is worth stating because the repo's own test
 suite asserted the opposite for four tests: they ran against `tests/sample.jpg` (a paper flower, no text at all)
 and asserted `len(text) > 0`. That passed only because Florence-2's OCR head emitted *something* for a text-free
-image — the assertions were pinning a hallucination. EasyOCR returns 0 regions there (11 on
-`tests/layout_two_column.png`). `tests/test_server.py::test_ocr_textless_image_returns_no_text` now pins the
+image — the assertions were pinning a hallucination. The `ocr` engine returns 0 regions there. `tests/test_server.py::test_ocr_textless_image_returns_no_text` now pins the
 correct behaviour. Do not "fix" an empty OCR result by routing to a VLM; an empty result is an answer.
 
 **`caption` describes text, it does not transcribe it.** Tested live on this repo's own banner (2026-08-25):
@@ -412,8 +432,9 @@ the generated prose for signage words and, if it finds any, crops and upscales t
 against a specialist OCR model, and substitutes the verbatim text back into the caption. The heavy model is
 loaded lazily, so a non-text image never pays for it.
 
-The specialist was originally `ibm-granite/granite-docling-258M`; it is now **EasyOCR** (`easyocr_engine.py`),
-and the `granite_docling` module is gone. If you find a reference to Granite-Docling anywhere, it is stale — two
+The specialist was originally `ibm-granite/granite-docling-258M`, then **EasyOCR** (`easyocr_engine.py`), and
+since 2026-09-29 is the `ocr` engine, PP-OCRv6 English (see the `ocr` section above). The `granite_docling`
+module is gone. If you find a reference to Granite-Docling anywhere, it is stale — two
 test files importing the deleted module survived the swap and broke `pytest` collection outright until v0.8.2.
 
 **Ground-Truth Suites (Sprints 15 & 16)**

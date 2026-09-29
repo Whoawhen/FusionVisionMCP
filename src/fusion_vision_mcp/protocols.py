@@ -156,9 +156,12 @@ class AppContext:
     segmenter: Segmenter
     aesthetic: AestheticScorer
     counter: InstanceDetector
-    # Always provided by `app_lifespan` -- it is an IdleProxy that builds EasyOCR on
-    # first use, not an optional backend. It was typed optional, which forced every
-    # `.readtext(...)` call site to fail type-checking against a None that cannot occur.
+    # Both always provided by `app_lifespan` as lazy IdleProxies, never None.
+    # `ocr_specialist` is EasyOCR, kept only for structured_analysis's gibberish check:
+    # its 0.20 confidence threshold is calibrated to EasyOCR's scores. `ocr_engine` backs
+    # the `ocr` tool and caption verification: PP-OCRv6 English, or EasyOCR again when
+    # the server is started with non-English --ocr-languages.
     ocr_specialist: SpecialistOCR
+    ocr_engine: SpecialistOCR
     iqa: Any | None = None
     reasoner: Any | None = None

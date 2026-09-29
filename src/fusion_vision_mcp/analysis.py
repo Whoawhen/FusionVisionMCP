@@ -491,7 +491,7 @@ def _critique_one(
 
 
 def ocr_pages(app: AppContext, images: Sequence[Image]) -> list[dict[str, Any]]:
-    """Transcribe each page with EasyOCR, splitting side-by-side columns first.
+    """Transcribe each page with `app.ocr_engine`, splitting side-by-side columns first.
 
     This is the `ocr` tool's whole implementation, factored out so the other two
     places that transcribe text cannot drift from it. Both used to call
@@ -512,7 +512,7 @@ def ocr_pages(app: AppContext, images: Sequence[Image]) -> list[dict[str, Any]]:
         page_text_regions: list[dict[str, Any]] = []
 
         for crop in layout.split_columns(image):
-            for region in app.ocr_specialist.readtext(crop):
+            for region in app.ocr_engine.readtext(crop):
                 box = region["box"]
                 box[0] += x_offset
                 box[2] += x_offset

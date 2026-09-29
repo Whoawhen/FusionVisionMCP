@@ -29,26 +29,27 @@ def register(mcp: MCPServer) -> None:
             Field(
                 description=(
                     "When true, return verbatim text *and* the bounding box and confidence score "
-                    "for each text span (via EasyOCR). Each page becomes a dict with `text_regions` "
+                    "for each text span. Each page becomes a dict with `text_regions` "
                     "({text, confidence, box}[], box=[x1,y1,x2,y2] in page coordinates) and the "
-                    "joined `text`. Use this when you need to know *where* a phrase is, or to "
-                    "evaluate OCR confidence scores for anomaly detection."
+                    "joined `text`. Use this when you need to know *where* a phrase is. Spans below "
+                    "0.75 confidence are already dropped, so this is not a gibberish detector -- use "
+                    "query_image(structured_analysis=true) for that."
                 )
             ),
         ] = False,
     ) -> list[Any]:
         """Process an image file or URL using OCR to extract text.
 
-        Uses EasyOCR. Strongest on documents, screenshots and clear printed or
-        stylized text; weaker on small, angled or distant text in busy photos --
-        on scene photos from TextVQA, the answer's text appeared in its output
-        for 44% of images.
+        Uses PaddleOCR's PP-OCRv6 English models. Reads documents, tables and
+        forms closely (prices, quantities and punctuation included) and handles
+        scene text in photos -- on 200 TextVQA photos, the answer's text appeared
+        in its output for 53% of images. Small, angled or distant text in a busy
+        photo is still the weak spot. Servers started with non-English
+        `--ocr-languages` use EasyOCR here instead.
 
-        This is the right tool for *any* text in an image. EasyOCR handles both
-        of the cases that used to need separate routing -- dense printed text and
-        stylized, cursive, logo or low-contrast text -- so there is no longer a
-        reason to send the second kind to `query_image`, which paraphrases rather
-        than transcribing.
+        This is the right tool for *any* text in an image: dense printed text
+        and stylized, logo or low-contrast text alike. `query_image` paraphrases
+        rather than transcribing, so it is not a substitute.
 
         A page laid out in side-by-side columns (a form, meeting notes, a
         resume) is detected automatically: each column is OCR'd separately and
@@ -61,9 +62,10 @@ def register(mcp: MCPServer) -> None:
         On a busy photo, though, an empty or partial result can also mean small
         text was missed, so treat it as weaker evidence there than on a document.
 
-        Set `detail=true` to get confidence scores and bounding boxes. This is
-        highly recommended for checking generative image artifacts: if an image
-        contains gibberish text, the confidence scores will drop significantly.
+        Text read with less than 0.75 confidence is dropped rather than returned,
+        so a line the model cannot read comes back missing, not garbled: on a
+        small-text test paragraph the last line is omitted while the two above it
+        are verbatim. Set `detail=true` for per-span boxes and confidence scores.
         """
         app = ctx.request_context.lifespan_context
         with get_images(src) as images:
@@ -97,7 +99,7 @@ def register(mcp: MCPServer) -> None:
                 description=(
                     "When true, run the `verify_text` check only if the caption's wording suggests "
                     "it quotes text (signage, labels, quotation marks), and additionally cross-check "
-                    "each text region with EasyOCR on an upscaled crop, which is what fills in "
+                    "each text region with the `ocr` engine on an upscaled crop, which is what fills in "
                     "`text_consensus` and `caption_text_warning`. When the caption "
                     "does not look like it quotes text, nothing extra runs and the plain list[str] "
                     "is returned -- so check the return shape rather than assuming dicts."
@@ -139,8 +141,8 @@ def register(mcp: MCPServer) -> None:
         caller can audit or reject any change.
 
         Set `auto_verify_text=true` to pay for that check only when it is needed:
-        it fires when the caption's wording suggests quoted text, and adds an
-        EasyOCR cross-check on upscaled crops (`text_consensus`,
+        it fires when the caption's wording suggests quoted text, and adds a
+        cross-check by the `ocr` engine on upscaled crops (`text_consensus`,
         `caption_text_warning`). The trigger reads the caption, not the image, so
         text the caption never mentions is not checked; when it does not fire the
         return stays the plain list[str].
@@ -169,7 +171,7 @@ def register(mcp: MCPServer) -> None:
                     caption_text,
                     text_regions,
                     image,
-                    specialist=app.ocr_specialist if auto_verify_text else None,
+                    specialist=app.ocr_engine if auto_verify_text else None,
                 )
                 results.append(fused)
             return results

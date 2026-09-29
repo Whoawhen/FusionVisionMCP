@@ -6,7 +6,7 @@ requires = [ "hatchling" ]
 name = "fusion-vision-mcp"
 version = "0.8.2"
 description = """\
-    An MCP server for processing images using Florence-2, Moondream2, SAM2, CLIP, Grounding DINO, EasyOCR, and ONNX \
+    An MCP server for processing images using Florence-2, Moondream2, SAM2, CLIP, Grounding DINO, PP-OCRv6, EasyOCR, and ONNX \
     IQA models for captioning, OCR, object detection/grounding, instance counting, visual question answering, spatial \
     measurement and aesthetic scoring\
     """
@@ -54,7 +54,12 @@ optional-dependencies.cpu = [ "torch>=2.13", "torchvision>=0.18" ]
 optional-dependencies.cu130 = [ "torch>=2.13", "torchvision>=0.18" ]
 optional-dependencies.iqa = [ "huggingface-hub>=0.23", "onnxruntime>=1.15" ]
 optional-dependencies.ocr-specialist = [
+    # Still needed: backs structured_analysis's gibberish check, whose threshold is
+    # calibrated to EasyOCR's scores, and `ocr` itself for non-English --ocr-languages.
     "easyocr>=1.7.2",
+    # PP-OCRv6 English on ONNX Runtime: the `ocr` engine. 3.x is the first line with the
+    # English PP-OCRv6 recognizer; see ppocr_engine.py.
+    "rapidocr>=3.9",
 ]
 scripts.fusion-vision-mcp = "fusion_vision_mcp.cli:main"
 
@@ -95,6 +100,10 @@ index = [
 conflicts = [
     [ { extra = "cpu" }, { extra = "cu130" } ],
 ]
+# easyocr needs opencv-python-headless and rapidocr needs opencv-python. Both install the
+# same `cv2` package, so whichever lands last silently overwrites the other. This drops
+# opencv-python; rapidocr uses only image functions, which the headless build has.
+override-dependencies = [ "opencv-python; sys_platform == 'never'" ]
 
 [tool.ruff]
 target-version = "py312"
@@ -113,6 +122,7 @@ overrides = [
         "huggingface_hub",
         "onnxruntime",
         "pypdfium2",
+        "rapidocr",
         "transformers.*",
     ], ignore_missing_imports = true },
 ]

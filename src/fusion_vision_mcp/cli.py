@@ -103,8 +103,9 @@ def resolve_memory_mode(memory_mode: str) -> float:
     multiple=True,
     default=("en",),
     show_default=True,
-    help="Languages EasyOCR should load, repeatable (e.g. --ocr-languages en --ocr-languages de). "
-    "Each one is an additional recognition model to download and hold in memory.",
+    help="OCR languages, repeatable (e.g. --ocr-languages en --ocr-languages de). English alone "
+    "uses PP-OCRv6; any other set switches `ocr` to EasyOCR, which loads one recognition model "
+    "per language.",
 )
 @click.option(
     "--memory-mode",

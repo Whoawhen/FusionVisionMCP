@@ -59,6 +59,14 @@ DEFAULT_FLORENCE2_MODEL: Final[str] = "florence-community/Florence-2-large"
 #: inference time for a marginal gain. `small` is the middle that earns its keep.
 DEFAULT_SAM2_MODEL: Final[str] = "facebook/sam2.1-hiera-small"
 
+#: Spans PP-OCRv6 reads below this confidence are dropped. Unfiltered, it read a lone
+#: "S" (0.52) on a text-free photo and "0" (0.57) on a shapes fixture, and turned the last
+#: line of a small-text paragraph into "chee o ee s s ns s eg ge." at 0.70. On 200 TextVQA
+#: photos, recall is unchanged from no floor up to 0.70 and drops only one item at 0.80, so
+#: 0.75 clears all three with margin rather than sitting exactly on the garbage line.
+#: Calibrated for PP-OCRv6 only: EasyOCR's scores run lower and mean something different.
+OCR_MIN_CONFIDENCE: Final[float] = 0.75
+
 #: SAM2 decodes masks on a fixed grid regardless of input size. Masks are upscaled
 #: to the image's own pixels for reporting, but detail finer than
 #: `max(image side) / MASK_DECODE_RESOLUTION` pixels is not actually resolved.

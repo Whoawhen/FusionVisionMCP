@@ -28,7 +28,7 @@ class _StubSegmenter:
 
 
 class _StubOcrSpecialist:
-    """Stands in for EasyOCR, which now backs every OCR path including this one.
+    """Stands in for the OCR engine, which backs every OCR path including this one.
 
     The cross-check used to call `app.florence2.ocr`; it goes through
     `analysis.ocr_pages` now so that the `ocr` tool, `batch_analyze_images` and this
@@ -49,7 +49,7 @@ class _StubApp:
         self.counter = counter
         self.segmenter = segmenter
         self.florence2 = florence2
-        self.ocr_specialist = _StubOcrSpecialist(ocr_text)
+        self.ocr_engine = _StubOcrSpecialist(ocr_text)
 
 
 def _image() -> Image.Image:
