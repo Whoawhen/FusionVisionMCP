@@ -79,6 +79,8 @@ def execute_detection(
         results = app.counter.detect_objects(
             images, object_name, threshold=threshold, adaptive_threshold=adaptive_threshold
         )
+        for result in results:
+            result["detector"] = "grounding_dino"
         if exclude_full_frame:
             # Drop full frame boxes if the query was generic.
             results = [

@@ -132,3 +132,28 @@ class TestVqaCrossCheckNoCategory:
     def test_count_question_without_a_noun_returns_none(self) -> None:
         app = _StubApp(counter=_StubCounter({}))
         assert _vqa_cross_check(app, _image(), "How many are there?") is None
+
+
+class _RecordingCounter:
+    """Grounding DINO stand-in that records the settings it was called with."""
+
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    def detect_objects(self, images: list, object_name: str, **kwargs) -> list[dict]:
+        self.calls.append(kwargs)
+        return [{"count": 1, "bboxes": [[1, 1, 5, 5]], "points": [[3, 3]], "labels": [object_name], "scores": [0.9]}]
+
+
+class TestBatchDetectMatchesTheTool:
+    """Batch `detect` called Florence-2 directly while the tool had moved on."""
+
+    def test_photo_batch_detect_uses_the_tools_detector_and_floor(self) -> None:
+        from fusion_vision_mcp.constants import DETECT_BOX_THRESHOLD
+
+        counter = _RecordingCounter()
+        app = _StubApp(counter=counter)
+        photo = Image.fromarray(np.random.default_rng(0).integers(0, 256, (64, 64, 3), dtype=np.uint8))
+        result = _dispatch(app, "detect", [photo], question="", object_name="dog")
+        assert result[0]["detector"] == "grounding_dino"
+        assert counter.calls == [{"threshold": DETECT_BOX_THRESHOLD, "adaptive_threshold": False}]

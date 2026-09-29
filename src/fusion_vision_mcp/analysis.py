@@ -17,7 +17,8 @@ from typing import Any, Final, cast
 from PIL.Image import Image
 
 from fusion_vision_mcp import geometry, layout, question
-from fusion_vision_mcp.constants import CaptionLevel
+from fusion_vision_mcp.constants import DETECT_BOX_THRESHOLD, CaptionLevel
+from fusion_vision_mcp.detection_policy import execute_detection
 from fusion_vision_mcp.protocols import AppContext, Processor
 
 #: Ceiling on objects compared in one `spatial_relations` call. Relations grow as
@@ -534,7 +535,15 @@ def _dispatch(app: AppContext, operation: str, images: list[Image], *, question:
     if operation == "detect":
         if not object_name:
             raise ValueError("object_name is required for the 'detect' operation")
-        return app.florence2.detect_objects(images, object_name)
+        # Same policy as the `detect_objects` tool, or a batch returns different boxes.
+        return execute_detection(
+            app,
+            images,
+            object_name,
+            backend_preference="auto",
+            threshold=DETECT_BOX_THRESHOLD,
+            adaptive_threshold=False,
+        )
     if operation == "dense_caption":
         return app.florence2.dense_region_caption(images)
     if operation == "query":

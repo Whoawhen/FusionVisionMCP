@@ -40,6 +40,16 @@ DEFAULT_GROUNDING_DINO_MODEL: Final[str] = "IDEA-Research/grounding-dino-tiny"
 #: ship, so 0.15 is the floor: the lowest threshold at which every control still holds.
 DEFAULT_BOX_THRESHOLD: Final[float] = 0.15
 
+#: `detect_objects`' Grounding DINO score floor, deliberately higher than counting's
+#: 0.15: locating a named object has to be able to say "not here". Swept on 143 COCO
+#: scenes (VisionBench detect_backend_ab.py), querying each image once for its real
+#: category and once for a category COCO says is absent. At 0.15 boxes came back for the
+#: absent category on 31% of images; at 0.35 on 2.8%, while still matching Florence-2's
+#: recall on scenes of 3 or fewer (66.4% vs 65.7%) and beating it on crowded ones (55.1%
+#: vs 35.6%). Florence-2's grounding head boxed the absent category on every image.
+#: Precision there is 62.7% against Florence-2's 83.7%: more stray boxes, but scored.
+DETECT_BOX_THRESHOLD: Final[float] = 0.35
+
 DEFAULT_MOONDREAM_MODEL: Final[str] = "vikhyatk/moondream2"
 #: Pinned rather than tracking `main`, since this repository ships its model code via
 #: `trust_remote_code` and reshapes it between revisions. `2025-06-21` is chosen over the

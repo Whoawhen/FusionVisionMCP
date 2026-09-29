@@ -15,7 +15,7 @@ from fusion_vision_mcp.analysis import (
     _region_label_consensus,
     _separability,
 )
-from fusion_vision_mcp.constants import DEFAULT_BOX_THRESHOLD, MASK_DECODE_RESOLUTION
+from fusion_vision_mcp.constants import DEFAULT_BOX_THRESHOLD, DETECT_BOX_THRESHOLD, MASK_DECODE_RESOLUTION
 from fusion_vision_mcp.detection_policy import execute_detection
 from fusion_vision_mcp.images import get_images
 from fusion_vision_mcp.params import ImagePath, ObjectName
@@ -39,34 +39,35 @@ def register(mcp: MCPServer) -> None:
             ),
         ] = False,
     ) -> list[dict[str, Any]] | dict[str, Any]:
-        """Locate a named object in an image, as bounding boxes and center points.
+        """Locate a named object in an image, as scored bounding boxes and center points.
 
-        Returns `bboxes` ([x1, y1, x2, y2] each), `points` (the center of each box)
-        and `labels`, all index-aligned -- so use this whether you want regions or
-        coordinates; the centers come free with the boxes.
+        Returns `bboxes` ([x1, y1, x2, y2] each), `points` (the center of each box),
+        `labels` and `scores`, all index-aligned -- so use this whether you want
+        regions or coordinates; the centers come free with the boxes. `detector`
+        says which model ran and `_routing` why.
+
+        On photographs it uses Grounding DINO and keeps boxes scoring 0.35 or more,
+        which is what lets it answer "not here": asked for a category that was
+        absent, it returned boxes on 2.8% of 143 real COCO scenes. On those scenes
+        it boxed 66% of the objects in scenes with 3 or fewer instances and 55% in
+        crowded ones. About a third of its boxes miss a real instance (precision
+        63%), so read `scores`: a box just above 0.35 is a weak candidate.
+
+        Flat vector art and clip art go to Florence-2's grounding head instead,
+        since Grounding DINO over-detects there. That path has no `scores`, and its
+        label is the query echoed back rather than a classification: asked for
+        "elephant" on a drawing of a dog, it boxes the dog and labels it
+        "elephant". On that path a box does not confirm the object is present --
+        confirm presence with `caption` or `query_image`.
 
         If `return_annotated` is true, the return value becomes a dictionary containing
         the regular results plus an `annotated_image_path` key.
 
-        The count of results is NOT a reliable count of objects on an ambiguous
-        class name: Florence-2 can return several overlapping results for one
-        physical object (a whole-animal box plus sub-part boxes all labelled
-        'wing'), or a single result spanning two touching instances (two fused
-        blades labelled once as 'sword blade'). Prefer a more specific
-        `object_name`, and treat results as candidates to inspect, not a tally.
-
-        A returned box does not confirm the object is present. The label is the
-        query echoed back, not a classification: asked for "elephant" on a photo of
-        a dog, it returns a box on the dog labelled "elephant". When presence is the
-        question, confirm it another way, e.g. with `caption` or `query_image`.
-
-        It usually returns a few boxes, not one per instance. On real photographs
-        (COCO) its boxes matched 58% of the objects in scenes with 3 or fewer
-        instances, but only 24% in crowded scenes, where most instances go unboxed.
-        Use `count_objects` when you actually need "how many" -- it runs a
-        detection head that emits one region per instance, which this head does
-        not. Neither can separate heavily overlapping instances, so a count of 1
-        from either means "could not separate", not "there is one".
+        Treat results as candidates to inspect, not a tally: one physical object
+        can come back as a whole-object box plus part boxes, and two touching
+        instances as one box. Use `count_objects` when you need "how many" -- it
+        adds the silhouette, consensus and separability checks a count needs.
+        Neither can separate heavily overlapping instances.
 
         Boxes cannot answer whether two objects actually touch or whether one is
         inside another -- they overlap the moment one object is merely in front
@@ -74,15 +75,21 @@ def register(mcp: MCPServer) -> None:
 
         A maximally vague `object_name` ("object", "thing", "item", ...) on a
         scene with nothing distinctive to point to gets a near-full-frame box
-        filtered out rather than returned as a match -- Florence-2's grounding
-        head has no explicit "nothing here" output for that case and falls back
-        to the whole image otherwise. This only applies to the exact generic
+        filtered out rather than returned as a match -- both detectors fall back
+        to the whole image for such a name. This only applies to the exact generic
         vocabulary itself: a specific noun that genuinely fills the frame (a
         close-up of wood, asked for "wood") is returned unfiltered.
         """
         app = ctx.request_context.lifespan_context
         with get_images(src) as images:
-            results = execute_detection(app, images, object_name, backend_preference="florence2")
+            results = execute_detection(
+                app,
+                images,
+                object_name,
+                backend_preference="auto",
+                threshold=DETECT_BOX_THRESHOLD,
+                adaptive_threshold=False,
+            )
 
             if return_annotated:
                 _attach_annotated_images(images, results)
@@ -196,10 +203,10 @@ def register(mcp: MCPServer) -> None:
         """Count how many instances of a named object an image contains.
 
         Use this, not `detect_objects`, whenever the question is "how many".
-        `detect_objects` returns however many regions Florence-2's grounding head
-        emits, which is not a tally: it collapses several repeated, undifferentiated
-        parts into one box (every petal of a flower, both halves of a fused blade)
-        and conversely splits one object into overlapping sub-part boxes.
+        `detect_objects` keeps only confident boxes (0.35+) so that it can say an
+        object is absent, which makes it miss faint instances a count needs; this
+        tool detects down to 0.15 and adds the silhouette, consensus and
+        separability checks that tell a real tally from a collapsed group.
 
         Returns `count`, plus `bboxes`/`points`/`labels`/`scores` for the instances
         found, index-aligned and in the same pixel-space convention `detect_objects`
