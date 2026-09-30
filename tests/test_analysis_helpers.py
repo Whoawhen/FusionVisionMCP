@@ -5,12 +5,19 @@ behind `critique_composition`, size questions and `compare_with`. They are pinne
 against stub apps, so a regression shows up in milliseconds rather than in a benchmark run.
 """
 
+import numpy as np
+import pytest
 from PIL import Image
 
 from fusion_vision_mcp.analysis import (
     _COMPARE_TIE,
+    _add_silhouette,
     _aesthetic_comparison,
+    _dispatch,
+    _enrich_aesthetics,
     _pick_primary_subject,
+    _region_label_consensus,
+    _separability,
     _size_measurement,
 )
 
@@ -177,3 +184,170 @@ class TestAestheticComparison:
         app = _CompareApp(_StubAesthetic())
         first, second = _aesthetic_comparison(app, [_img(6.0), _img(7.0)], [_img(4.0)], style_context=False)
         assert first["reference"] is not second["reference"]
+
+
+class TestSeparability:
+    """`separable` must never contradict the evidence sitting beside it in the payload."""
+
+    def test_count_above_one_is_separable(self) -> None:
+        assert _separability({"count": 3}) == "yes"
+
+    def test_missing_count_is_unknown(self) -> None:
+        assert _separability({}) == "unknown"
+
+    def test_singleton_without_silhouette_is_unknown(self) -> None:
+        assert _separability({"count": 1}) == "unknown"
+
+    def test_shattered_or_clipped_silhouette_is_unknown(self) -> None:
+        assert _separability({"count": 1, "silhouette": {"lobes": 1, "shattered": True}}) == "unknown"
+        assert _separability({"count": 1, "silhouette": {"lobes": 5, "clipped": True}}) == "unknown"
+
+    def test_silhouette_without_a_lobe_count_is_unknown(self) -> None:
+        assert _separability({"count": 1, "silhouette": {"by_radial": 0}}) == "unknown"
+
+    def test_distance_estimator_alone_decides_when_radial_is_not_measured(self) -> None:
+        assert _separability({"count": 1, "silhouette": {"lobes": 1, "by_radial": 0}}) == "yes"
+        assert _separability({"count": 1, "silhouette": {"lobes": 4, "by_radial": 0}}) == "no"
+
+    def test_agreeing_estimators_are_trusted(self) -> None:
+        assert _separability({"count": 1, "silhouette": {"lobes": 1, "by_radial": 1, "agreement": True}}) == "yes"
+        assert _separability({"count": 1, "silhouette": {"lobes": 6, "by_radial": 6, "agreement": True}}) == "no"
+
+    def test_the_flower_collapse_is_not_separable(self) -> None:
+        """by_distance=1 with by_radial=8 is the documented rosette collapse."""
+        silhouette = {"lobes": 1, "by_radial": 8, "agreement": False}
+        assert _separability({"count": 1, "silhouette": silhouette}) == "no"
+
+    def test_disagreement_without_a_strong_signal_is_unknown(self) -> None:
+        silhouette = {"lobes": 3, "by_radial": 1, "agreement": False}
+        assert _separability({"count": 1, "silhouette": silhouette}) == "unknown"
+
+
+class _StubSegmenter:
+    def __init__(self, masks: list) -> None:
+        self.masks = masks
+        self.calls = 0
+
+    def segment(self, image, boxes: list) -> list:
+        self.calls += 1
+        return self.masks
+
+
+class _SilhouetteApp:
+    def __init__(self, segmenter: _StubSegmenter) -> None:
+        self.segmenter = segmenter
+
+
+def _disc_mask(size: int = 100) -> np.ndarray:
+    yy, xx = np.mgrid[:size, :size]
+    return (yy - size / 2) ** 2 + (xx - size / 2) ** 2 < (size / 3) ** 2
+
+
+class TestAddSilhouette:
+    def test_collapsed_single_region_gets_a_silhouette_and_keeps_its_count(self) -> None:
+        segmenter = _StubSegmenter([_disc_mask()])
+        result = {"count": 1, "bboxes": [[20, 20, 80, 80]]}
+        _add_silhouette(_SilhouetteApp(segmenter), Image.new("RGB", (100, 100)), result)
+        assert result["count"] == 1
+        assert result["silhouette"]["box"] == [20, 20, 80, 80]
+        assert segmenter.calls == 1
+
+    def test_more_than_one_region_is_not_segmented(self) -> None:
+        segmenter = _StubSegmenter([_disc_mask()])
+        result = {"count": 2, "bboxes": [[20, 20, 80, 80], [0, 0, 10, 10]]}
+        _add_silhouette(_SilhouetteApp(segmenter), Image.new("RGB", (100, 100)), result)
+        assert "silhouette" not in result
+        assert segmenter.calls == 0
+
+    def test_a_tiny_box_is_one_small_object_not_a_merged_group(self) -> None:
+        segmenter = _StubSegmenter([_disc_mask()])
+        result = {"count": 1, "bboxes": [[10, 10, 15, 15]]}
+        _add_silhouette(_SilhouetteApp(segmenter), Image.new("RGB", (100, 100)), result)
+        assert "silhouette" not in result
+        assert segmenter.calls == 0
+
+    def test_no_mask_returned_adds_nothing(self) -> None:
+        result = {"count": 1, "bboxes": [[20, 20, 80, 80]]}
+        _add_silhouette(_SilhouetteApp(_StubSegmenter([])), Image.new("RGB", (100, 100)), result)
+        assert "silhouette" not in result
+
+
+class _LabelProcessor:
+    def __init__(self, labels: list) -> None:
+        self.labels = labels
+
+    def dense_region_caption(self, images: list) -> list[dict]:
+        return [{"labels": self.labels}]
+
+
+class TestRegionLabelConsensus:
+    def test_counts_labels_containing_the_name_case_insensitively(self) -> None:
+        processor = _LabelProcessor(["a red Car", "a person", "car door", "blue CAR"])
+        assert _region_label_consensus(processor, _IMAGE, " Car ") == 3
+
+    def test_nothing_matching_is_zero(self) -> None:
+        assert _region_label_consensus(_LabelProcessor(["a dog"]), _IMAGE, "cat") == 0
+
+    def test_blank_name_matches_nothing(self) -> None:
+        """An empty needle is a substring of everything; it must not count every region."""
+        assert _region_label_consensus(_LabelProcessor(["a dog", "a cat"]), _IMAGE, "  ") == 0
+
+
+class _EnrichApp:
+    def __init__(self, iqa=None, reasoner=None) -> None:
+        self.iqa = iqa
+        self.reasoner = reasoner
+
+
+class _RaisingIqa:
+    def score(self, image):
+        raise RuntimeError("onnx session died")
+
+
+class _OkIqa:
+    def score(self, image):
+        return {"technical_quality": 71.0}
+
+
+class TestEnrichAesthetics:
+    def test_a_broken_iqa_backend_is_reported_not_omitted(self) -> None:
+        """An absent key is indistinguishable from "IQA not configured"."""
+        result = {"score": 5.0}
+        _enrich_aesthetics(_EnrichApp(iqa=_RaisingIqa()), _IMAGE, result, None)
+        assert "technical_quality" not in result
+        assert "onnx session died" in result["technical_quality_error"]
+
+    def test_iqa_score_is_attached(self) -> None:
+        result = {"score": 5.0}
+        _enrich_aesthetics(_EnrichApp(iqa=_OkIqa()), _IMAGE, result, None)
+        assert result["technical_quality"] == 71.0
+
+    def test_a_non_photograph_medium_marks_the_photographic_score_inapplicable(self) -> None:
+        photo, art = {"score": 5.0}, {"score": 5.0}
+        _enrich_aesthetics(_EnrichApp(), _IMAGE, photo, {"style": "photograph"})
+        _enrich_aesthetics(_EnrichApp(), _IMAGE, art, {"style": "illustration"})
+        assert photo["photographic_aesthetic_applicable"] is True
+        assert art["photographic_aesthetic_applicable"] is False
+
+    def test_a_failing_reasoner_is_reported_not_raised(self) -> None:
+        class _RaisingReasoner:
+            def analyze(self, **kwargs):
+                raise RuntimeError("ollama unreachable")
+
+        result = {"score": 5.0}
+        _enrich_aesthetics(_EnrichApp(reasoner=_RaisingReasoner()), _IMAGE, result, None)
+        assert "ollama unreachable" in result["artistic_judgment_error"]
+        assert "artistic_judgment" not in result
+
+
+class TestDispatchRequiredArguments:
+    """Operations that need a name or question must refuse without one, not guess."""
+
+    def test_operations_missing_their_argument_raise(self) -> None:
+        for operation in ("detect", "count", "query"):
+            with pytest.raises(ValueError, match="required"):
+                _dispatch(object(), operation, [_IMAGE], question="", object_name="")  # type: ignore[arg-type]
+
+    def test_unknown_operation_raises(self) -> None:
+        with pytest.raises(ValueError, match="Unknown operation"):
+            _dispatch(object(), "sharpen", [_IMAGE], question="", object_name="")  # type: ignore[arg-type]
