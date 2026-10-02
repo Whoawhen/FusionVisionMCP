@@ -48,6 +48,13 @@ _GUTTER_DENSITY_FRAC: Final[float] = 0.002
 #: inter-word spacing, not a column boundary.
 _MIN_GUTTER_WIDTH_FRAC: Final[float] = 0.01
 
+#: A gutter must also be at least as wide as a typical text line is tall, up to
+#: this fraction of the image width. A word space is a fraction of the text height
+#: and a column gutter is usually wider than it: on VisionBench's rendered pages a
+#: 10px word gap passed the 1% floor on a 1024px dashboard and split its lines
+#: between words. The cap keeps the floor sane where "lines" are tall blocks.
+_MAX_LINE_HEIGHT_GUTTER_FRAC: Final[float] = 0.03
+
 #: An ink run at most this many pixels wide, flanked by gutter on both sides,
 #: is treated as part of the gutter rather than a column boundary -- a ruled
 #: divider line down the middle of a real gutter should not defeat detection.
@@ -81,6 +88,22 @@ _LINE_ROW_DENSITY_FRAC: Final[float] = 0.005
 #: gaps to coincidentally align across, and this is also what every
 #: single-block synthetic test in `test_layout.py` looks like.
 _MIN_LINES_FOR_SPLIT: Final[int] = 3
+
+#: A text line crosses a gutter when more than this many of its ink pixels fall
+#: inside the gutter strip. A gutter's per-column tolerance (`_GUTTER_DENSITY_FRAC`)
+#: scales with the page height, so on a sparse page -- a slide, a dashboard -- a
+#: strip can pass it while running through the rounded edges of letters: measured
+#: on VisionBench's rendered pages (phase 14), 34 of 60 pages were split through a
+#: line of text, cutting "Bicycles" into "Bicycl" + "es". A real gutter holds no
+#: glyph at all, so any line with more than stray-pixel ink there is read whole.
+_CROSSING_MAX_INK_PX: Final[int] = 2
+
+#: The outermost columns of a gutter are not checked for crossing lines. They can
+#: legitimately hold a pixel or two -- the gutter test tolerates that -- and the
+#: anti-aliased edge of an opening quote mark at a column's left margin made a
+#: whole newspaper column zone cross. Insetting by a quarter of the gutter instead
+#: let dashboard lines through at word gaps, so this is a fixed, small margin.
+_CROSSING_INSET_PX: Final[int] = 2
 
 
 def _otsu_threshold(gray: NDArray[np.uint8]) -> int:
@@ -128,23 +151,28 @@ def _ink_mask(body: NDArray[np.uint8]) -> NDArray[np.bool_]:
     return candidate if low <= candidate.mean() <= high else ink
 
 
-def _count_line_bands(body: NDArray[np.uint8]) -> int:
-    """Counts contiguous ink-bearing row runs (text lines) in a page body.
+def _line_bands(ink: NDArray[np.bool_], floor: int | None = None) -> list[tuple[int, int]]:
+    """Contiguous ink-bearing row runs (text lines) in an ink mask, as `(top, bottom)`.
 
-    A thin ruled divider running down a real gutter contributes at most a
-    couple of ink pixels to any row it crosses, which stays under the density
-    floor here -- a fully blank inter-line row does not gain a false line
+    A row counts as text when it holds more than `floor` ink pixels, by default a
+    small fraction of the width. A thin ruled divider running down a real gutter
+    contributes at most a couple of ink pixels to any row it crosses, which stays
+    under that default -- a fully blank inter-line row does not gain a false line
     just because a rule line passes through it.
     """
-    ink = _ink_mask(body)
     density = ink.sum(axis=1)
-    has_text = density > max(1, int(_LINE_ROW_DENSITY_FRAC * body.shape[1]))
+    if floor is None:
+        floor = max(1, int(_LINE_ROW_DENSITY_FRAC * ink.shape[1]))
+    has_text = density > floor
+    padded = np.concatenate(([False], has_text, [False]))
+    starts = np.flatnonzero(~padded[:-1] & padded[1:])
+    ends = np.flatnonzero(padded[:-1] & ~padded[1:])
+    return list(zip(starts.tolist(), ends.tolist(), strict=True))
 
-    # A band starts wherever a False->True edge occurs. Counting rising edges over the
-    # padded array is the same answer as the row-by-row state machine this replaces,
-    # without a Python-level iteration per image row.
-    padded = np.concatenate(([False], has_text))
-    return int(np.count_nonzero(~padded[:-1] & padded[1:]))
+
+def _count_line_bands(body: NDArray[np.uint8]) -> int:
+    """Counts the text lines in a page body; see `_line_bands`."""
+    return len(_line_bands(_ink_mask(body)))
 
 
 def _close_thin_ink(is_gap: NDArray[np.bool_]) -> NDArray[np.bool_]:
@@ -166,6 +194,46 @@ def _close_thin_ink(is_gap: NDArray[np.bool_]) -> NDArray[np.bool_]:
     return closed
 
 
+def _find_gutters(image: Image) -> tuple[list[tuple[int, int]], NDArray[np.bool_]]:
+    """Gutters as `(left, right)` x-ranges, plus which x-columns hold a bridged rule line.
+
+    See `find_column_splits` for what counts as a gutter.
+    """
+    arr = np.asarray(image.convert("L"))
+    height, width = arr.shape
+    body = arr[int(height * _TOP_BAND_FRAC) :, :]
+    no_rules = np.zeros(width, dtype=bool)
+
+    line_bands = _count_line_bands(body)
+    if 1 < line_bands < _MIN_LINES_FOR_SPLIT:
+        return [], no_rules
+
+    ink = _ink_mask(body)
+    density = ink.sum(axis=0)
+    raw_gap = density <= max(1, int(_GUTTER_DENSITY_FRAC * body.shape[0]))
+    is_gap = _close_thin_ink(raw_gap)
+
+    heights = [bottom - top for top, bottom in _line_bands(ink)]
+    line_height = int(np.median(heights)) if heights else 0
+    min_gutter_width = max(
+        4,
+        int(_MIN_GUTTER_WIDTH_FRAC * width),
+        min(line_height, int(_MAX_LINE_HEIGHT_GUTTER_FRAC * width)),
+    )
+    edge_margin = _EDGE_MARGIN_FRAC * width
+
+    # Same edge-pair scan as above, over gutter runs this time.
+    padded = np.concatenate(([False], is_gap, [False]))
+    starts = np.flatnonzero(~padded[:-1] & padded[1:])
+    ends = np.flatnonzero(padded[:-1] & ~padded[1:])
+    gutters = [
+        (int(start), int(end))
+        for start, end in zip(starts, ends, strict=True)
+        if end - start >= min_gutter_width and start > edge_margin and end < width - edge_margin
+    ]
+    return gutters, is_gap & ~raw_gap
+
+
 def find_column_splits(image: Image) -> list[int]:
     """Finds x-coordinates that split `image` into left-to-right reading columns.
 
@@ -178,41 +246,72 @@ def find_column_splits(image: Image) -> list[int]:
     A table's own column gaps do not trigger a split here: unlike a form's
     columns, a table's columns each carry ink in most rows, so there is
     usually no vertical strip that is blank across the whole body height.
+
+    These are candidates over the page body. `reading_blocks` decides, line by
+    line, where they actually apply.
     """
-    arr = np.asarray(image.convert("L"))
-    height, width = arr.shape
-    body = arr[int(height * _TOP_BAND_FRAC) :, :]
-
-    line_bands = _count_line_bands(body)
-    if 1 < line_bands < _MIN_LINES_FOR_SPLIT:
-        return []
-
-    ink = _ink_mask(body)
-    density = ink.sum(axis=0)
-    is_gap = _close_thin_ink(density <= max(1, int(_GUTTER_DENSITY_FRAC * body.shape[0])))
-
-    min_gutter_width = max(4, int(_MIN_GUTTER_WIDTH_FRAC * width))
-    edge_margin = _EDGE_MARGIN_FRAC * width
-
-    # Same edge-pair scan as above, over gutter runs this time.
-    padded = np.concatenate(([False], is_gap, [False]))
-    starts = np.flatnonzero(~padded[:-1] & padded[1:])
-    ends = np.flatnonzero(padded[:-1] & ~padded[1:])
-    return [
-        (int(start) + int(end)) // 2
-        for start, end in zip(starts, ends, strict=True)
-        if end - start >= min_gutter_width and start > edge_margin and end < width - edge_margin
-    ]
+    return [(left + right) // 2 for left, right in _find_gutters(image)[0]]
 
 
-def split_columns(image: Image) -> list[Image]:
-    """Crops `image` into left-to-right reading columns at each detected gutter.
+def reading_blocks(image: Image) -> list[tuple[Image, int, int]]:
+    """Crops `image` into blocks in reading order, as `(crop, left, top)`.
 
-    Returns `[image]` unchanged when no gutter is found.
+    A page with no gutter is one block, the image itself. Otherwise the page is
+    cut into horizontal zones between text lines. A line that runs through any
+    gutter -- a title over the columns, an intro paragraph, a table heading, a
+    word that happens to straddle a gap -- is read across the full width, so it
+    is never cut in half. A run of lines clear of every gutter is split into
+    columns and read one column at a time, unless no column in it holds
+    `_MIN_LINES_FOR_SPLIT` lines: a gap lining up across one or two lines is
+    most likely a coincidence of word spacing. A page that is one ink region is
+    exempt, as in `find_column_splits`.
     """
-    splits = find_column_splits(image)
-    if not splits:
-        return [image]
+    gutters, rule_columns = _find_gutters(image)
+    if not gutters:
+        return [(image, 0, 0)]
 
-    bounds = [0, *splits, image.width]
-    return [image.crop((left, 0, right, image.height)) for left, right in pairwise(bounds)]
+    ink = _ink_mask(np.asarray(image.convert("L")))
+    height, width = ink.shape
+    keep = ~rule_columns
+
+    def crosses(top: int, bottom: int) -> bool:
+        for left, right in gutters:
+            inset = min(_CROSSING_INSET_PX, (right - left) // 4)
+            mid = slice(left + inset, right - inset)
+            if int(ink[top:bottom, mid][:, keep[mid]].sum()) > _CROSSING_MAX_INK_PX:
+                return True
+        return False
+
+    def column_lines(top: int, bottom: int, left: int, right: int) -> int:
+        return len(_line_bands(ink[top:bottom, left:right]))
+
+    # Group consecutive lines by whether they cross, then give each zone the page
+    # rows halfway to its neighbours so the zones tile the page with nothing lost.
+    # Any ink makes a row part of a line here, rule lines aside, so a zone boundary
+    # always falls on a blank row: the default floor leaves a line's descenders and
+    # accents outside its band, and a boundary there cut lines in half.
+    bands = _line_bands(ink[:, keep], floor=0)
+    zones: list[tuple[bool, list[tuple[int, int]]]] = []
+    for band in bands:
+        crossing = crosses(*band)
+        if zones and zones[-1][0] == crossing:
+            zones[-1][1].append(band)
+        else:
+            zones.append((crossing, [band]))
+
+    bounds = [0, *((prev[1][-1][1] + nxt[1][0][0]) // 2 for prev, nxt in pairwise(zones)), height]
+    cuts = [0, *((left + right) // 2 for left, right in gutters), width]
+    blocks: list[tuple[Image, int, int]] = []
+    for (crossing, _), (top, bottom) in zip(zones, pairwise(bounds), strict=True):
+        # Lines are counted per column: columns set at offset baselines leave no
+        # row blank across the page, so the full-width bands above merge them.
+        most_lines = max(column_lines(top, bottom, left, right) for left, right in pairwise(cuts))
+        if crossing or (most_lines < _MIN_LINES_FOR_SPLIT and len(bands) > 1):
+            blocks.append((image.crop((0, top, width, bottom)), 0, top))
+            continue
+        blocks.extend(
+            (image.crop((left, top, right, bottom)), left, top)
+            for left, right in pairwise(cuts)
+            if ink[top:bottom, left:right].any()
+        )
+    return blocks or [(image, 0, 0)]

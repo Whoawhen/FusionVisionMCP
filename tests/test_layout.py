@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
 
-from fusion_vision_mcp.layout import find_column_splits, split_columns
+from fusion_vision_mcp.layout import find_column_splits, reading_blocks
 
 TEST_DIR = Path(__file__).resolve().parent
 
@@ -92,22 +92,74 @@ def test_three_blocks_split_twice() -> None:
     assert 560 < splits[1] < 630
 
 
-def test_split_columns_returns_original_image_when_no_gutter() -> None:
+def test_reading_blocks_returns_original_image_when_no_gutter() -> None:
     image = _blank()
     _fill(image, (30, 100, 770, 300))
-    assert split_columns(image) == [image]
+    assert reading_blocks(image) == [(image, 0, 0)]
 
 
-def test_split_columns_crops_span_the_full_width_in_order() -> None:
+def test_reading_blocks_crops_span_the_full_width_in_order() -> None:
     image = _blank(width=800)
     _fill(image, (30, 100, 300, 300))
     _fill(image, (500, 100, 770, 300))
-    columns = split_columns(image)
-    assert len(columns) == 2
-    assert columns[0].width + columns[1].width == image.width
-    assert columns[0].width < columns[1].width or columns[0].width == columns[1].width
+    blocks = reading_blocks(image)
     split_x = find_column_splits(image)[0]
-    assert columns[0].width == split_x
+    assert [(left, top) for _, left, top in blocks] == [(0, 0), (split_x, 0)]
+    assert blocks[0][0].width + blocks[1][0].width == image.width
+
+
+def _lines(image: Image.Image, x_ranges: list[tuple[int, int]], top: int, count: int) -> None:
+    """Draws `count` text-line stand-ins (12px tall, 10px apart) in each x-range."""
+    for i in range(count):
+        y = top + i * 22
+        for left, right in x_ranges:
+            _fill(image, (left, y, right, y + 12))
+
+
+def _crossing_line(image: Image.Image, y: int) -> None:
+    """A text line through the gutter, as real text crosses one: sparse ink in the strip.
+
+    Solid ink there would hide the gutter from detection altogether. A line that
+    straddles a gap with only a letter's rounded edge in it -- the case measured
+    on the rendered pages -- leaves a pixel or two per column, which is this
+    1px stroke joining two blocks.
+    """
+    _fill(image, (30, y, 380, y + 12))
+    _fill(image, (420, y, 770, y + 12))
+    _fill(image, (380, y + 6, 420, y + 6))
+
+
+def test_line_through_the_gutter_is_read_whole_and_the_columns_below_are_split() -> None:
+    """A title or intro line spanning the gutter must not be cut in half.
+
+    Measured on VisionBench's rendered pages (phase 14): splitting the whole page
+    height cut 105 of 2,754 lines, titles and intro paragraphs above the columns.
+    """
+    image = _blank(height=500)
+    _crossing_line(image, 200)  # below the heading band
+    _lines(image, [(30, 300), (500, 770)], top=260, count=5)
+    blocks = reading_blocks(image)
+    assert [(crop.width, left) for crop, left, _ in blocks] == [(800, 0), (400, 0), (400, 400)]
+    full, left_col, right_col = blocks
+    assert full[2] == 0 and full[0].height > 212  # the crossing line is inside the full-width block
+    assert left_col[2] == right_col[2] > 212
+
+
+def test_word_gap_rows_too_few_to_be_columns_are_not_split() -> None:
+    """Two lines clear of a gutter under one that crosses it are read full width."""
+    image = _blank(height=500)
+    _lines(image, [(30, 300), (500, 770)], top=100, count=5)  # real columns
+    _crossing_line(image, 250)
+    _lines(image, [(30, 300), (500, 770)], top=290, count=2)  # a two-line run below it
+    blocks = reading_blocks(image)
+    assert [crop.width for crop, _, _ in blocks] == [400, 400, 800, 800]
+
+
+def test_rule_line_does_not_make_every_line_cross() -> None:
+    image = _blank(height=500)
+    _lines(image, [(30, 300), (500, 770)], top=100, count=6)
+    ImageDraw.Draw(image).line((400, 60, 400, 400), fill="black", width=1)
+    assert len(reading_blocks(image)) == 2
 
 
 # --- Regression fixtures: real rendered documents ---------------------------

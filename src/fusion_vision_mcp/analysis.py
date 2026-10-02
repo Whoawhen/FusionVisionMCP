@@ -503,23 +503,22 @@ def ocr_pages(app: AppContext, images: Sequence[Image]) -> list[dict[str, Any]]:
     direct tool; routing everything through here extends it to the other two.
 
     Returns one `{"text", "text_regions"}` dict per page. Boxes are in page
-    coordinates: a column crop's boxes are shifted right by the crop's origin,
-    which is why the offset is accumulated here rather than inside `split_columns`.
+    coordinates: each block's boxes are shifted by the block's origin on the page.
     """
     pages: list[dict[str, Any]] = []
     for image in images:
-        x_offset = 0
         page_texts: list[str] = []
         page_text_regions: list[dict[str, Any]] = []
 
-        for crop in layout.split_columns(image):
+        for crop, left, top in layout.reading_blocks(image):
             for region in app.ocr_engine.readtext(crop):
                 box = region["box"]
-                box[0] += x_offset
-                box[2] += x_offset
+                box[0] += left
+                box[1] += top
+                box[2] += left
+                box[3] += top
                 page_texts.append(region["text"])
                 page_text_regions.append({"text": region["text"], "confidence": region["confidence"], "box": box})
-            x_offset += crop.width
 
         pages.append({"text": "\n".join(page_texts), "text_regions": page_text_regions})
     return pages

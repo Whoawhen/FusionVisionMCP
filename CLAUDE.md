@@ -164,7 +164,7 @@ for a table — and `Deadline: Sept 10` never appeared in *any* of them, matchin
 to paraphrase rather than exhaustively transcribe (see the OCR-routing note above). One phrasing even bled left-
 column fields into the right-column answer.
 
-**What ships instead: `layout.find_column_splits`/`split_columns` (`src/fusion_vision_mcp/layout.py`), pure
+**What ships instead: `layout.find_column_splits`/`reading_blocks` (`src/fusion_vision_mcp/layout.py`), pure
 numpy/PIL, no model call.** It sums ink pixels per x-column, finds a vertical strip with near-zero ink density
 that's wide enough and far enough from the edges to be a real gutter rather than word-spacing or a margin, and
 crops there. `ocr` calls it automatically on every page: each column is OCR'd independently and the results
@@ -201,6 +201,27 @@ as 26px. Fixed by counting independent text lines first (`layout._count_line_ban
 there are more than one but fewer than three — too few for that kind of coincidental alignment to mean anything
 real. Every existing multi-column fixture (five-plus lines) clears this floor easily; `layout_small_text_paragraph.png`
 (committed from the exact fixture that exposed the bug) is the regression test.
+
+**2026-10-02: a third mode, found by measuring rather than by a report — the split cut lines in half.** VisionBench
+phase 14 renders 60 pages in a browser and takes every line's exact box from the DOM, so a split can be checked
+against ground truth. Cropping the whole page height at each gutter cut **105 of 2,754 lines**: titles and intro
+paragraphs above the columns, table headings, and on a slide `Bicycles` → `Bicycl` + `es`. Two causes. A gutter's
+per-column tolerance scales with page height, so on a sparse page a strip passed it while running through the
+rounded edges of letters; and a gutter only has to be blank below the top 15%, while plenty of full-width text
+sits lower than that.
+
+`reading_blocks` replaced `split_columns`. It cuts the page into horizontal zones on blank rows: a line with more
+than two ink pixels in a gutter's interior is read across the full width, and a run of lines clear of every gutter
+is split into columns, provided some column in it has three or more lines. A gutter must also be at least as wide
+as the median line is tall (capped at 3% of the width), which stops a 10px word gap on a 1024px dashboard
+qualifying. Cut lines went 105 → 3 (two invoice "Total due:" labels whose word gap lines up with a table gap, and
+one accented word). Through the server: lines read verbatim 95.4% → 97.3%, character accuracy 98.8% → 99.6%,
+regions sitting on a real line 96.4% → 99.3%, non-English verbatim 92.9% → 97.3%; real images unchanged at 75.3%.
+Three things were load-bearing, each found by a regression on the rendered set: zone boundaries use *any* ink
+(rule lines excepted), since the density floor leaves descenders outside a line and a boundary there cut it;
+lines are counted per column, since columns at offset baselines leave no blank row across the page and merge
+into one "line"; and the outer 2px of a gutter are not checked, since an opening quote mark's anti-aliasing at a
+column's edge made a whole newspaper zone read full width.
 
 **That fix eliminates the scrambling, but does not make Florence-2's OCR head perfect at small text.** Verified
 end-to-end through the real MCP server (fresh subprocess, real protocol call, not a direct-Python import) on the
