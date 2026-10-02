@@ -25,8 +25,8 @@ def test_contains_likely_text_detection():
     assert contains_likely_text("The company logo is FusionVisionMCP")
     # Acronyms
     assert contains_likely_text("The MCP server runs locally")
-    # Capitalized long words
-    assert contains_likely_text("Welcome to California today")
+    # A capitalised long word alone is not enough: it fired on 60% of text-free images
+    assert not contains_likely_text("Welcome to California today")
     # Negative control: plain scene description with no text/names
     assert not contains_likely_text("a brown dog running across the grass under trees")
 

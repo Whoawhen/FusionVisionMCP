@@ -24,8 +24,15 @@ from typing import cast
 _MIN_SIMILARITY: float = 0.6
 
 #: An exact match (ratio == 1.0) is *not* a correction -- the caption read it
-#: right -- so only the half-open band ``[_MIN_SIMILARITY, 1.0)`` corrects.
+#: right -- so only the half-open band ``[_CORRECTION_MIN_SIMILARITY, 1.0)`` corrects.
 _EXACT: float = 1.0
+
+#: A token is only rewritten when it is at least this similar to the OCR span.
+#: `_MIN_SIMILARITY` pairs a token with a span; rewriting needs more. VisionBench
+#: phase 12 (2026-10-01) found the correction *lowering* the share of an image's
+#: key phrases in the caption, 25.5% -> 20.8%: on a screenshot it rewrote a correct
+#: "Sagittal" as "Axial", a different button's label, at 0.62.
+_CORRECTION_MIN_SIMILARITY: float = 0.75
 
 # --- Candidate-token extraction ------------------------------------------------
 # A "candidate" is a word in the caption plausibly reproducing embedded text, and
@@ -88,6 +95,29 @@ def _ratio(a: str, b: str) -> float:
     return SequenceMatcher(None, a.lower(), b.lower()).ratio()
 
 
+def _words(text: str) -> set[str]:
+    return set(re.findall(r"\w+", text.lower()))
+
+
+def should_correct(candidate: str, ocr: str, ratio: float, ocr_texts: list[str]) -> bool:
+    """Whether a caption token paired with an OCR span is a misreading worth rewriting.
+
+    Three ways a pairing is not a misreading, all seen on one phase-12 screenshot:
+    the token is too far from the span (a different word); the token already
+    appears verbatim in some OCR span, so the caption read it right and only got
+    paired with a neighbour; or one is the other with words added or dropped
+    ("Sagittal Image" against "Sagittal"), which is a caption choosing its own
+    words, not a misspelling.
+    """
+    if not _CORRECTION_MIN_SIMILARITY <= ratio < _EXACT:
+        return False
+    token = re.compile(r"(?<!\w)" + re.escape(candidate.lower()) + r"(?!\w)")
+    if any(token.search(text.lower()) for text in ocr_texts):
+        return False
+    a, b = _words(candidate), _words(ocr)
+    return not (a <= b or b <= a)
+
+
 def correct_text(caption: str, text_regions: list[dict[str, object]]) -> tuple[list[Correction], str]:
     """Cross-check a caption against verbatim OCR spans and correct the close misses.
 
@@ -125,7 +155,7 @@ def correct_text(caption: str, text_regions: list[dict[str, object]]) -> tuple[l
             if _MIN_SIMILARITY <= ratio < _EXACT and ratio > best_ratio:
                 best_idx = i
                 best_ratio = ratio
-        if best_idx is None:
+        if best_idx is None or not should_correct(candidate, ocr_texts[best_idx], best_ratio, ocr_texts):
             continue
         verbatim = ocr_texts[best_idx]
         box = [int(v) for v in ocr_boxes[best_idx]]
@@ -172,17 +202,20 @@ def contains_likely_text(caption: str) -> bool:
     """Checks if a caption likely contains transcribed text, signage, or quoted names.
 
     Used by auto_verify_text to decide whether to trigger OCR automatically (Spec 13).
+    A capitalised long word alone does not count: proper nouns and sentence starts
+    are in most captions, and with them this fired on 60% of VisionBench's
+    text-free images (phase 12, 2026-10-01).
     """
     lower_caption = caption.lower()
     for word in re.findall(r"\b[a-z]+\b", lower_caption):
         if word in _SIGNAGE_WORDS:
             return True
 
-    for pattern in (_QUOTED, _CAMEL, _ALLCAPS, _CAP_LONG):
+    for pattern in (_QUOTED, _CAMEL, _ALLCAPS):
         if pattern.search(caption):
             return True
 
     return False
 
 
-__all__ = ["Correction", "contains_likely_text", "correct_text", "extract_candidates"]
+__all__ = ["Correction", "contains_likely_text", "correct_text", "extract_candidates", "should_correct"]

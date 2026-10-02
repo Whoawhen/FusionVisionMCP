@@ -90,3 +90,28 @@ class TestCorrectText:
         # The exact-match token is left untouched; only the misspelled one is fixed.
         assert corrected.count("FusionVisionMCP") == 2
         assert "FusionVisionMP" not in corrected
+
+
+class TestShouldCorrect:
+    """The three non-misreadings found on one VisionBench phase-12 screenshot (AFNI)."""
+
+    regions = (
+        _region("Axial", [23, 237, 68, 250]),
+        _region("Sagittal", [23, 263, 96, 277]),
+        _region("Coronal", [23, 290, 87, 303]),
+    )
+
+    def test_a_word_already_read_verbatim_is_left_alone(self) -> None:
+        corrections, corrected = correct_text('options such as "Sagittal" and "Coronal"', list(self.regions))
+        assert corrections == []
+        assert "Sagittal" in corrected
+
+    def test_a_different_word_is_not_a_misreading(self) -> None:
+        # "Sagittal" pairs with "Axial" at 0.62 once its own span is out of reach.
+        corrections, _ = correct_text('a button "Sagittal"', [self.regions[0]])
+        assert corrections == []
+
+    def test_added_words_are_not_a_misreading(self) -> None:
+        corrections, corrected = correct_text('options such as "Coronal Image"', [self.regions[2]])
+        assert corrections == []
+        assert "Coronal Image" in corrected

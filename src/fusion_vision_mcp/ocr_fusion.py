@@ -22,7 +22,7 @@ from typing import Any, Protocol
 from PIL import Image
 from PIL.Image import Image as PILImage
 
-from .textmatch import _MIN_SIMILARITY, Correction, _ratio, extract_candidates
+from .textmatch import _MIN_SIMILARITY, Correction, _ratio, extract_candidates, should_correct
 
 logger = logging.getLogger(__name__)
 
@@ -125,19 +125,21 @@ def fuse_caption_ocr(
     ocr_texts = [str(r.get("text", "")) for r in text_regions]
     ocr_boxes = [list(r.get("box", [])) for r in text_regions]
 
-    # Run specialist OCR on cropped, upscaled regions where available
-    specialist_texts: list[str] = []
-    for box in ocr_boxes:
-        if specialist is not None and len(box) == 4:
-            try:
-                crop = crop_and_upscale_text_region(image, box)
-                read_text = specialist.ocr(crop).strip()
-                specialist_texts.append(read_text if read_text else "")
-            except (RuntimeError, ValueError, TypeError, AttributeError, OSError) as e:
-                logger.warning("Specialist OCR crop failed: %s", e)
-                specialist_texts.append("")
-        else:
-            specialist_texts.append("")
+    # The specialist re-reads a region only once a caption token has been paired
+    # with it. It used to read every region up front: about 80 upscaled crops on one
+    # screenshot, which put caption's p90 latency past 200s in VisionBench phase 12.
+    specialist_texts: dict[int, str] = {}
+
+    def specialist_text(i: int) -> str:
+        if i not in specialist_texts:
+            specialist_texts[i] = ""
+            box = ocr_boxes[i]
+            if specialist is not None and len(box) == 4:
+                try:
+                    specialist_texts[i] = specialist.ocr(crop_and_upscale_text_region(image, box)).strip()
+                except (RuntimeError, ValueError, TypeError, AttributeError, OSError) as e:
+                    logger.warning("Specialist OCR crop failed: %s", e)
+        return specialist_texts[i]
 
     corrections: list[Correction] = []
     consensuses: list[TextConsensus] = []
@@ -159,7 +161,7 @@ def fuse_caption_ocr(
             continue
 
         florence_val = ocr_texts[best_idx]
-        specialist_val = specialist_texts[best_idx] if best_idx < len(specialist_texts) else ""
+        specialist_val = specialist_text(best_idx)
         if not specialist_val:
             specialist_val = florence_val
 
@@ -189,7 +191,9 @@ def fuse_caption_ocr(
         )
         consensuses.append(consensus)
 
-        if candidate != target_text:
+        if candidate != target_text and should_correct(
+            candidate, target_text, _ratio(candidate, target_text), [*ocr_texts, *specialist_texts.values()]
+        ):
             corrections.append(Correction(candidate, target_text, box, best_ratio))
             replacement = target_text.replace("\\", "\\\\")
             corrected = re.sub(
