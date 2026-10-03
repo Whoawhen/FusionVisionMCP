@@ -14,7 +14,7 @@ import re
 from collections.abc import Sequence
 from typing import Any, Final, cast
 
-from PIL.Image import Image
+from PIL.Image import Image, Transpose
 
 from fusion_vision_mcp import geometry, layout, question
 from fusion_vision_mcp.constants import DETECT_BOX_THRESHOLD, CaptionLevel
@@ -491,6 +491,69 @@ def _critique_one(
     return result
 
 
+#: A page reads as sideways when at least this many of its regions are tall...
+_SIDEWAYS_MIN_REGIONS: Final[int] = 3
+#: ...and they are at least this share of the regions counted.
+_SIDEWAYS_SHARE: Final[float] = 0.6
+#: A region is tall when its box is this many times taller than wide. RapidOCR reads a
+#: crop this shape turned on its side, and reports the box as found, so the regions of
+#: an ordinary read already say which way the page faces.
+_TALL_RATIO: Final[float] = 1.5
+#: Regions shorter than this are not counted: a lone "1" or "l" is tall upright too.
+_SIDEWAYS_MIN_CHARS: Final[int] = 3
+
+
+def _read_page(app: AppContext, image: Image) -> list[dict[str, Any]]:
+    """One page's regions in reading order, boxes in page coordinates."""
+    regions: list[dict[str, Any]] = []
+    for crop, left, top in layout.reading_blocks(image):
+        for region in app.ocr_engine.readtext(crop):
+            x1, y1, x2, y2 = region["box"]
+            box = [x1 + left, y1 + top, x2 + left, y2 + top]
+            regions.append({"text": region["text"], "confidence": region["confidence"], "box": box})
+    return regions
+
+
+def _looks_sideways(regions: list[dict[str, Any]]) -> bool:
+    counted = [r["box"] for r in regions if len(r["text"].strip()) >= _SIDEWAYS_MIN_CHARS]
+    tall = sum(int((y2 - y1) > _TALL_RATIO * (x2 - x1)) for x1, y1, x2, y2 in counted)
+    return tall >= _SIDEWAYS_MIN_REGIONS and tall >= _SIDEWAYS_SHARE * len(counted)
+
+
+def _unrotate_box(box: list[int], turn: Transpose, width: int, height: int) -> list[int]:
+    """Maps a box read on `image.transpose(turn)` back onto the `width` x `height` page."""
+    x1, y1, x2, y2 = box
+    if turn is Transpose.ROTATE_90:  # counter-clockwise: page (x, y) -> (y, width - 1 - x)
+        return [width - 1 - y2, x1, width - 1 - y1, x2]
+    # ROTATE_270, clockwise: page (x, y) -> (height - 1 - y, x)
+    return [y1, height - 1 - x2, y2, height - 1 - x1]
+
+
+def _read_upright(app: AppContext, image: Image) -> list[dict[str, Any]]:
+    """Reads the page, and again turned a quarter each way if its text runs sideways.
+
+    VisionBench phase 13 (2026-10-01): turning images 90 degrees cost 26 points of
+    key-phrase recall. RapidOCR reads a sideways line crop by turning it, but a whole
+    sideways page also defeats column detection, and on a turned article it kept 1,096
+    of the 2,178 characters it read upright. The turn that reads the most confident
+    characters wins, and its boxes are mapped back onto the page as sent. An upright
+    page costs nothing extra: the check reads the regions it already has.
+    """
+    regions = _read_page(app, image)
+    if not _looks_sideways(regions):
+        return regions
+
+    def chars(found: list[dict[str, Any]]) -> int:
+        return sum(len(r["text"].strip()) for r in found)
+
+    best = regions
+    for turn in (Transpose.ROTATE_90, Transpose.ROTATE_270):
+        turned = _read_page(app, image.transpose(turn))
+        if chars(turned) > chars(best):
+            best = [{**r, "box": _unrotate_box(r["box"], turn, image.width, image.height)} for r in turned]
+    return best
+
+
 def ocr_pages(app: AppContext, images: Sequence[Image]) -> list[dict[str, Any]]:
     """Transcribe each page with `app.ocr_engine`, splitting side-by-side columns first.
 
@@ -502,25 +565,13 @@ def ocr_pages(app: AppContext, images: Sequence[Image]) -> list[dict[str, Any]]:
     test_ocr_textless_image_returns_no_text` pins the correct behaviour for the
     direct tool; routing everything through here extends it to the other two.
 
-    Returns one `{"text", "text_regions"}` dict per page. Boxes are in page
-    coordinates: each block's boxes are shifted by the block's origin on the page.
+    Returns one `{"text", "text_regions"}` dict per page. Boxes are in the
+    coordinates of the page as sent, including a page read turned upright.
     """
     pages: list[dict[str, Any]] = []
     for image in images:
-        page_texts: list[str] = []
-        page_text_regions: list[dict[str, Any]] = []
-
-        for crop, left, top in layout.reading_blocks(image):
-            for region in app.ocr_engine.readtext(crop):
-                box = region["box"]
-                box[0] += left
-                box[1] += top
-                box[2] += left
-                box[3] += top
-                page_texts.append(region["text"])
-                page_text_regions.append({"text": region["text"], "confidence": region["confidence"], "box": box})
-
-        pages.append({"text": "\n".join(page_texts), "text_regions": page_text_regions})
+        regions = _read_upright(app, image)
+        pages.append({"text": "\n".join(r["text"] for r in regions), "text_regions": regions})
     return pages
 
 
