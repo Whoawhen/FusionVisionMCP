@@ -70,7 +70,12 @@ class GroundingDino:
 
     def __init__(self, model_id: str = DEFAULT_GROUNDING_DINO_MODEL, device: str | None = None) -> None:
         self.device = resolve_device(device)
-        self.torch_dtype = torch.float32 if self.device == "cpu" else torch.float16
+        # Full precision on every device. Transformers' Grounding DINO builds float32
+        # tensors inside its text encoder, so half precision fails on CUDA ("mat1 and mat2
+        # must have the same dtype"); it never ran there until VisionBench's first GPU run
+        # (2026-10-03). The model is small, and float32 keeps scores, and so the 0.35 and
+        # 0.15 thresholds, the same as on CPU.
+        self.torch_dtype = torch.float32
 
         self.processor = AutoProcessor.from_pretrained(model_id)
         self.model = AutoModelForZeroShotObjectDetection.from_pretrained(model_id, dtype=self.torch_dtype).to(
