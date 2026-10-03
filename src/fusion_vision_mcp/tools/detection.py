@@ -47,18 +47,23 @@ def register(mcp: MCPServer) -> None:
         says which model ran and `_routing` why.
 
         On photographs it uses Grounding DINO and keeps boxes scoring 0.35 or more,
-        which is what lets it answer "not here": asked for a category that was
-        absent, it returned boxes on 2.8% of 143 real COCO scenes. On those scenes
-        it boxed 66% of the objects in scenes with 3 or fewer instances and 55% in
-        crowded ones. About a third of its boxes miss a real instance (precision
-        63%), so read `scores`: a box just above 0.35 is a weak candidate.
+        which is what lets it answer "not here" -- but only for something unlike
+        anything in the scene. Asked for a COCO category absent from a real photo,
+        it returned boxes on 2.8% of 143 scenes; asked for a plausible neighbour
+        (a fork in a kitchen, a smartphone on a screenshot), it boxed something on
+        62% of 130 generalist images, screenshots, documents and game UI included.
+        It boxed 66% of the objects in COCO scenes with 3 or fewer instances and
+        55% in crowded ones, about half on screenshots and documents. About a third
+        of its boxes miss a real instance, so read `scores`: a box just above 0.35
+        is a weak candidate.
 
-        Flat vector art and clip art go to Florence-2's grounding head instead,
-        since Grounding DINO over-detects there. That path has no `scores`, and its
-        label is the query echoed back rather than a classification: asked for
-        "elephant" on a drawing of a dog, it boxes the dog and labels it
-        "elephant". On that path a box does not confirm the object is present --
-        confirm presence with `caption` or `query_image`.
+        Flat vector art and clip art go to Florence-2's grounding head instead.
+        That path has no `scores`, and its label is the query echoed back rather
+        than a classification: asked for "elephant" on a drawing of a dog, it
+        boxes the dog and labels it "elephant". Grounding DINO does no better
+        there -- it boxed an absent object on 95% of flat images and found fewer of
+        the real ones. On either path, a box does not confirm the object is
+        present: confirm presence with `caption` or `query_image`.
 
         If `return_annotated` is true, the return value becomes a dictionary containing
         the regular results plus an `annotated_image_path` key.
