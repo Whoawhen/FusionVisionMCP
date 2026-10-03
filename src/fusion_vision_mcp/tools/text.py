@@ -43,8 +43,8 @@ def register(mcp: MCPServer) -> None:
         Uses PaddleOCR's PP-OCRv6 English models. Reads documents, tables and
         forms closely (prices, quantities and punctuation included) and handles
         scene text in photos -- on 200 TextVQA photos, the answer's text appeared
-        in its output for 53% of images. Small, angled or distant text in a busy
-        photo is still the weak spot. Servers started with non-English
+        in its output for 58.5% of images. Small, angled or distant text in a busy
+        photo is still the weak spot. A page sent sideways is read turned upright. Servers started with non-English
         `--ocr-languages` use EasyOCR here instead.
 
         This is the right tool for *any* text in an image: dense printed text

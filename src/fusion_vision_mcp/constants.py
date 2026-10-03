@@ -77,6 +77,14 @@ DEFAULT_SAM2_MODEL: Final[str] = "facebook/sam2.1-hiera-small"
 #: Calibrated for PP-OCRv6 only: EasyOCR's scores run lower and mean something different.
 OCR_MIN_CONFIDENCE: Final[float] = 0.75
 
+#: PP-OCR's detector keeps a candidate text box when its mean probability reaches this.
+#: RapidOCR's default, 0.5, is tuned for documents; on 200 TextVQA photos, answer recall
+#: climbs 55.0% (0.5) -> 57.0 (0.45) -> 58.5 (0.4) and plateaus (58.0 at 0.35 and 0.3).
+#: Held constant: rendered pages 97.5% of lines, the held-out sourced images' lines 75.6% ->
+#: 76.2%, text-free fixtures still empty -- the 0.75 recognition floor above still decides
+#: what is returned. VisionBench `benchmarks/ppocr_det_sweep.py`, 2026-10-03.
+OCR_DET_BOX_THRESHOLD: Final[float] = 0.4
+
 #: SAM2 decodes masks on a fixed grid regardless of input size. Masks are upscaled
 #: to the image's own pixels for reporting, but detail finer than
 #: `max(image side) / MASK_DECODE_RESOLUTION` pixels is not actually resolved.

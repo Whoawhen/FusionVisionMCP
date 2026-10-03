@@ -115,6 +115,17 @@ on VisionBench's 200-photo TextVQA set before shipping (`VisionBench/benchmarks/
 58.6% vs 40.3% on text questions without column splitting. It also reads the invoice fixture exactly, where
 EasyOCR produced `812.50` for $12.50 and `S11.00` for $11.00.
 
+**2026-10-03: 58.5%, from the detector, not the recognizer.** Column zoning and the sideways re-read (see the
+layout section) took TextVQA recall from 53.0% to 55.0%. Then `VisionBench/benchmarks/ppocr_det_sweep.py` swept
+PP-OCR's *detector*, never tuned before, through the server's own `ocr_pages` with three controls: rendered pages
+(exact lines), the 100 held-out sourced images by line, and the text-free fixtures. Lowering `Det.box_thresh`
+(`OCR_DET_BOX_THRESHOLD`) from RapidOCR's document-tuned 0.5 climbs smoothly to a plateau — 55.0 → 57.0 (0.45) →
+**58.5 (0.4)** → 58.0 (0.35, 0.3) — with every control held (rendered 97.5%, held-out lines 75.6 → 76.2%,
+text-free empty). Rejected: a larger detector side length, `thresh` 0.2, `unclip` 2.0 and a 1.5x upscale gained
+less or lost lines. The PP-OCRv5 server detector reads photos best (61%) but drops rendered pages to 87%; routing
+it to photos only reached 62% while losing on the held-out images and rendered pages and doubling photo latency,
+so it is a trade, not a gain, and was not shipped.
+
 Four things about that swap are load-bearing:
 
 - **No EasyOCR setting would have closed the gap.** Magnification (1.5x, 2x), beam-search decoding and turning

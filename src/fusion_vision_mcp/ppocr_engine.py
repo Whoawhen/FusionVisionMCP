@@ -18,7 +18,7 @@ from typing import Any
 import numpy as np
 from PIL.Image import Image
 
-from fusion_vision_mcp.constants import OCR_MIN_CONFIDENCE
+from fusion_vision_mcp.constants import OCR_DET_BOX_THRESHOLD, OCR_MIN_CONFIDENCE
 
 
 class PPOCREngine:
@@ -33,7 +33,7 @@ class PPOCREngine:
         if self._engine is None:
             from rapidocr import LangRec, OCRVersion, RapidOCR
 
-            self._engine = RapidOCR(params={"Rec.lang_type": LangRec.EN, "Rec.ocr_version": OCRVersion.PPOCRV6})
+            self._engine = RapidOCR(params=engine_params(LangRec.EN, OCRVersion.PPOCRV6))
         return self._engine
 
     def ocr(self, image: Image, max_new_tokens: int = 256) -> str:
@@ -44,6 +44,14 @@ class PPOCREngine:
         """Spans as `{text, confidence, box}`, box = [x1, y1, x2, y2] in image pixels."""
         result = self._load()(np.array(image.convert("RGB")))
         return spans(result.boxes, result.txts, result.scores, self.min_confidence)
+
+
+def engine_params(lang: Any, version: Any) -> dict[str, Any]:
+    """RapidOCR settings: the English PP-OCRv6 recognizer, and a detector tuned for photos.
+
+    Split out so a test can pin them without loading the ONNX models.
+    """
+    return {"Rec.lang_type": lang, "Rec.ocr_version": version, "Det.box_thresh": OCR_DET_BOX_THRESHOLD}
 
 
 def spans(

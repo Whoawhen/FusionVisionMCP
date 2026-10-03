@@ -50,3 +50,13 @@ async def test_non_english_ocr_falls_back_to_easyocr(languages: tuple[str, ...],
         ocr_languages=languages,
     ) as app:
         assert (app.ocr_engine is app.ocr_specialist) is shared
+
+
+def test_detector_uses_the_photo_tuned_box_threshold() -> None:
+    # 0.5 (RapidOCR's default) read 55.0% of TextVQA answers; 0.4 read 58.5% with the
+    # rendered-page and text-free controls unchanged.
+    from fusion_vision_mcp.ppocr_engine import engine_params
+
+    params = engine_params("en", "v6")
+    assert params["Det.box_thresh"] == 0.4
+    assert params["Rec.lang_type"] == "en" and params["Rec.ocr_version"] == "v6"
