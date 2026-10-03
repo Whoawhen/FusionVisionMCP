@@ -237,3 +237,6 @@ COUNTING_IMPLEMENTATION_PLAN.md
 
 # Claude Code runtime lock (carries a live PID; meaningless to version)
 .claude/scheduled_tasks.lock
+
+# CUDA environment used only for GPU VisionBench runs; delete the folder to remove it.
+.venv-cuda/
