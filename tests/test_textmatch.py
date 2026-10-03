@@ -115,3 +115,10 @@ class TestShouldCorrect:
         corrections, corrected = correct_text('options such as "Coronal Image"', [self.regions[2]])
         assert corrections == []
         assert "Coronal Image" in corrected
+
+    def test_case_spacing_and_accents_alone_are_not_a_misreading(self) -> None:
+        # The caption read this Czech invoice line right; the OCR got an accent wrong.
+        regions = [_region("NEJSEM PLÀTCE \nDPH", [391, 637, 531, 652])]
+        corrections, corrected = correct_text('a field titled "Nejsem Plátce DPH"', regions)
+        assert corrections == []
+        assert "Nejsem Plátce DPH" in corrected

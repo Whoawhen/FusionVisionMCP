@@ -15,6 +15,7 @@ already produce, so it adds no model load and is unit-testable in isolation.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from typing import cast
@@ -99,17 +100,29 @@ def _words(text: str) -> set[str]:
     return set(re.findall(r"\w+", text.lower()))
 
 
+def _folded(text: str) -> str:
+    """Lowercase, accents stripped, whitespace collapsed: what two readings share if same."""
+    decomposed = unicodedata.normalize("NFKD", text.lower())
+    return " ".join("".join(c for c in decomposed if not unicodedata.combining(c)).split())
+
+
 def should_correct(candidate: str, ocr: str, ratio: float, ocr_texts: list[str]) -> bool:
     """Whether a caption token paired with an OCR span is a misreading worth rewriting.
 
-    Three ways a pairing is not a misreading, all seen on one phase-12 screenshot:
-    the token is too far from the span (a different word); the token already
+    Differences of case, spacing or accents alone are not a misreading. Nor are
+    three others, all seen on one phase-12 screenshot: the token is too far from
+    the span (a different word); the token already
     appears verbatim in some OCR span, so the caption read it right and only got
     paired with a neighbour; or one is the other with words added or dropped
     ("Sagittal Image" against "Sagittal"), which is a caption choosing its own
     words, not a misspelling.
     """
     if not _CORRECTION_MIN_SIMILARITY <= ratio < _EXACT:
+        return False
+    # Case, spacing and accents only: the same reading, so a rewrite gains nothing and
+    # can lose -- on a Czech invoice it replaced a correct "Nejsem Plátce DPH" with the
+    # OCR's "NEJSEM PLÀTCE DPH", split over two lines (phase 12 rerun, 2026-10-02).
+    if _folded(candidate) == _folded(ocr):
         return False
     token = re.compile(r"(?<!\w)" + re.escape(candidate.lower()) + r"(?!\w)")
     if any(token.search(text.lower()) for text in ocr_texts):
