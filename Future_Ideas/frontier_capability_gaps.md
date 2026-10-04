@@ -62,15 +62,15 @@ in its description. Targets (agreed 2026-10-02 as reasonable starting points, no
 | Tool | Now | Good |
 | --- | --- | --- |
 | `ocr`, clean screens and documents | 97.3% of lines verbatim (phase 14) | ≥ 95% — met |
-| `ocr`, real images by line | 75% (label ceiling ~80%) | ≥ 75% — met |
-| `ocr`, photos (TextVQA) | 53% | ≥ 60% |
-| `ocr`, rotated / blurred | −26 / −52 points (phase 13) | rotation ≤ −5; blur documented as a limit |
+| `ocr`, real images by line | 76.2% (label ceiling ~80%) | ≥ 75% — met |
+| `ocr`, photos (TextVQA) | 58.5% (was 53%; detector box_thresh 0.4, 2026-10-03) | ≥ 60% |
+| `ocr`, rotated / blurred | −5.7 / −52 points (rotation was −26) | rotation ≤ −5 — essentially met; blur documented as a limit |
 | `caption` | 50% of label keywords (ceiling ~75%) | ≥ 60% |
 | `caption(auto_verify_text)` | lowered key phrases 25.5% → 20.8% | never makes a caption worse |
 | `detect_objects` | 53% recall; absent object boxed 62% | ≥ 60% recall; limit stated in description — stated |
 | `count_objects` | 36% exact; consensus flag catches every wrong count | ≥ 50% exact on scenes of 3 or fewer; flag stays reliable |
 | `query_image` | 68% answer contained; position 0% | ≥ 75%; position flagged or routed |
-| `spatial_relations` | contact 92%, containment 68% | containment ≥ 80% |
+| `spatial_relations` | contact 92%, containment 83.8% (was 67.6%; `enclosed_by`, 2026-10-03) | containment ≥ 80% — met |
 | `score_aesthetics` | ρ 0.49 | ≥ 0.5 |
 | AI-defect checks | sensitivity 46%, specificity 85% | ≥ 60% / ≥ 85% |
 
@@ -85,3 +85,4 @@ exact boxes outright.
 - 2026-09-30: list created. Nothing scheduled yet; the Gemini backend branch stays parked.
 - 2026-10-01: Evidence column filled from VisionBench phases 7, 10, 11 (25-image sample), 12, 13 and 14.
 - 2026-10-02: "good" targets and the stop rule added; fine-tuning waits for them.
+- 2026-10-03: OCR photos 53 → 58.5%, rotation −26 → −5.7, containment 67.6 → 83.8% (met). GPU benchmark runs crash the laptop on phase 11 (hypervisor I/O MMU fault); benchmarks run on CPU, GPU only for phases 7 and 10.
