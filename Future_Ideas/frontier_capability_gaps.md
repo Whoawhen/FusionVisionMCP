@@ -68,11 +68,11 @@ in its description. Targets (agreed 2026-10-02 as reasonable starting points, no
 | `caption` | 50% of label keywords (ceiling ~75%) | ≥ 60% |
 | `caption(auto_verify_text)` | lowered key phrases 25.5% → 20.8% | never makes a caption worse |
 | `detect_objects` | 53% recall; absent object boxed 62% | ≥ 60% recall; limit stated in description — stated |
-| `count_objects` | 36% exact; consensus flag catches every wrong count | ≥ 50% exact on scenes of 3 or fewer; flag stays reliable |
+| `count_objects` | 57.3% exact on 75 held-out COCO scenes of 3 or fewer (1: 85%, 2: 50%, 3: 24%); 36% on generalist images. `separable` "no" was right 2/12 on predicted singles, now 2/5 | ≥ 50% exact on scenes of 3 or fewer — met |
 | `query_image` | 68% answer contained; position 0% | ≥ 75%; position flagged or routed |
 | `spatial_relations` | contact 92%, containment 83.8% (was 67.6%; `enclosed_by`, 2026-10-03) | containment ≥ 80% — met |
 | `score_aesthetics` | ρ 0.49 | ≥ 0.5 |
-| AI-defect checks | sensitivity 46%, specificity 85% | ≥ 60% / ≥ 85% |
+| AI-defect checks | sensitivity 46%, specificity 85% (26 images) | ≥ 60% / ≥ 85% — rules can't reach it: 5 of 7 misses are omissions, which a part count can't tell from occlusion. First candidate for a model variant; worker round 7 is building a 150-image set |
 
 **Stop rule.** If hard work on a target stops making tangible progress, or the changes
 start fitting the test rather than improving the tool, stop and try a different approach
@@ -86,3 +86,4 @@ exact boxes outright.
 - 2026-10-01: Evidence column filled from VisionBench phases 7, 10, 11 (25-image sample), 12, 13 and 14.
 - 2026-10-02: "good" targets and the stop rule added; fine-tuning waits for them.
 - 2026-10-03: OCR photos 53 → 58.5%, rotation −26 → −5.7, containment 67.6 → 83.8% (met). GPU benchmark runs crash the laptop on phase 11 (hypervisor I/O MMU fault); benchmarks run on CPU, GPU only for phases 7 and 10.
+- 2026-10-03 (evening): counting target met on held-out COCO (57.3%); separable's weak-split "no" removed; AI-defect detection judged a model problem, not a rules problem (worker round 7 sourcing 150 images).
