@@ -209,6 +209,13 @@ class TestSeparability:
         assert _separability({"count": 1, "silhouette": {"lobes": 1, "by_radial": 0}}) == "yes"
         assert _separability({"count": 1, "silhouette": {"lobes": 4, "by_radial": 0}}) == "no"
 
+    def test_a_weak_distance_split_is_not_called_a_collapse(self) -> None:
+        """COCO holdout: a single person split at the neck, support 0.2 -> was "no", now "unknown"."""
+        weak = {"lobes": 2, "by_distance": 2, "distance_support": 0.2, "by_radial": 0}
+        assert _separability({"count": 1, "silhouette": weak}) == "unknown"
+        strong = {**weak, "distance_support": 0.8}
+        assert _separability({"count": 1, "silhouette": strong}) == "no"
+
     def test_agreeing_estimators_are_trusted(self) -> None:
         assert _separability({"count": 1, "silhouette": {"lobes": 1, "by_radial": 1, "agreement": True}}) == "yes"
         assert _separability({"count": 1, "silhouette": {"lobes": 6, "by_radial": 6, "agreement": True}}) == "no"

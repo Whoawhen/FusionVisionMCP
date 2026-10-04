@@ -79,6 +79,11 @@ def _region_label_consensus(processor: Processor, image: Image, object_name: str
     return count
 
 
+#: A silhouette split into several lobes counts as a collapse only when that reading held
+#: over at least this share of the distance-transform level sweep (`distance_support`).
+_MIN_SPLIT_SUPPORT: Final[float] = 0.5
+
+
 def _separability(result: dict[str, Any]) -> str:
     """Surfaces whether the reported `count` is a real tally or a structural collapse.
 
@@ -113,7 +118,17 @@ def _separability(result: dict[str, Any]) -> str:
     # by_radial == 0: the rosette estimator was not applicable (not a rosette shape),
     # so by_distance is the only signal the geometry module can provide.
     if by_radial <= 0:
-        return "yes" if by_distance <= 1 else "no"
+        if by_distance <= 1:
+            return "yes"
+        # A split that held over only a sliver of the level sweep is a narrow point in
+        # one outline -- a person's neck, a bird's wing -- not evidence of a collapse. On
+        # the COCO holdout (2026-10-03) every "no" from this path was a true singleton
+        # (8 of 8, support 0.08-0.24), while the real collapses all came through the
+        # rosette path below. Weak evidence says neither yes nor no.
+        support = silhouette.get("distance_support")
+        if isinstance(support, (int, float)) and not math.isnan(support) and support < _MIN_SPLIT_SUPPORT:
+            return "unknown"
+        return "no"
 
     # by_radial > 0: the rosette estimator was applicable. Agreement is the key signal.
     if agreement:
