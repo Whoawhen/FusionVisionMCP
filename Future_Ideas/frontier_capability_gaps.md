@@ -18,15 +18,15 @@ count, exact text, a measurement.
 | --- | --- | --- | --- |
 | Locate, count, segment, measure contact/containment | Grounding DINO + SAM2, `spatial_relations` | **Ahead.** Frontier models don't return masks or contact measurements. | Phase 4 (verified labels): contact 91.9%, containment 67.6% (the coffee-cup ring failure) |
 | Image quality / aesthetics | LAION, MUSIQ, composition critique | On par for comparing similar images | Phase 7 (2026-10-01): Spearman rho 0.49, critique token F1 27%, dense-caption box recall 74% |
-| Printed text (OCR) | PP-OCRv6 English, column splitting | Good on English print. **No handwriting, formulas or strong multilingual models.** | TextVQA answer recall 53%. Phase 14 (2026-10-01), 60 rendered pages with exact line boxes: 98.7% of lines located, 95% of those verbatim, 98.8% character accuracy; the weak template is slides (47% verbatim: a false column split cuts words in half). Real images by line (phase 14 sourced): 75% recall against a ~80% label ceiling; documents 64%, signage 63%, non-English 71%. Phase 13: blur costs 52 points of key-phrase recall, a 90° turn 26 (no orientation handling). Phase 11 sample: empty on only 40% of text-free images |
+| Printed text (OCR) | PP-OCRv6 English, column splitting | Good on English print. **No handwriting, formulas or strong multilingual models.** | TextVQA answer recall 53%. Phase 14 (2026-10-01), 60 rendered pages with exact line boxes: 98.7% of lines located, 95% of those verbatim, 98.8% character accuracy; the weak template is slides (47% verbatim: a false column split cuts words in half). Real images by line (phase 14 sourced): 75% recall against a ~80% label ceiling; documents 64%, signage 63%, non-English 71%. Phase 13: blur costs 52 points of key-phrase recall. Phase 11 full (400 images, 2026-10-04): key phrases 74.9% (screenshots 89%, charts 87%, artwork 15%, comics 46%); empty on 87.1% of text-free images |
 | Document structure (tables, forms, key-value fields) | Plain lines of text | **Missing.** No table output, no form fields. | — |
 | Charts and diagrams (read values, trends) | Caption + OCR only | **Missing** | — |
-| Screenshots / UI (elements, "where is the Save button") | OCR boxes can find text labels | **Partial.** No detector for buttons or icons. | Phase 11 sample: OCR key phrases 87% on app/web, 50% on game UI; `detect_objects` recall 40% on app/web, and an absent object is still boxed 64% of the time across kinds (flat images take Florence-2's path) |
-| Open visual Q&A, reasoning | Moondream2 | **Largest gap.** A small model paraphrases and misses details. | TextVQA: 48% exact, 77% answer contained. Phase 11 sample: 68% contained, position questions 0%. Phase 12: `check_consistency` catches 25% of wrong answers, quiet on 94% of right ones |
+| Screenshots / UI (elements, "where is the Save button") | OCR boxes can find text labels | **Partial.** No detector for buttons or icons. | Phase 11 full: OCR key phrases 89% on app/web, 76% on game UI; `detect_objects` recall 34% on app/web, 56% on game UI; an absent object is boxed 70% of the time across kinds |
+| Open visual Q&A, reasoning | Moondream2 | **Largest gap.** A small model paraphrases and misses details. | TextVQA: 48% exact, 77% answer contained. Phase 11 full: 78.8% contained (yes/no 98%, colour 87%, count 70%, position 70%, reading text 58%; says 'no text' correctly 89%). Phase 12: `check_consistency` catches 25% of wrong answers, quiet on 94% of right ones |
 | Naming a species, landmark, style or scene type | CLIP powers only `style_context` | **Missing as a tool**, though CLIP is already loaded | — |
 | Comparing two images (what changed) | `compare_with` gives scores only | **Missing** general diff | — |
 | Depth, camera angle, foreground/background | None | Missing | — |
-| AI-generation defects | `structured_analysis` (anatomy) + EXIF check | **Weak** | Phase 10 (2026-10-01): 6/13 sensitivity, 11/13 specificity |
+| AI-generation defects | `structured_analysis` (anatomy) + EXIF check | **Weak** | Phase 10 (2026-10-01): 6/13 sensitivity, 11/13 specificity. Phase 11 full: 14/24 sensitivity, 9/16 specificity |
 | Video | None | Out of scope for now | — |
 
 ## Candidate additions, in rough order of value per cost
@@ -50,8 +50,8 @@ documents, charts, AI-generated images, artwork, photos). Its labels come from a
 frontier-class model, so it doubles as a rough frontier comparison: how close
 FusionVision gets to the labels' own repeatability ceiling (about 90% for key phrases,
 75% for caption keywords) shows where it is weakest, kind by kind. Add the per-kind
-numbers to the Evidence column once the first phase-11 run is in. A 25-image
-sample is in (2026-10-01); a full 400-image run is still to do.
+numbers to the Evidence column as runs come in. The first full 400-image run finished
+2026-10-04 (8.5 h on the CPU, 0 tool errors).
 
 ## What "good" means, before any fine-tuning
 
@@ -65,14 +65,14 @@ in its description. Targets (agreed 2026-10-02 as reasonable starting points, no
 | `ocr`, real images by line | 76.2% (label ceiling ~80%) | ≥ 75% — met |
 | `ocr`, photos (TextVQA) | 58.5% (was 53%; detector box_thresh 0.4, 2026-10-03) | ≥ 60% |
 | `ocr`, rotated / blurred | −5.7 / −52 points (rotation was −26) | rotation ≤ −5 — essentially met; blur documented as a limit |
-| `caption` | 50% of label keywords (ceiling ~75%) | ≥ 60% |
+| `caption` | 54.1% of label keywords on 400 images (ceiling ~75%); photos 78%, artwork 76%, game UI 42%, AI images 48% | ≥ 60% |
 | `caption(auto_verify_text)` | lowered key phrases 25.5% → 20.8% | never makes a caption worse |
-| `detect_objects` | 53% recall; absent object boxed 62% | ≥ 60% recall; limit stated in description — stated |
-| `count_objects` | 57.3% exact on 75 held-out COCO scenes of 3 or fewer (1: 85%, 2: 50%, 3: 24%); 36% on generalist images. `separable` "no" was right 2/12 on predicted singles, now 2/5 | ≥ 50% exact on scenes of 3 or fewer — met |
-| `query_image` | 68% answer contained; position 0% | ≥ 75%; position flagged or routed |
+| `detect_objects` | 59.2% recall, 42.7% precision on 400 images (app/web 34%); absent object boxed 70% | ≥ 60% recall — essentially met; limit stated in description — stated |
+| `count_objects` | 57.3% exact on 75 held-out COCO scenes of 3 or fewer (1: 85%, 2: 50%, 3: 24%); 41.6% on 400 generalist images (MAE 3.4; screenshots and game UI 24%). `separable` "no" was right 2/12 on predicted singles, now 2/5 | ≥ 50% exact on scenes of 3 or fewer — met |
+| `query_image` | 78.8% answer contained on 400 images; position 69.7% (n=76; the 0% was a 25-image sample) | ≥ 75% — met |
 | `spatial_relations` | contact 92%, containment 83.8% (was 67.6%; `enclosed_by`, 2026-10-03) | containment ≥ 80% — met |
 | `score_aesthetics` | ρ 0.49 | ≥ 0.5 |
-| AI-defect checks | sensitivity 46%, specificity 85% (26 images) | ≥ 60% / ≥ 85% — rules can't reach it: 5 of 7 misses are omissions, which a part count can't tell from occlusion. First candidate for a model variant; worker round 7 is building a 150-image set |
+| AI-defect checks | sensitivity 46%, specificity 85% (26 images); phase 11 full: 58%, 56% (40 images) | ≥ 60% / ≥ 85% — rules can't reach it: 5 of 7 misses are omissions, which a part count can't tell from occlusion. First candidate for a model variant; worker round 7 is building a 150-image set |
 
 **Stop rule.** If hard work on a target stops making tangible progress, or the changes
 start fitting the test rather than improving the tool, stop and try a different approach
@@ -87,3 +87,4 @@ exact boxes outright.
 - 2026-10-02: "good" targets and the stop rule added; fine-tuning waits for them.
 - 2026-10-03: OCR photos 53 → 58.5%, rotation −26 → −5.7, containment 67.6 → 83.8% (met). GPU benchmark runs crash the laptop on phase 11 (hypervisor I/O MMU fault); benchmarks run on CPU, GPU only for phases 7 and 10.
 - 2026-10-03 (evening): counting target met on held-out COCO (57.3%); separable's weak-split "no" removed; AI-defect detection judged a model problem, not a rules problem (worker round 7 sourcing 150 images).
+- 2026-10-04: first full phase 11 run (400 images, CPU). `query_image` met (78.8%, after a grader fix for "no text" questions); `detect_objects` recall essentially met (59.2%); caption 54.1% is the main open target besides AI defects. Phase 11's AI-defect numbers disagree with phase 10's specificity (56% vs 85%), more reason to wait for round 7's 150 images.
