@@ -220,7 +220,19 @@ def relation(a: Mask, b: Mask) -> dict[str, Any]:
     missing from its own mask) measures as containing that thing rather than
     barely overlapping it. A hole large enough to plausibly be real structure
     (a ring, a frame) is left alone.
+
+    ``a_enclosed_by_b`` / ``b_enclosed_by_a`` answer the question that rule leaves
+    open: the share of one mask lying within the other's *outline*, every hole
+    filled. Seen from above, a cup's mask is its rim, and the tea is the rim's
+    hole: ``a_inside_b`` is 0 (no material overlap) while ``a_enclosed_by_b`` is
+    1.0. Measured on VisionBench phase 4 (2026-10-03), 10 of the 11 containment
+    pairs missed were a cup and its coffee or tea. An outline only encloses what
+    it closes around: an open shape (a C, a cup seen from the side) encloses
+    nothing, and something in a ring's opening is enclosed but not inside.
     """
+    if a.shape != b.shape:
+        raise ValueError(f"masks must share a shape; got {a.shape} and {b.shape}")
+    outline_a, outline_b = binary_fill_holes(a), binary_fill_holes(b)
     a = _fill_small_holes(a, _MAX_FILLED_RELATION_HOLE_FRACTION)
     b = _fill_small_holes(b, _MAX_FILLED_RELATION_HOLE_FRACTION)
     area_a, area_b = int(a.sum()), int(b.sum())
@@ -230,12 +242,15 @@ def relation(a: Mask, b: Mask) -> dict[str, Any]:
             "gap": float("nan"),
             "a_inside_b": float("nan"),
             "b_inside_a": float("nan"),
+            "a_enclosed_by_b": float("nan"),
+            "b_enclosed_by_a": float("nan"),
             "embed_depth": float("nan"),
         }
 
-    if a.shape != b.shape:
-        raise ValueError(f"masks must share a shape; got {a.shape} and {b.shape}")
-
+    enclosed = {
+        "a_enclosed_by_b": float((a & outline_b).sum()) / area_a,
+        "b_enclosed_by_a": float((b & outline_a).sum()) / area_b,
+    }
     both = a & b
     if not both.any():
         gap = float(distance_transform_edt(~b)[a].min())
@@ -244,6 +259,7 @@ def relation(a: Mask, b: Mask) -> dict[str, Any]:
             "gap": gap,
             "a_inside_b": 0.0,
             "b_inside_a": 0.0,
+            **enclosed,
             "embed_depth": 0.0,
         }
 
@@ -252,6 +268,7 @@ def relation(a: Mask, b: Mask) -> dict[str, Any]:
         "gap": 0.0,
         "a_inside_b": float(both.sum()) / area_a,
         "b_inside_a": float(both.sum()) / area_b,
+        **enclosed,
         "embed_depth": float(distance_transform_edt(b)[both].mean()),
     }
 

@@ -116,6 +116,35 @@ def test_a_large_ring_hole_is_not_filled() -> None:
     assert result["a_inside_b"] < 0.5
 
 
+def test_tea_in_a_cup_seen_from_above_is_enclosed_not_inside() -> None:
+    """The phase-4 failure: SAM2 segments the cup as its rim, and the tea fills the hole."""
+    rim = disc(100, 100, 60) & ~disc(100, 100, 48)
+    tea = disc(100, 100, 47)
+    result = geometry.relation(tea, rim)
+    assert result["a_inside_b"] == 0.0
+    assert result["a_enclosed_by_b"] == pytest.approx(1.0)
+    assert result["b_enclosed_by_a"] == 0.0
+
+
+def test_an_open_shape_encloses_nothing() -> None:
+    """A cup seen from the side, or a C: no closed outline, so nothing is enclosed."""
+    c_shape = (disc(100, 100, 60) & ~disc(100, 100, 48)) & ~rect(100, 90, 170, 110)
+    inside_the_c = disc(100, 100, 40)
+    assert geometry.relation(inside_the_c, c_shape)["a_enclosed_by_b"] == 0.0
+
+
+def test_separate_objects_are_not_enclosed() -> None:
+    result = geometry.relation(disc(50, 50, 20), disc(150, 150, 20))
+    assert result["a_enclosed_by_b"] == 0.0 and result["b_enclosed_by_a"] == 0.0
+
+
+def test_something_in_a_rings_opening_is_enclosed_but_not_inside() -> None:
+    real_ring = disc(100, 100, 60) & ~disc(100, 100, 40)
+    result = geometry.relation(disc(100, 100, 20), real_ring)
+    assert result["a_inside_b"] < 0.5
+    assert result["a_enclosed_by_b"] == pytest.approx(1.0)
+
+
 def test_elongation_separates_a_bar_from_a_square() -> None:
     assert geometry.elongation(rect(10, 95, 190, 105)) > 8
     assert geometry.elongation(rect(80, 80, 120, 120)) == pytest.approx(1.0, abs=0.15)

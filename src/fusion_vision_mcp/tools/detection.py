@@ -372,7 +372,15 @@ def register(mcp: MCPServer) -> None:
         and the grip it holds that come back `separate` with a large `gap` are not
         in contact; a hand `overlapping` a shield with `a_inside_b` near 1.0 and a
         large `embed_depth` is buried in the shield face rather than gripping its
-        rim; an elongated object whose `end_symmetry` is near 1.0 is equally wide
+        rim. `a_inside_b` counts only material overlap, so tea in a cup seen from
+        above -- the cup segmented as its rim -- reads 0 there, while
+        `a_enclosed_by_b` (the share of a within b's outline, holes filled) reads
+        1.0: use the enclosed figures for "is X in Y"; an open shape encloses
+        nothing. In a flat image, something held *in front of* an object also
+        sits within its outline (a microphone before a face): on 85 labelled
+        pairs, enclosed > 0.5 held for 84% of containment pairs, 19% of contact
+        pairs and 9% of separate ones, so read it with the scene in mind. An
+        elongated object whose `end_symmetry` is near 1.0 is equally wide
         at both ends, unlike a blade that tapers to a point at one end only.
 
         Useful for checking whether a generated or edited image holds together
