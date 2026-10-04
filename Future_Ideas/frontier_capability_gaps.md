@@ -42,6 +42,7 @@ count, exact text, a measurement.
 | 7 | Handwriting OCR | A handwriting recogniser such as TrOCR | Medium | Needs handwriting test images (none in VisionBench yet) | Idea |
 | 8 | Multilingual OCR | PP-OCR multilingual recognisers | Low-medium | Worker round 6 is tagging languages, which will show how much non-English text there is | Waiting on data |
 | 9 | Depth / scene layers | A small monocular depth model (e.g. Depth Anything V2 Small) | Medium | Licence of the chosen size; what output a caller needs | Idea |
+| 10 | Closer look at a region ("inspect") | Optional `region=[x1,y1,x2,y2]` on `caption`, `query_image` and `ocr`: the caller (which can reason about where to look) points, the tool crops so the region gets the model's full input resolution (Florence-2 resizes every image to 768 px, so a 1080p HUD's minimap is a few pixels) | Low | Test first on phase 11: VQA and caption keywords on the whole image vs a crop around the labeled object's box; game UI (worst kind) is the likeliest gain | Idea (2026-10-04), after the caption confirm |
 
 ## How we'll know
 
