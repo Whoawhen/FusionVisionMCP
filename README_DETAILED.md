@@ -201,6 +201,14 @@ specific, and `ocr` to transcribe text rather than describe it. Returns one capt
   list of the close misses it fixed, and a `caption_corrected` copy with the verbatim OCR text substituted in.
   Defaults to `false`, which keeps the original `list[str]` return shape; `true` returns one
   `{caption, text_regions, corrections, caption_corrected}` dict per page.
+- **deep**: When `true`, caption with Moondream2's long captioner (already loaded for `query_image`) instead
+  of Florence-2. About 3x slower (~33s vs ~11s per image on CPU) and ~60% longer. On VisionBench's 280
+  held-out generalist images it named 61.5% of labelled key facts against 53.3% (charts 67 vs 52, signage
+  71 vs 54, game UI 59 vs 44, documents 71 vs 58; everyday photos and artwork barely move), naming a
+  labelled absent object in ~1% of captions either way. Cut to the default's length it is no better
+  (55.2%, CI includes zero), so the gain is coverage from saying more, not sharper wording. A fine-tuned
+  Florence-2 (PromptGen v2.0) was also tested and rejected: +2.9 points, all of it length, for a second
+  1.5 GB model.
 
 ### detect_objects ➕
 

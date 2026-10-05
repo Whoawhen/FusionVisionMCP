@@ -92,6 +92,18 @@ async def test_caption(mcp_client_session: ClientSession) -> None:
 
 
 @pytest.mark.anyio
+async def test_caption_deep_uses_moondream(mcp_client_session: ClientSession) -> None:
+    default = await mcp_client_session.call_tool("caption", arguments={"src": SAMPLE_IMAGE_FILEPATH})
+    deep = await mcp_client_session.call_tool("caption", arguments={"src": SAMPLE_IMAGE_FILEPATH, "deep": True})
+    default_text = "\n".join(cast(TextContent, c).text for c in default.content)
+    deep_text = "\n".join(cast(TextContent, c).text for c in deep.content)
+
+    assert not deep.is_error
+    assert len(deep_text) > 0
+    assert deep_text != default_text
+
+
+@pytest.mark.anyio
 async def test_caption_url(mcp_client_session: ClientSession, static_file_server: str) -> None:
     res = await mcp_client_session.call_tool(
         "caption",

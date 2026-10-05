@@ -66,7 +66,7 @@ in its description. Targets (agreed 2026-10-02 as reasonable starting points, no
 | `ocr`, real images by line | 76.2% (label ceiling ~80%) | ≥ 75% — met |
 | `ocr`, photos (TextVQA) | 58.5% (was 53%; detector box_thresh 0.4, 2026-10-03) | ≥ 60% |
 | `ocr`, rotated / blurred | −5.7 / −52 points (rotation was −26) | rotation ≤ −5 — essentially met; blur documented as a limit |
-| `caption` | 54.1% of label keywords on 400 images (ceiling ~75%); photos 78%, artwork 76%, game UI 42%, AI images 48% | ≥ 60% |
+| `caption` | 54.1% of label keywords on 400 images (ceiling ~75%); photos 78%, artwork 76%, game UI 42%, AI images 48%. `deep=true` (Moondream2 long): 61.5% vs 53.3% on 280 held-out images, ~3x slower | ≥ 60% — met with `deep=true`; the fast default stays at ~54% |
 | `caption(auto_verify_text)` | lowered key phrases 25.5% → 20.8% | never makes a caption worse |
 | `detect_objects` | 59.2% recall, 42.7% precision on 400 images (app/web 34%); absent object boxed 70% | ≥ 60% recall — essentially met; limit stated in description — stated |
 | `count_objects` | 57.3% exact on 75 held-out COCO scenes of 3 or fewer (1: 85%, 2: 50%, 3: 24%); 41.6% on 400 generalist images (MAE 3.4; screenshots and game UI 24%). `separable` "no" was right 2/12 on predicted singles, now 2/5 | ≥ 50% exact on scenes of 3 or fewer — met |
@@ -89,3 +89,4 @@ exact boxes outright.
 - 2026-10-03: OCR photos 53 → 58.5%, rotation −26 → −5.7, containment 67.6 → 83.8% (met). GPU benchmark runs crash the laptop on phase 11 (hypervisor I/O MMU fault); benchmarks run on CPU, GPU only for phases 7 and 10.
 - 2026-10-03 (evening): counting target met on held-out COCO (57.3%); separable's weak-split "no" removed; AI-defect detection judged a model problem, not a rules problem (worker round 7 sourcing 150 images).
 - 2026-10-04: first full phase 11 run (400 images, CPU). `query_image` met (78.8%, after a grader fix for "no text" questions); `detect_objects` recall essentially met (59.2%); caption 54.1% is the main open target besides AI defects. Phase 11's AI-defect numbers disagree with phase 10's specificity (56% vs 85%), more reason to wait for round 7's 150 images.
+- 2026-10-05: caption decided on 280 held-out images (VisionBench `caption_confirm_analysis.py`). PromptGen v2.0 +2.9 points, all of it caption length (+0.3 when cut to the default's length), so it was not shipped: not worth a second 1.5 GB Florence-2. Moondream2 long +8.2 (CI 5.3–11.2) shipped as opt-in `caption(deep=true)`, at no extra memory; its gain is also mostly length (+1.9 length-matched), which is coverage a caller asking for detail wants. Region crops tested earlier: no gain.

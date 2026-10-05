@@ -54,3 +54,11 @@ class Moondream:
                 answer = self.model.query(rgb_img, question)["answer"]
                 res.append(answer)
         return res
+
+    def caption(self, images: list[Image], length: str = "long") -> list[str]:
+        """Moondream2's own captioner; `length` is "short", "normal" or "long"."""
+        res = []
+        for img in images:
+            with img.convert("RGB") as rgb_img:
+                res.append(self.model.caption(rgb_img, length=length)["caption"].strip())
+        return res

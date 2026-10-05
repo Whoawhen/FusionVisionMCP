@@ -106,11 +106,31 @@ def register(mcp: MCPServer) -> None:
                 )
             ),
         ] = False,
+        deep: Annotated[
+            bool,
+            Field(
+                description=(
+                    "When true, caption with Moondream2's long captioner instead of Florence-2: "
+                    "about 3x slower (~33s vs ~11s per image on CPU) and about 60% longer, and it "
+                    "covers more of what is there. Worth it on charts, documents, signage, game UI "
+                    "and screenshots, where the default misses most; little gain on everyday photos "
+                    "and artwork. The return shape is unchanged, and `verify_text` still applies."
+                )
+            ),
+        ] = False,
     ) -> list[Any]:
         """Describe what an image shows, as one detailed prose caption.
 
         The default choice for "what is this a picture of". Returns a single
         paragraph covering the scene as a whole, with no coordinates.
+
+        Set `deep=true` for a closer look when the default caption is too thin
+        to answer what you need, or up front for a chart, document, sign,
+        screenshot or game UI. On 280 held-out mixed images the deep caption
+        named 61.5% of the labelled key facts against the default's 53.3%
+        (charts 67 vs 52, signage 71 vs 54, game UI 59 vs 44), and invented an
+        absent object no more often (about 1%). Much of that gain comes from
+        it simply saying more, so it is slower, not sharper per word.
 
         Reach for a different tool when the question is narrower: `query_image`
         to ask something specific about the image, `dense_region_caption` to get
@@ -149,7 +169,10 @@ def register(mcp: MCPServer) -> None:
         """
         app = ctx.request_context.lifespan_context
         with get_images(src) as images:
-            captions = app.florence2.caption(images, CaptionLevel.MORE_DETAILED)
+            if deep:
+                captions = app.vqa.caption(images, length="long")
+            else:
+                captions = app.florence2.caption(images, CaptionLevel.MORE_DETAILED)
             if not verify_text and not auto_verify_text:
                 return captions
 

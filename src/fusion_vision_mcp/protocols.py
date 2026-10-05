@@ -103,6 +103,10 @@ class VqaProcessor(Protocol):
         """Answers a free-form question about each image."""
         ...
 
+    def caption(self, images: list[Image], length: str = "long") -> list[str]:
+        """Describes each image in prose ("short", "normal" or "long")."""
+        ...
+
 
 class InstanceDetector(Protocol):
     """Represents a protocol for open-vocabulary detection that tallies instances."""
