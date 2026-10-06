@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Final
 
 from PIL import Image
 
-from fusion_vision_mcp import geometry
+from fusion_vision_mcp import defect_probe, geometry
 
 if TYPE_CHECKING:
     from fusion_vision_mcp.protocols import AppContext
@@ -320,11 +320,67 @@ def _check_anatomy(app: AppContext, image: Image.Image) -> tuple[list[Observatio
     return observations, anomalies
 
 
+def _check_defect_probe(app: AppContext, image: Image.Image) -> tuple[list[Observation], list[Anomaly]]:
+    """Score every detected hand and face crop with the learned defect probe (see `defect_probe`).
+
+    Unlike the part count, this reads the crop itself, so it can see a fused, melted or
+    misshapen hand. It is a learned score, not a measurement: `corroborated` stays False, and the
+    evidence carries every crop's score so a caller can see how close the call was.
+    """
+    probe = defect_probe.load_probe()
+    crops: list[tuple[str, list[float], Image.Image]] = []
+    for part in probe["parts"]:
+        for box in app.counter.detect_objects([image], part, adaptive_threshold=True)[0].get("bboxes", []):
+            region = defect_probe.padded_box(box, image.width, image.height, probe["crop_pad_px"])
+            crops.append((part, [round(float(v)) for v in box], image.crop(region)))
+    if not crops:
+        return [
+            Observation(
+                claim="Defect probe not applied: no hand or face was detected.",
+                source="defect_probe",
+                corroborated=False,
+                evidence=[],
+            )
+        ], []
+
+    embeddings = app.aesthetic.image_embeddings([crop for _, _, crop in crops])
+    scored = sorted(
+        ((defect_probe.score(e, probe), part, box) for (part, box, _), e in zip(crops, embeddings, strict=True)),
+        reverse=True,
+    )
+    threshold = probe["threshold"]
+    evidence = [f"{part} at {box}: {s:.2f}" for s, part, box in scored[:6]]
+    evidence.append(f"Threshold {threshold:.2f}; {len(scored)} crop(s) scored")
+    top, part, box = scored[0]
+    if top <= threshold:
+        claim = f"Defect probe: no hand or face crop above threshold (highest {top:.2f}, {part} at {box})."
+        return [Observation(claim=claim, source="defect_probe", corroborated=False, evidence=evidence)], []
+    above = [f"{p} at {b}" for s, p, b in scored if s > threshold]
+    observation = Observation(
+        claim=f"Defect probe: {len(above)} crop(s) look like a generation defect, highest {top:.2f} ({part} at {box}).",
+        source="defect_probe",
+        corroborated=False,
+        evidence=evidence,
+    )
+    return [observation], [
+        Anomaly(
+            description=(
+                f"Likely generation defect: the {part} at {box} scores {top:.2f} on the learned defect probe "
+                f"(threshold {threshold:.2f}). Flagged: {', '.join(above[:4])}."
+            ),
+            observations=[observation],
+        )
+    ]
+
+
 def analyze_inspection(
     app: AppContext, image: Image.Image, vqa_answers: list[str]
 ) -> tuple[list[Observation], list[Anomaly]]:
     """Perform a structured visual inspection for anomalies (like AI artifacts)."""
     observations, anomalies = _check_anatomy(app, image)
+    probe_observations, probe_anomalies = _check_defect_probe(app, image)
+    observations += probe_observations
+    anomalies += probe_anomalies
 
     # We could parse vqa_answers for other claims and corroborate them here.
     # For now, we rely on the structural anatomy checks which catch AI artifacts

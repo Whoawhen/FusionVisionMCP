@@ -18,7 +18,7 @@ third leg, and that one limb detected three times is one limb.
 import numpy as np
 from PIL import Image
 
-from fusion_vision_mcp import geometry
+from fusion_vision_mcp import defect_probe, geometry
 from fusion_vision_mcp.inspection import _containment, analyze_inspection
 
 
@@ -43,9 +43,27 @@ class _StubDetector:
         ]
 
 
+class _StubAesthetic:
+    """Stands in for CLIP: every crop gets the same embedding, so the defect probe's score is fixed."""
+
+    def __init__(self, embedding: list[float] | None = None) -> None:
+        self.embedding = embedding or [0.0] * len(defect_probe.load_probe()["coef"])
+        self.calls = 0
+
+    def image_embeddings(self, images: list) -> list[list[float]]:
+        self.calls += 1
+        return [self.embedding for _ in images]
+
+
 class _StubApp:
-    def __init__(self, counter) -> None:
+    def __init__(self, counter, aesthetic: _StubAesthetic | None = None) -> None:
         self.counter = counter
+        self.aesthetic = aesthetic or _StubAesthetic()
+
+
+def _anatomy(obs: list) -> list:
+    """Observations from the part count and VQA, without the defect probe's (tested separately below)."""
+    return [o for o in obs if o.source != "defect_probe"]
 
 
 def _image() -> Image.Image:
@@ -71,7 +89,7 @@ def _outside(n: int) -> list[list[float]]:
 def test_stub_arithmetic_analyze_inspection_no_person():
     app = _StubApp(_StubDetector({"person": [], "arm": _inside(10)}))
     obs, anomalies = analyze_inspection(app, _image(), [])
-    assert len(obs) == 0
+    assert len(_anatomy(obs)) == 0
     assert len(anomalies) == 0
 
 
@@ -91,8 +109,8 @@ def test_stub_arithmetic_analyze_inspection_normal_person():
     obs, anomalies = analyze_inspection(app, _image(), ["A person."])
     assert len(anomalies) == 0
     # There should be 1 uncorroborated VLM claim and no coverage observation (nothing was orphaned).
-    assert len(obs) == 1
-    assert obs[0].source == "vqa"
+    assert len(_anatomy(obs)) == 1
+    assert _anatomy(obs)[0].source == "vqa"
 
 
 def test_stub_arithmetic_parts_outside_every_person_box_are_coverage_evidence_not_anatomy():
@@ -123,7 +141,7 @@ def test_stub_arithmetic_one_limb_detected_several_times_is_one_limb():
     app = _StubApp(_StubDetector({"person": [PERSON], "arm": [*duplicates, second_arm]}))
     obs, anomalies = analyze_inspection(app, _image(), [])
     assert anomalies == [], "duplicate re-detections of one arm were counted as separate arms"
-    assert obs == []
+    assert _anatomy(obs) == []
 
 
 def test_stub_arithmetic_a_person_with_too_many_arms_is_still_flagged_against_that_person():
@@ -223,6 +241,60 @@ def test_stub_arithmetic_analyze_inspection_records_vqa_claims():
 
     # "The person is glowing" is not filtered out
     assert len(anomalies) == 0
-    assert len(obs) == 1
-    assert obs[0].claim == "The person is glowing."
-    assert obs[0].corroborated is False
+    assert len(_anatomy(obs)) == 1
+    assert _anatomy(obs)[0].claim == "The person is glowing."
+    assert _anatomy(obs)[0].corroborated is False
+
+
+HAND = [150.0, 100.0, 190.0, 150.0]
+
+
+def _probe_embedding(logit: float) -> list[float]:
+    """An embedding the shipped probe scores at exactly `logit` (a multiple of its own weights)."""
+    probe = defect_probe.load_probe()
+    norm = sum(w * w for w in probe["coef"])
+    k = (logit - probe["intercept"]) / norm
+    return [k * w for w in probe["coef"]]
+
+
+def test_defect_probe_flags_a_crop_above_threshold_and_names_it():
+    app = _StubApp(_StubDetector({"hand": [HAND]}), _StubAesthetic(_probe_embedding(4.0)))
+    obs, anomalies = analyze_inspection(app, _image(), [])
+    assert len(anomalies) == 1
+    assert "hand at [150, 100, 190, 150]" in anomalies[0].description
+    probe_obs = [o for o in obs if o.source == "defect_probe"]
+    assert len(probe_obs) == 1 and probe_obs[0].corroborated is False
+    assert any("0.98" in line for line in probe_obs[0].evidence)
+
+
+def test_defect_probe_below_threshold_reports_its_highest_score_without_an_anomaly():
+    app = _StubApp(
+        _StubDetector({"hand": [HAND], "face": [[10.0, 10.0, 60.0, 60.0]]}), _StubAesthetic(_probe_embedding(0.0))
+    )
+    obs, anomalies = analyze_inspection(app, _image(), [])
+    assert anomalies == []
+    probe_obs = [o for o in obs if o.source == "defect_probe"]
+    assert len(probe_obs) == 1 and "highest 0.50" in probe_obs[0].claim
+    assert "2 crop(s) scored" in probe_obs[0].evidence[-1]
+
+
+def test_defect_probe_threshold_is_strict_and_matches_the_shipped_file():
+    probe = defect_probe.load_probe()
+    assert 0.5 < probe["threshold"] < 1.0
+    assert len(probe["coef"]) == 768
+    at = defect_probe.score(_probe_embedding(0.0), probe)
+    assert abs(at - 0.5) < 1e-9
+
+
+def test_defect_probe_with_no_hand_or_face_does_not_load_clip():
+    aesthetic = _StubAesthetic()
+    app = _StubApp(_StubDetector({"person": [PERSON]}), aesthetic)
+    obs, anomalies = analyze_inspection(app, _image(), [])
+    assert anomalies == []
+    assert aesthetic.calls == 0
+    assert any(o.source == "defect_probe" and "not applied" in o.claim for o in obs)
+
+
+def test_padded_box_clips_to_the_image():
+    assert defect_probe.padded_box([5.0, 5.0, 390.0, 290.0], 400, 300, 20) == (0, 0, 400, 300)
+    assert defect_probe.padded_box([100.0, 100.0, 150.0, 150.0], 400, 300, 20) == (80, 80, 170, 170)

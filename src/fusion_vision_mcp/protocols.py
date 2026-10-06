@@ -141,6 +141,10 @@ class AestheticScorer(Protocol):
         """Both of the above off a single image encode."""
         ...
 
+    def image_embeddings(self, images: list[Image]) -> list[list[float]]:
+        """Unnormalised CLIP image embeddings, one 768-float list per image."""
+        ...
+
     def classify_style(self, images: list[Image]) -> list[dict[str, Any]]:
         """Zero-shot medium/genre classification reusing the CLIP backbone.
 

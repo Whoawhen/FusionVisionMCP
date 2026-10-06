@@ -48,13 +48,16 @@ def register(mcp: MCPServer) -> None:
             Field(
                 description=(
                     "When true, return structured `observations` and `anomalies` per image instead of "
-                    "a plain answer. Counts body parts with Grounding DINO to flag extra or missing "
-                    "limbs in generated images, checks metadata for generator signatures, and flags "
-                    "low-confidence text as likely generated gibberish. Measured on 25 anatomy "
-                    "fixtures, it caught 6 of 13 defective images and cleared 10 of 12 clean ones: "
-                    "an anomaly is worth investigating, but no anomaly does not mean the image is clean. "
-                    "It checks counts, not shape, so a fused or malformed hand with the right number "
-                    "of parts passes."
+                    "a plain answer, as a check for AI-generation defects. Four checks raise anomalies: "
+                    "a learned defect probe that scores every detected hand and face crop with CLIP "
+                    "('Likely generation defect: ...', the main signal: it can see a fused or misshapen "
+                    "hand), a per-person body-part count ('Structural anomaly: ...', extra limbs only, "
+                    "and often a detection error on crowded scenes), generator signatures in metadata, "
+                    "and low-confidence text as likely generated gibberish. Measured on 95 images none "
+                    "of these were tuned on, it flagged 71% of defective images but also 45% of clean "
+                    "ones: an anomaly is a lead to check, not a verdict, and no anomaly does not mean "
+                    "the image is clean. Every probe crop's score is listed in `observations` "
+                    "(source 'defect_probe'). Loads the CLIP model used by score_aesthetics."
                 )
             ),
         ] = False,

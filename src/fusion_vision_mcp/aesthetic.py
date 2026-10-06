@@ -166,6 +166,16 @@ class Aesthetic:
             for value in predictions
         ]
 
+    def image_embeddings(self, images: list[Image]) -> list[list[float]]:
+        """Unnormalised CLIP image embeddings (`image_embeds`), the input `defect_probe` was trained on."""
+        out: list[list[float]] = []
+        with torch.no_grad():
+            for start in range(0, len(images), 16):
+                inputs = self.processor(images=images[start : start + 16], return_tensors="pt").to(self.device)
+                inputs["pixel_values"] = inputs["pixel_values"].to(self.torch_dtype)
+                out.extend(self.model.get_image_features(**inputs).float().cpu().tolist())
+        return out
+
     def score(self, images: list[Image]) -> list[dict[str, Any]]:
         """Returns one {"score": float, "rating": str} dict per image, score roughly 1-10."""
         return self._score_from_features(self._encode_images(images))
