@@ -184,7 +184,14 @@ def _associate(part_boxes: list[list[float]], person_boxes: list[list[float]]) -
 
 
 def _check_anatomy(app: AppContext, image: Image.Image) -> tuple[list[Observation], list[Anomaly]]:
-    """Count body parts against the person each one belongs to, and flag anyone carrying too many.
+    """Count body parts against the person each one belongs to, and note anyone carrying too many.
+
+    **Since 2026-10-06 this raises no anomalies; an over-count is an observation only.** Measured on
+    VisionBench's user-reviewed round 7 it flagged 30% of 100 clean images (38.8% of defective
+    ones), and on 95 images the defect probe never saw it added ~11 points of sensitivity for ~12
+    of specificity, mostly through leg counts on crowded scenes. `_check_defect_probe` is the
+    anomaly signal now; a person with too many parts is still reported here, `corroborated=True`,
+    for a caller to weigh. The second return value stays for the signature and is always empty.
 
     A generative artifact looks like *this person has three arms*. The check used to ask a
     question that cannot express that: it summed every `arm` box in the frame and compared the sum
@@ -269,26 +276,22 @@ def _check_anatomy(app: AppContext, image: Image.Image) -> tuple[list[Observatio
             if count <= expected + margin:
                 continue
             box = [round(v) for v in person_boxes[index]]
-            observation = Observation(
-                claim=f"Person {index + 1} of {len(person_boxes)} has {count} {part}s associated with them",
-                source="detector",
-                corroborated=True,
-                evidence=[
-                    f"Person box: {box}",
-                    f"{part.capitalize()} detections inside that box (>= {_PART_CONTAINMENT:.0%} of each box's area): {count}",
-                    f"Expected at most {expected} per person, plus a margin of {margin}",
-                    f"{part.capitalize()} detections in frame: {len(merged)} after IoU dedup at {_DUPLICATE_PART_IOU}, {len(raw_boxes)} raw",
-                    f"{part.capitalize()} detections associated with no person: {unassociated} (excluded from this ratio)",
-                ],
-            )
-            observations.append(observation)
-            anomalies.append(
-                Anomaly(
-                    description=(
-                        f"Structural anomaly: person {index + 1} of {len(person_boxes)} at {box} has "
-                        f"{count} {part}s associated with them (expected at most {expected})."
+            observations.append(
+                Observation(
+                    claim=(
+                        f"Person {index + 1} of {len(person_boxes)} at {box} has {count} {part}s associated with them "
+                        f"(expected at most {expected}). A part count, not raised as an anomaly: on clean images "
+                        f"it is usually a detection error, most often legs in a crowded scene."
                     ),
-                    observations=[observation],
+                    source="detector",
+                    corroborated=True,
+                    evidence=[
+                        f"Person box: {box}",
+                        f"{part.capitalize()} detections inside that box (>= {_PART_CONTAINMENT:.0%} of each box's area): {count}",
+                        f"Expected at most {expected} per person, plus a margin of {margin}",
+                        f"{part.capitalize()} detections in frame: {len(merged)} after IoU dedup at {_DUPLICATE_PART_IOU}, {len(raw_boxes)} raw",
+                        f"{part.capitalize()} detections associated with no person: {unassociated} (excluded from this ratio)",
+                    ],
                 )
             )
 

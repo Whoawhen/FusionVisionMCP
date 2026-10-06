@@ -61,6 +61,11 @@ class _StubApp:
         self.aesthetic = aesthetic or _StubAesthetic()
 
 
+def _overcounts(obs: list) -> list:
+    """The part count's per-person findings. Since 2026-10-06 they are observations, never anomalies."""
+    return [o for o in obs if o.source == "detector" and "associated with them" in o.claim]
+
+
 def _anatomy(obs: list) -> list:
     """Observations from the part count and VQA, without the defect probe's (tested separately below)."""
     return [o for o in obs if o.source != "defect_probe"]
@@ -149,9 +154,11 @@ def test_stub_arithmetic_a_person_with_too_many_arms_is_still_flagged_against_th
     app = _StubApp(_StubDetector({"person": [PERSON], "arm": _inside(4)}))
     obs, anomalies = analyze_inspection(app, _image(), ["None"])
 
-    assert len(anomalies) == 1
-    assert "person 1 of 1" in anomalies[0].description.lower()
-    assert "4 arms" in anomalies[0].description
+    assert anomalies == [], "the part count no longer raises anomalies"
+    over = _overcounts(obs)
+    assert len(over) == 1
+    assert "person 1 of 1" in over[0].claim.lower()
+    assert "4 arms" in over[0].claim
 
     det_obs = [o for o in obs if o.source == "detector"]
     assert len(det_obs) == 1
@@ -171,10 +178,11 @@ def test_stub_arithmetic_anomaly_names_the_offending_person_not_the_frame():
     second_person = [200.0, 0.0, 300.0, 200.0]
     normal_arms = [[210.0, 10.0, 230.0, 30.0], [210.0, 60.0, 230.0, 80.0]]
     app = _StubApp(_StubDetector({"person": [PERSON, second_person], "arm": _inside(4) + normal_arms}))
-    _obs, anomalies = analyze_inspection(app, _image(), [])
+    obs, _anomalies = analyze_inspection(app, _image(), [])
 
-    assert len(anomalies) == 1
-    assert "person 1 of 2" in anomalies[0].description.lower()
+    over = _overcounts(obs)
+    assert len(over) == 1
+    assert "person 1 of 2" in over[0].claim.lower()
 
 
 def test_stub_arithmetic_a_limb_reaching_past_its_person_box_is_still_that_person_s():
@@ -183,12 +191,12 @@ def test_stub_arithmetic_a_limb_reaching_past_its_person_box_is_still_that_perso
     reaching = [[88.0, 40.0, 108.0, 60.0]]
     mostly_out = [[96.0, 100.0, 116.0, 120.0]]  # 20% inside, below the cutoff
     app = _StubApp(_StubDetector({"person": [PERSON], "arm": _inside(3) + reaching}))
-    _obs, anomalies = analyze_inspection(app, _image(), [])
-    assert len(anomalies) == 1, "a limb 60% inside its person box was not associated with them"
+    obs, _anomalies = analyze_inspection(app, _image(), [])
+    assert len(_overcounts(obs)) == 1, "a limb 60% inside its person box was not associated with them"
 
     app = _StubApp(_StubDetector({"person": [PERSON], "arm": _inside(3) + mostly_out}))
-    _obs, anomalies = analyze_inspection(app, _image(), [])
-    assert anomalies == [], "a box only 20% inside a person box was counted against them"
+    obs, _anomalies = analyze_inspection(app, _image(), [])
+    assert _overcounts(obs) == [], "a box only 20% inside a person box was counted against them"
 
 
 def test_stub_arithmetic_a_part_inside_two_person_boxes_is_counted_once_against_the_tightest():
@@ -203,10 +211,10 @@ def test_stub_arithmetic_a_part_inside_two_person_boxes_is_counted_once_against_
     second_person = [200.0, 0.0, 300.0, 200.0]
     second_arms = [[210.0, 10.0, 230.0, 30.0], [210.0, 60.0, 230.0, 80.0]]
     app = _StubApp(_StubDetector({"person": [pair_envelope, PERSON, second_person], "arm": _inside(2) + second_arms}))
-    _obs, anomalies = analyze_inspection(app, _image(), [])
+    obs, anomalies = analyze_inspection(app, _image(), [])
     # Four arms all fall inside the envelope box; attributed to the tightest box containing each,
-    # they are two arms apiece and nothing is anomalous.
-    assert anomalies == []
+    # they are two arms apiece and nothing is over-counted.
+    assert anomalies == [] and _overcounts(obs) == []
 
 
 def test_stub_arithmetic_box_containment_matches_geometry_relation_on_rasterized_masks():

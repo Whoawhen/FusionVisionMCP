@@ -48,16 +48,17 @@ def register(mcp: MCPServer) -> None:
             Field(
                 description=(
                     "When true, return structured `observations` and `anomalies` per image instead of "
-                    "a plain answer, as a check for AI-generation defects. Four checks raise anomalies: "
+                    "a plain answer, as a check for AI-generation defects. Three checks raise anomalies: "
                     "a learned defect probe that scores every detected hand and face crop with CLIP "
                     "('Likely generation defect: ...', the main signal: it can see a fused or misshapen "
-                    "hand), a per-person body-part count ('Structural anomaly: ...', extra limbs only, "
-                    "and often a detection error on crowded scenes), generator signatures in metadata, "
-                    "and low-confidence text as likely generated gibberish. Measured on 95 images none "
-                    "of these were tuned on, it flagged 71% of defective images but also 45% of clean "
-                    "ones: an anomaly is a lead to check, not a verdict, and no anomaly does not mean "
-                    "the image is clean. Every probe crop's score is listed in `observations` "
-                    "(source 'defect_probe'). Loads the CLIP model used by score_aesthetics."
+                    "hand), generator signatures in metadata, and low-confidence text as likely "
+                    "generated gibberish. Measured on 95 images none of these were tuned on, it flagged "
+                    "60% of defective images and 33% of clean ones: an anomaly is a lead to check, not a "
+                    "verdict, and no anomaly does not mean the image is clean. Every probe crop's score "
+                    "is listed in `observations` (source 'defect_probe'). A per-person body-part count "
+                    "also reports any person with too many limbs as an observation (source 'detector'), "
+                    "not an anomaly: on clean images it is usually a detection error. Loads the CLIP "
+                    "model used by score_aesthetics."
                 )
             ),
         ] = False,

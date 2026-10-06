@@ -480,6 +480,27 @@ We needed to split aesthetics into `photographic_aesthetic`, `technical_quality`
 **Structured Visual Inspection (Sprint 10)**
 VLMs are notoriously blind to generative AI artifacts (e.g., humans with 3 arms). We built `structured_analysis` into `query_image` to physically measure anatomy using Grounding DINO (`person`, `arm`, `leg`, etc.) and evaluate against physiological ratios (e.g., `arm > persons * 2 + 1`). If the ratio fails, it raises an `Anomaly` backed by a physical `Observation`, overriding the VLM's hallucination. (Sprints 17-19 later refined this by enforcing strict part-to-person association and bounding-box deduplication to ensure the anomaly flags aren't just detector noise).
 
+**2026-10-06: the part count no longer raises anomalies; a learned probe does.** Measured on VisionBench's
+user-reviewed round 7 (149 images, 49 defective) the part count flagged 38.8% of defective images and 30.0% of
+clean ones, near chance, and 47 of its 69 anomalies were leg counts. It can only say "too many", so a fused or
+misshapen hand passes it. `defect_probe.py` replaces it as the anomaly signal: every Grounding DINO `hand` and
+`face` crop (padded 20 px) is embedded with the CLIP ViT-L/14 `score_aesthetics` already loads, and a logistic
+regression trained on round 7's reviewed crops scores it (`data/defect_probe.json`, written by VisionBench's
+`export_defect_probe.py`, threshold set on round 7 alone at 85% specificity). The part count still reports an
+over-count as a `detector` observation.
+
+Three things were load-bearing, each measured:
+
+- **Train on the reviewed rounds, not SynArtifact.** The published probe (AUC 0.88 on SynArtifact, one generator)
+  scored round 7 at image AUC 0.65 and rated real photos as *more* defective than defects -- it had learned a
+  generator's look. Trained on round 7 it reached 0.885 on the held-out round 8; adding SynArtifact made it worse.
+- **The embeddings must be the unnormalised `image_embeds`**, which is what `Aesthetic.image_embeddings` returns
+  (`get_image_features`), not the normalised features the aesthetic head uses. Parity with the training
+  embeddings was checked to 4e-6.
+- **Round 7 is training data now.** Measure the shipped tool on what the probe never saw: VisionBench
+  `ai_defect_e2e.py` (round 8, phase 10, phase 11; 95 images). There, defective images flagged went 41.9% ->
+  59.7% and clean images left alone 72.7% -> 66.7%. Specificity is the open gap.
+
 ## Where things live
 
 `__init__.py` was 1,952 lines with all eleven tool definitions and their helpers inline. It is now ~250 and
