@@ -486,8 +486,8 @@ clean ones, near chance, and 47 of its 69 anomalies were leg counts. It can only
 misshapen hand passes it. `defect_probe.py` replaces it as the anomaly signal: every Grounding DINO `hand` and
 `face` crop (padded 20 px) is embedded with the CLIP ViT-L/14 `score_aesthetics` already loads, and a logistic
 regression trained on round 7's reviewed crops scores it (`data/defect_probe.json`, written by VisionBench's
-`export_defect_probe.py`, threshold set on round 7 alone at 85% specificity). The part count still reports an
-over-count as a `detector` observation.
+`probe_rounds_7_9.py --round7-only`, threshold set on round 7 alone at 85% specificity). The part count still
+reports an over-count as a `detector` observation.
 
 Three things were load-bearing, each measured:
 
@@ -500,6 +500,16 @@ Three things were load-bearing, each measured:
 - **Round 7 is training data now.** Measure the shipped tool on what the probe never saw: VisionBench
   `ai_defect_e2e.py` (round 8, phase 10, phase 11; 95 images). There, defective images flagged went 41.9% ->
   59.7% and clean images left alone 72.7% -> 66.7%. Specificity is the open gap.
+
+**2026-10-08: retrained with the user's crop calls; more data stopped helping.** The user called every round 7
+crop the defect boxes did not cover (216), and re-graded phase 11 themselves (the e2e set is now 94 images, 47
+defective). Retrained on round 7's boxes plus those calls (261 defect, 772 clean crops): 72.3% of defective images
+flagged and 63.8% of clean left alone, against 63.8% / 63.8% for the first probe on the same 94 images (image AUC
+0.720 -> 0.741). VisionBench `ai_defect_rescore.py` re-scores the e2e set from cached boxes and embeddings, so a
+candidate probe is checked in minutes rather than a two-hour server run. Adding round 9 (246 user-graded Stable
+Diffusion 1.x images) made it *worse* on the unseen images (51.1% / 76.6%, AUC 0.699) while its own CV looked
+fine, so the CLIP crop probe has plateaued: the next gain has to come from what the probe looks at (a different
+backbone, landmarks), not from more of the same labels.
 
 ## Where things live
 

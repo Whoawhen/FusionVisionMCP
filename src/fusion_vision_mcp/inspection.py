@@ -188,8 +188,8 @@ def _check_anatomy(app: AppContext, image: Image.Image) -> tuple[list[Observatio
 
     **Since 2026-10-06 this raises no anomalies; an over-count is an observation only.** Measured on
     VisionBench's user-reviewed round 7 it flagged 30% of 100 clean images (38.8% of defective
-    ones), and on 95 images the defect probe never saw it added ~11 points of sensitivity for ~12
-    of specificity, mostly through leg counts on crowded scenes. `_check_defect_probe` is the
+    ones), and on 94 images the defect probe never saw it added ~9 points of sensitivity for ~15
+    of specificity (2026-10-08 probe), mostly through leg counts on crowded scenes. `_check_defect_probe` is the
     anomaly signal now; a person with too many parts is still reported here, `corroborated=True`,
     for a caller to weigh. The second return value stays for the signature and is always empty.
 
