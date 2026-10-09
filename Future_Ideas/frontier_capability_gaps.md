@@ -44,6 +44,22 @@ count, exact text, a measurement.
 | 9 | Depth / scene layers | A small monocular depth model (e.g. Depth Anything V2 Small) | Medium | Licence of the chosen size; what output a caller needs | Idea |
 | 10 | Closer look at a region ("inspect") | Optional `region=[x1,y1,x2,y2]` on `caption`, `query_image` and `ocr`: the caller (which can reason about where to look) points, the tool crops so the region gets the model's full input resolution (Florence-2 resizes every image to 768 px, so a 1080p HUD's minimap is a few pixels) | Low | Test first on phase 11: VQA and caption keywords on the whole image vs a crop around the labeled object's box; game UI (worst kind) is the likeliest gain | **Tested for caption, no gain** (2026-10-04, VisionBench `region_crop_pilot.py`): on 60 labeled objects the caption named the object 33% on the whole image vs 28% on a crop (control 3%); small objects 21% vs 9%, as the crop loses the context that identifies them. Untested for `ocr` and `query_image` |
 
+## Replacing Chinese-developed models
+
+**Decision (user, 2026-10-08):** no Chinese-developed models in new work, including models built on a
+Chinese base model (e.g. Molmo-7B-D on Qwen2), and the two already shipping get replaced in time. Until
+then, **don't tune anything heavily that relies on them**: no threshold sweeps, fine-tunes or
+detector-specific heuristics on Grounding DINO or PP-OCRv6. Keep work that touches them light and
+portable (labels and measurements that a replacement can reuse).
+
+| Shipping model | Developer | What depends on it | Alternatives to evaluate | Notes |
+| --- | --- | --- | --- | --- |
+| Grounding DINO tiny | IDEA Research (Shenzhen) | `detect_objects` (photos), `count_objects`, `spatial_relations` (boxes for SAM2), the defect probe's hand/face crops, `_check_anatomy` part count, `query_image` cross-checks | **OWLv2** (Google, Apache-2.0): open-vocabulary boxes with scores, the closest drop-in. **SAM 3** (Meta): text-prompted segmentation, could replace detector + SAM2 in one model (check licence and CPU speed). **MediaPipe** hand and face detectors (Google, already in `.venv`) for the defect probe's crops only. Florence-2 grounding (Microsoft, already loaded) has no scores, so it can't say "not here" | Exclude YOLO-World (Tencent). Re-run VisionBench phases 4, 11 and the COCO counting set before switching; the 0.35 score floor and counting thresholds were tuned for Grounding DINO and will need re-measuring, not copying |
+| PP-OCRv6 English (via RapidOCR) | Baidu (PaddleOCR); RapidOCR packaging also Chinese-origin | `ocr`, `caption(auto_verify_text)` | **docTR** (Mindee, France, Apache-2.0): detection + recognition, ONNX export, the strongest candidate. **EasyOCR** (Jaided AI, Thailand): already installed as the non-English fallback, but 37.5% vs 53% on TextVQA photos. Tesseract (Apache-2.0): weak on photos. TrOCR (Microsoft): recognizer only, would pair with a detector | The layout code (`reading_blocks`, column zoning, sideways re-read) is engine-independent and carries over. Gates: phase 14 rendered pages (97.3% verbatim), TextVQA photos (58.5%), and empty on text-free images |
+
+Not affected: Florence-2 (Microsoft), Moondream2 (SigLIP + Phi, US), CLIP and the LAION predictor
+(OpenAI / LAION), SAM2.1 (Meta), MUSIQ (Google), EasyOCR (Jaided AI; its CRAFT detector is Naver, Korea).
+
 ## How we'll know
 
 VisionBench phase 11 scores every tool on 400 generalist images (game UI, screenshots,
@@ -113,3 +129,4 @@ exact boxes outright.
 - 2026-10-05 (later): the SynArtifact-trained probe did not transfer (round 7 image AUC 0.65; it scored real photos as more defective than defects). Retrained on round 7's reviewed hand/face crops it did (round 8 image AUC 0.885) and shipped in `structured_analysis` as `defect_probe` (weights in `data/defect_probe.json`, ~15 KB; reuses the aesthetics CLIP). End to end on 95 unseen images: defective flagged 41.9% → 71.0%, clean left alone 72.7% → 54.5%. Specificity is now the gap; the part count costs ~12 points of it for ~11 of sensitivity.
 - 2026-10-06: part count demoted to an observation (user decision). `structured_analysis` on the 95 unseen images: 59.7% of defective flagged, 66.7% of clean left alone (was 41.9% / 72.7% before the probe). Next for AI defects: specificity (85% target), and phase 11's Gemini-made defect labels, which nobody has reviewed.
 - 2026-10-08: frontier column added to the "good" table (measured where possible, otherwise label ceilings, published benchmarks or estimates, each marked). Phase 11's AI-defect key replaced by the user's anatomy verdicts (8 defective of 39, where Gemini's had 24); round 9 (246 DiffusionDB images, 141 defective) reviewed for probe training.
+- 2026-10-08 (later): no Chinese-developed models in new work, and Grounding DINO (IDEA Research) and PP-OCRv6 (Baidu) to be replaced in time; no heavy tuning on either meanwhile (user decision). Alternatives listed in "Replacing Chinese-developed models". Caption candidates narrowed to Gemma 3 4B, PaliGemma 2, Phi-4-multimodal, SmolVLM2, newer Moondream and MolmoE-1B.
