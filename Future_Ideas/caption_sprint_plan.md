@@ -76,12 +76,31 @@ other Chinese bases).
 3. **Confirm split (280 images), finalists only, nothing changed:** paired bootstrap against Florence-2 detailed
    and Moondream2 long, full and length-matched; CHAIR; latency.
 
+4. **Coverage (finalists only, added 2026-10-09):** which other jobs could the model take over, so the server
+   ends up with fewer, better models rather than one more? Each check uses the tool's existing VisionBench
+   measure, unchanged:
+   - **`query_image`** (Moondream2's other job): phase 11 answer-contained, 78.8% today. A model that wins
+     the deep caption and beats this replaces Moondream2 outright.
+   - **Boxes** (Florence-2's other jobs, and Grounding DINO's): only models that output coordinates
+     (PaliGemma 2's detect tokens, Molmo's points). `detect_objects` recall and precision and the
+     absent-object rate (phase 11), `dense_region_caption` box recall (phase 7). A good result here is also
+     the first candidate to replace Grounding DINO.
+   - **Text positions** (Florence-2's `verify_text` head): `caption(verify_text)` on the text-heavy kinds.
+
+   Report a coverage table per finalist (tool, today's model and score, candidate's score, latency). A model
+   that covers two jobs at a small loss can beat one that wins a single job, because it removes a model
+   from memory.
+
 ### What would ship
 
 - **New `deep` model:** beats Moondream2 long at matched length with a confidence interval above zero, and
   hallucinates no more (CHAIR within noise or better), within the memory budget.
 - **New default:** beats Florence-2 detailed at matched length at roughly its speed (≤ ~15 s/image on CPU).
   Only SmolVLM2 and maybe PaliGemma 2 have a realistic chance.
+- **A replacement model, not just a captioner:** the likely best end state is one larger model for deep
+  captions and `query_image` (retiring Moondream2), and a small fast model for the default caption. If a
+  model with boxes (PaliGemma 2, Molmo) also passes the box checks, it can retire Florence-2's box jobs and
+  Grounding DINO too. Each retirement is its own decision, made from the coverage table.
 - **Nothing:** a fine result. Then the sprint's output is the hallucination numbers and a recommendation.
 
 Memory budget: the server already holds Florence-2-large, Moondream2, CLIP ViT-L/14, SAM2 and Grounding DINO
