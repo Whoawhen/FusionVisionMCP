@@ -60,20 +60,35 @@ Model variants, LoRAs and fine-tunes wait until the whole suite is "good". A too
 good when it meets its target **or** its failures are caught by a flag or stated plainly
 in its description. Targets (agreed 2026-10-02 as reasonable starting points, not fixed):
 
-| Tool | Now | Good |
-| --- | --- | --- |
-| `ocr`, clean screens and documents | 97.3% of lines verbatim (phase 14) | ≥ 95% — met |
-| `ocr`, real images by line | 76.2% (label ceiling ~80%) | ≥ 75% — met |
-| `ocr`, photos (TextVQA) | 58.5% (was 53%; detector box_thresh 0.4, 2026-10-03) | ≥ 60% |
-| `ocr`, rotated / blurred | −5.7 / −52 points (rotation was −26) | rotation ≤ −5 — essentially met; blur documented as a limit |
-| `caption` | 54.1% of label keywords on 400 images (ceiling ~75%); photos 78%, artwork 76%, game UI 42%, AI images 48%. `deep=true` (Moondream2 long): 61.5% vs 53.3% on 280 held-out images, ~3x slower | ≥ 60% — met with `deep=true`; the fast default stays at ~54% |
-| `caption(auto_verify_text)` | lowered key phrases 25.5% → 20.8% | never makes a caption worse |
-| `detect_objects` | 59.2% recall, 42.7% precision on 400 images (app/web 34%); absent object boxed 70% | ≥ 60% recall — essentially met; limit stated in description — stated |
-| `count_objects` | 57.3% exact on 75 held-out COCO scenes of 3 or fewer (1: 85%, 2: 50%, 3: 24%); 41.6% on 400 generalist images (MAE 3.4; screenshots and game UI 24%). `separable` "no" was right 2/12 on predicted singles, now 2/5 | ≥ 50% exact on scenes of 3 or fewer — met |
-| `query_image` | 78.8% answer contained on 400 images; position 69.7% (n=76; the 0% was a 25-image sample) | ≥ 75% — met |
-| `spatial_relations` | contact 92%, containment 83.8% (was 67.6%; `enclosed_by`, 2026-10-03) | containment ≥ 80% — met |
-| `score_aesthetics` | ρ 0.49 | ≥ 0.5 |
-| AI-defect checks | sensitivity 46%, specificity 85% (26 images); phase 11 full: 58%, 56% (40 images). **Reviewed rounds 7/8 (2026-10-05): 38.8% / 70.0% on 149 images, flagging defective 38.8% vs clean 30.0%, near chance; only 8 of 19 hits on the defect's own part, 47 of 69 anomalies are leg counts. Held-out round 8: 23.1% sensitivity**. **With the defect probe and the part count demoted (2026-10-06), on 95 images it never trained on (round 8, phase 10, phase 11): 59.7% / 66.7% (was 41.9% / 72.7%); probe alone 51.6% / 69.7%; round 7 CV, probe alone: 63.3% / 85.0%** | ≥ 60% / ≥ 85% — rules can't reach it: 5 of 7 misses are omissions, which a part count can't tell from occlusion. First candidate for a model variant; worker round 7 is building a 150-image set |
+| Tool | Now | Good | Frontier model (best estimate) |
+| --- | --- | --- | --- |
+| `ocr`, clean screens and documents | 97.3% of lines verbatim (phase 14) | ≥ 95% — met | **E** ~97–99%; **P** DocVQA 91–95% (GPT-4o, Claude 3.5 Sonnet, Gemini 1.5 Pro). About parity |
+| `ocr`, real images by line | 76.2% (label ceiling ~80%) | ≥ 75% — met | **L** ~80%: the labels are a frontier model's reading, and they agree with themselves about that often |
+| `ocr`, photos (TextVQA) | 58.5% (was 53%; detector box_thresh 0.4, 2026-10-03) | ≥ 60% | **P** 76.5–80.8% on TextVQA's own VQA metric (Claude 3.5 Sonnet 76.5, GPT-4o 77.4, Gemini 1.5 Pro 78.8, Claude 3 Opus 80.8); not the same metric as ours. **E** ~75–80% here |
+| `ocr`, rotated / blurred | −5.7 / −52 points (rotation was −26) | rotation ≤ −5 — essentially met; blur documented as a limit | **E** rotation −5 to −10; blur −20 to −30 (reads context, guesses words). Low confidence |
+| `caption` | 54.1% of label keywords on 400 images (ceiling ~75%); photos 78%, artwork 76%, game UI 42%, AI images 48%. `deep=true` (Moondream2 long): 61.5% vs 53.3% on 280 held-out images, ~3x slower | ≥ 60% — met with `deep=true`; the fast default stays at ~54% | **L** ~75%: a frontier labeller's keyword agreement with itself |
+| `caption(auto_verify_text)` | lowered key phrases 25.5% → 20.8% | never makes a caption worse | n/a: a frontier model reads the text while captioning |
+| `detect_objects` | 59.2% recall, 42.7% precision on 400 images (app/web 34%); absent object boxed 70% | ≥ 60% recall — essentially met; limit stated in description — stated | **E** recall 60–70% with looser boxes, precision ~70%; boxes an absent object 10–20% of the time (it can just say "not there"). Frontier is clearly ahead on absent objects |
+| `dense_region_caption` | 74% box recall (phase 7) | — | **E** ~60–70%: frontier boxes are less tight |
+| `count_objects` | 57.3% exact on 75 held-out COCO scenes of 3 or fewer (1: 85%, 2: 50%, 3: 24%); 41.6% on 400 generalist images (MAE 3.4; screenshots and game UI 24%). `separable` "no" was right 2/12 on predicted singles, now 2/5 | ≥ 50% exact on scenes of 3 or fewer — met | **E** 80–90% on scenes of 3 or fewer; **P** compositional counting of simple shapes: GPT-4o 35%, Gemini 2.5 Flash 47% (VLMCountBench). Frontier is ahead on small counts, weak on large or mixed ones |
+| `query_image` | 78.8% answer contained on 400 images; position 69.7% (n=76; the 0% was a 25-image sample) | ≥ 75% — met | **E** ~88–92%. **P** TextVQA as above (~77–81% vs Moondream2's 48% exact here). The largest gap |
+| `spatial_relations` | contact 92%, containment 83.8% (was 67.6%; `enclosed_by`, 2026-10-03) | containment ≥ 80% — met | **E** 75–85% as a yes/no judgement, and no masks or distances at all. FusionVision ahead |
+| `score_aesthetics` | ρ 0.49 | ≥ 0.5 | **E** ρ 0.5–0.65 zero-shot; trained scorers (Q-Align) do better than either. About parity |
+| `critique_composition` | token F1 27% against label critiques (phase 7) | — | **E** ~40%; the labels are a frontier critique |
+| AI-defect checks | sensitivity 46%, specificity 85% (26 images); phase 11 full: 58%, 56% (40 images). **Reviewed rounds 7/8 (2026-10-05): 38.8% / 70.0% on 149 images, flagging defective 38.8% vs clean 30.0%, near chance; only 8 of 19 hits on the defect's own part, 47 of 69 anomalies are leg counts. Held-out round 8: 23.1% sensitivity**. **With the defect probe and the part count demoted (2026-10-06), on 95 images it never trained on (round 8, phase 10, phase 11): 59.7% / 66.7% (was 41.9% / 72.7%); probe alone 51.6% / 69.7%; round 7 CV, probe alone: 63.3% / 85.0%**. **2026-10-08, phase 11 graded by the user's anatomy verdicts (94 images, 47/47): 63.8% / 63.8%; retrained with round 7 crop reviews 72.3% / 63.8% (not shipped yet)** | ≥ 60% / ≥ 85% — rules can't reach it: 5 of 7 misses are omissions, which a part count can't tell from occlusion. First candidate for a model variant; worker round 7 is building a 150-image set | **M** against the user's labels, 2026-10-08: Claude Opus 5.5 first-pass drafts 42% / 98% (round 9, 246 images) and 38% / 81% (phase 11); Gemini 100% / 52% (phase 11, 39 images, judging any glitch, not only anatomy). Two frontier models, opposite trade-offs, neither balanced. **P** zero-shot VLMs need scaffolding for this; ArtifactLens reports +45% from it |
+
+**Frontier column key.** **M** measured here, on the same images and labels. **L** the label ceiling: the
+labels were written by a frontier-class model, so its agreement with itself stands in for its score. **P**
+a published benchmark, usually a different metric from ours. **E** an informed estimate, not measured.
+Only **M** is a head-to-head. A scripted GeminiVisionMCP run on the AI-defect set and a phase 11 sample would
+turn the main **E** rows into **M** (it sends those images to Google's API).
+
+Sources for **P**: [Qwen2.5-VL report](https://arxiv.org/pdf/2502.13923) (TextVQA, DocVQA, ChartQA for
+GPT-4o, Claude 3.5 Sonnet, Gemini 1.5 Pro), [InternVL3.5 report](https://arxiv.org/pdf/2508.18265) (Claude 3
+Opus), [VLMCountBench](https://arxiv.org/pdf/2510.04401) (counting),
+[ArtifactLens](https://arxiv.org/pdf/2602.09475) (artifact detection), [OCRBench
+v2](https://arxiv.org/pdf/2501.00321) (GPT-4o 47.6%, Gemini 1.5 Pro 51.6% English: hard text-localisation
+tasks also trouble frontier models).
 
 **Stop rule.** If hard work on a target stops making tangible progress, or the changes
 start fitting the test rather than improving the tool, stop and try a different approach
@@ -93,3 +108,4 @@ exact boxes outright.
 - 2026-10-05: AI-defect answer key finished: round 7 (149 images from Commons and DiffusionDB, 49 defective, user-reviewed; the worker's draft had 14 false defects and 20 repeated images) is the tune set, round 8 (31 of the user's own DreamShaperXL images) the holdout. The shipping part count is near chance on it (VisionBench `ai_defect_baseline.py`). Next: the CLIP crop probe (AUC 0.88 on SynArtifact) against both rounds.
 - 2026-10-05 (later): the SynArtifact-trained probe did not transfer (round 7 image AUC 0.65; it scored real photos as more defective than defects). Retrained on round 7's reviewed hand/face crops it did (round 8 image AUC 0.885) and shipped in `structured_analysis` as `defect_probe` (weights in `data/defect_probe.json`, ~15 KB; reuses the aesthetics CLIP). End to end on 95 unseen images: defective flagged 41.9% → 71.0%, clean left alone 72.7% → 54.5%. Specificity is now the gap; the part count costs ~12 points of it for ~11 of sensitivity.
 - 2026-10-06: part count demoted to an observation (user decision). `structured_analysis` on the 95 unseen images: 59.7% of defective flagged, 66.7% of clean left alone (was 41.9% / 72.7% before the probe). Next for AI defects: specificity (85% target), and phase 11's Gemini-made defect labels, which nobody has reviewed.
+- 2026-10-08: frontier column added to the "good" table (measured where possible, otherwise label ceilings, published benchmarks or estimates, each marked). Phase 11's AI-defect key replaced by the user's anatomy verdicts (8 defective of 39, where Gemini's had 24); round 9 (246 DiffusionDB images, 141 defective) reviewed for probe training.
