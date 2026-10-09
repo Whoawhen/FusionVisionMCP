@@ -38,10 +38,9 @@ real hallucination measure and runs it on what ships, before any new model is tr
    to Florence-2's word count on the same image, as recall already is.
 3. **Generalist set spot-check.** COCO is photos only; the weak kinds are not. On a 60-image sample of the
    tune split (stratified by kind), list each caption's concrete claims (objects, text, counts, colours) and
-   grade them present / absent / unsure. The grader is the open question; options, in order of preference:
-   - the user, through a `crops_serve.py`-style card UI (caption claim + image, one key per claim);
-   - Claude's own vision, which needs the user's explicit permission per the vision rule;
-   - GeminiVisionMCP, which sends the images off the machine (ask first).
+   grade them present / absent / unsure. **Grader: Gemini (user's choice, 2026-10-09)**, via GeminiVisionMCP or
+   the Gemini API, so these 60 images leave the machine. Spot-check a sample of Gemini's grades by hand before
+   trusting it: on AI defects it called glitches the user did not (100% caught, 52% clean left alone on phase 11).
 4. **Baselines.** Run all of it on Florence-2 detailed and Moondream2 long. This is the bar the bake-off has to
    clear, and it may show `deep=true` already hallucinates more than its recall gain is worth.
 
