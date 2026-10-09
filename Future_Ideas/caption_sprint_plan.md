@@ -91,6 +91,18 @@ other Chinese bases).
    that covers two jobs at a small loss can beat one that wins a single job, because it removes a model
    from memory.
 
+### Speed limits (user, 2026-10-09)
+
+Median seconds per image on CPU, measured on the same machine and images as today's model. A model over a
+slot's limit cannot win that slot, whatever its quality; latency is reported beside every score.
+
+| Slot | Today | Limit |
+|---|---|---|
+| Default caption | Florence-2-large, ~11 s | ≤ 15 s |
+| `caption(deep=true)` | Moondream2 long, ~33 s | ≤ 45 s |
+| `query_image`, if a model takes it over | Moondream2 (measure it first) | ≤ 1.5x today |
+| First-call load time | ~5–20 s today | reported, not a gate |
+
 ### What would ship
 
 - **New `deep` model:** beats Moondream2 long at matched length with a confidence interval above zero, and
