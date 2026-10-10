@@ -162,6 +162,16 @@ This is stated in `caption`'s MCP description, since a calling agent reads that 
 this file. `caption(verify_text=true)` still uses Florence-2's `<OCR_WITH_REGION>` head for that cross-check —
 the one remaining place Florence-2 reads text.
 
+**2026-10-10: the caption now carries the `ocr` engine's text (`read_text`, on by default).** The captioners
+paraphrase text and cannot read most of it, so `caption` runs `ocr_pages` and ends the caption with
+`Visible text: "..."` (verbatim, reading order, ` / ` between lines, 40 words at most; `CAPTION_TEXT_WORDS`). A
+text-free image gets no line, so its caption is unchanged. On VisionBench's 280 held-out images (variants fixed
+before running, `caption_text_grounding.py`): default 53.3% -> 60.9% of key facts, `deep` 61.5% -> 66.3%, no image
+worse, and none of the absent objects named came from the text. The line is appended *after* any `verify_text`
+work, so its quotes cannot trip `auto_verify_text`'s "caption quotes text" trigger. Two things lost on the tune
+split and were not shipped: asking Moondream2 for the image type first (-9.2 points; its answers are a third the
+length of its long caption) and a language tag on the text (no recall gain, about 1 in 4 tags wrong).
+
 ## Multi-column layouts are handled by geometry, not by asking the model harder
 
 `ocr` reads strictly in raster order, so a document laid out in side-by-side columns (a two-column form, meeting

@@ -77,6 +77,11 @@ DEFAULT_SAM2_MODEL: Final[str] = "facebook/sam2.1-hiera-small"
 #: Calibrated for PP-OCRv6 only: EasyOCR's scores run lower and mean something different.
 OCR_MIN_CONFIDENCE: Final[float] = 0.75
 
+#: `caption(read_text=true)` appends at most this many words of the `ocr` engine's text.
+#: Fixed before measuring (VisionBench `caption_text_grounding.py`, 2026-10-10); on 280
+#: held-out images it lifted the default caption's keyword recall 53.3% -> 60.9%.
+CAPTION_TEXT_WORDS: Final[int] = 40
+
 #: PP-OCR's detector keeps a candidate text box when its mean probability reaches this.
 #: RapidOCR's default, 0.5, is tuned for documents; on 200 TextVQA photos, answer recall
 #: climbs 55.0% (0.5) -> 57.0 (0.45) -> 58.5 (0.4) and plateaus (58.0 at 0.35 and 0.3).

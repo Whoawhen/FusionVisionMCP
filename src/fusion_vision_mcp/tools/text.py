@@ -11,7 +11,7 @@ from mcp.server.mcpserver import Context, MCPServer
 from pydantic import Field
 
 from fusion_vision_mcp import textmatch
-from fusion_vision_mcp.analysis import ocr_pages
+from fusion_vision_mcp.analysis import ocr_pages, visible_text_line
 from fusion_vision_mcp.constants import CaptionLevel
 from fusion_vision_mcp.images import get_images
 from fusion_vision_mcp.ocr_fusion import fuse_caption_ocr
@@ -118,6 +118,19 @@ def register(mcp: MCPServer) -> None:
                 )
             ),
         ] = False,
+        read_text: Annotated[
+            bool,
+            Field(
+                description=(
+                    "When true (the default), also read the image with the `ocr` engine and end the "
+                    'caption with `Visible text: "..."`: the verbatim text in reading order, lines '
+                    "separated by ' / ', at most 40 words. The captioners cannot read app and game "
+                    "titles, document headings or labels; this gives them to the caption. An image "
+                    "with no text gets no line, so its caption is unchanged. Adds about 1-2s per image. "
+                    "Set false for the bare caption."
+                )
+            ),
+        ] = True,
     ) -> list[Any]:
         """Describe what an image shows, as one detailed prose caption.
 
@@ -132,12 +145,20 @@ def register(mcp: MCPServer) -> None:
         absent object no more often (about 1%). Much of that gain comes from
         it simply saying more, so it is slower, not sharper per word.
 
+        By default the caption ends with `Visible text: "..."`, the `ocr`
+        engine's verbatim reading of any text in the image (`read_text`). On
+        the same 280 images that took the default caption from 53.3% to 60.9%
+        of key facts and the deep caption from 61.5% to 66.3%, mostly app and
+        game titles, document headings and labels the captioners cannot read;
+        no image scored worse, and a text-free image gets no line at all. The
+        quoted line is the reliable text; the prose before it is not.
+
         Reach for a different tool when the question is narrower: `query_image`
         to ask something specific about the image, `dense_region_caption` to get
         a separate caption and box for each thing in it, and `ocr` to transcribe
         text rather than describe it. Returns one caption per page for a PDF.
 
-        Do not trust any text this quotes back. A caption that mentions a name,
+        Do not trust any text the prose quotes back. A caption that mentions a name,
         brand or label is describing it, not transcribing it, and Florence-2
         misspells text here that it reads correctly under `ocr` -- it rendered a
         logo reading "FusionVisionMCP" as "FusionVisionMP" mid-caption while `ocr`
@@ -173,19 +194,27 @@ def register(mcp: MCPServer) -> None:
                 captions = app.vqa.caption(images, length="long")
             else:
                 captions = app.florence2.caption(images, CaptionLevel.MORE_DETAILED)
-            if not verify_text and not auto_verify_text:
-                return captions
+            # Read before any verify step runs, but append after it, so the quoted text
+            # cannot itself trip `auto_verify_text`'s "caption quotes text" trigger.
+            lines = (
+                [visible_text_line(page["text"]) for page in ocr_pages(app, images)]
+                if read_text
+                else [""] * len(captions)
+            )
+
+            def with_text(caption_text: str, line: str) -> str:
+                return f"{caption_text.rstrip()} {line}" if line else caption_text
 
             should_verify = verify_text
             if auto_verify_text and any(textmatch.contains_likely_text(c) for c in captions):
                 should_verify = True
 
             if not should_verify:
-                return captions
+                return [with_text(c, line) for c, line in zip(captions, lines, strict=True)]
 
             regioned = app.florence2.ocr_with_regions(images)
             results = []
-            for image, caption_text, page_regions in zip(images, captions, regioned, strict=True):
+            for image, caption_text, page_regions, line in zip(images, captions, regioned, lines, strict=True):
                 text_regions = [
                     {"text": text, "box": [int(v) for v in box]}
                     for text, box in zip(page_regions.get("labels", []), page_regions.get("bboxes", []))
@@ -196,6 +225,9 @@ def register(mcp: MCPServer) -> None:
                     image,
                     specialist=app.ocr_engine if auto_verify_text else None,
                 )
+                for key in ("caption", "caption_corrected"):
+                    if isinstance(fused.get(key), str):
+                        fused[key] = with_text(fused[key], line)
                 results.append(fused)
             return results
 

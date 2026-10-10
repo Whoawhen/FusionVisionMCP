@@ -70,7 +70,7 @@ root-caused against the exact fixture that exposed it, not patched at the sympto
 | Tool | Model(s) | Description |
 |---|---|---|
 | `ocr` | PP-OCRv6 English | Transcribe any text in an image or PDF — printed, stylized or low-contrast alike — with a per-span confidence score. Multi-column pages are split by geometry and read in reading order. Text-free images return nothing. |
-| `caption` | Florence-2 | Describe what an image shows as one detailed prose caption of the whole scene. `verify_text=true` also corrects close text misses against a verbatim OCR pass; `deep=true` uses Moondream2's longer caption (slower, covers more on charts, documents, signage and game UI). |
+| `caption` | Florence-2 | Describe what an image shows as one detailed prose caption of the whole scene. `verify_text=true` also corrects close text misses against a verbatim OCR pass; `deep=true` uses Moondream2's longer caption (slower, covers more on charts, documents, signage and game UI). By default (`read_text`) the caption ends with `Visible text: "..."`, the `ocr` engine's verbatim reading of any text in the image. |
 | `detect_objects` | Florence-2 | Locate a named object, returning bounding boxes, center points and labels. |
 | `dense_region_caption` | Florence-2 | Caption every salient region of an image at once, without naming objects first. |
 | `query_image` | Moondream2 | Ask a free-form question about an image (visual question answering). `check_consistency=true` routes a low-confidence answer to the measurement that actually answers it, when one applies. |

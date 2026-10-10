@@ -19,6 +19,7 @@ from fusion_vision_mcp.analysis import (
     _region_label_consensus,
     _separability,
     _size_measurement,
+    visible_text_line,
 )
 
 
@@ -358,3 +359,20 @@ class TestDispatchRequiredArguments:
     def test_unknown_operation_raises(self) -> None:
         with pytest.raises(ValueError, match="Unknown operation"):
             _dispatch(object(), "sharpen", [_IMAGE], question="", object_name="")  # type: ignore[arg-type]
+
+
+class TestVisibleTextLine:
+    def test_text_free_page_gets_no_line(self) -> None:
+        assert visible_text_line("") == ""
+        assert visible_text_line("\n  \n") == ""
+
+    def test_lines_keep_reading_order_and_are_quoted(self) -> None:
+        assert (
+            visible_text_line("OpenTTD 14.1\nNew Game\n Load Game ")
+            == 'Visible text: "OpenTTD 14.1 / New Game / Load Game".'
+        )
+
+    def test_cut_at_max_words(self) -> None:
+        assert visible_text_line("one two three\nfour five", max_words=5) == 'Visible text: "one two three / four".'
+        # The " / " separator counts toward the cut; a cut landing on it does not leave it dangling.
+        assert visible_text_line("one two three\nfour five", max_words=4) == 'Visible text: "one two three".'

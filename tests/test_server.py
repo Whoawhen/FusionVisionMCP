@@ -1027,6 +1027,35 @@ async def test_caption_auto_verify_text_plain_photo_negative_control(
 
 
 @pytest.mark.anyio
+async def test_caption_reads_text_by_default(mcp_client_session: ClientSession) -> None:
+    """The caption ends with the `ocr` engine's verbatim text, which reads the banner exactly."""
+    res = await mcp_client_session.call_tool("caption", arguments={"src": BANNER_IMAGE_FILEPATH})
+    caption = cast(TextContent, res.content[0]).text
+
+    assert not res.is_error
+    assert 'Visible text: "' in caption
+    assert "FusionVisionMCP" in caption.split("Visible text:", 1)[1]
+
+
+@pytest.mark.anyio
+async def test_caption_text_free_image_gets_no_text_line(mcp_client_session: ClientSession) -> None:
+    """Negative control: a photo with no text keeps the bare caption, with or without `read_text`."""
+    default = await mcp_client_session.call_tool("caption", arguments={"src": SAMPLE_IMAGE_FILEPATH})
+    bare = await mcp_client_session.call_tool("caption", arguments={"src": SAMPLE_IMAGE_FILEPATH, "read_text": False})
+
+    assert "Visible text" not in cast(TextContent, default.content[0]).text
+    assert cast(TextContent, default.content[0]).text == cast(TextContent, bare.content[0]).text
+
+
+@pytest.mark.anyio
+async def test_caption_read_text_false_returns_bare_caption(mcp_client_session: ClientSession) -> None:
+    res = await mcp_client_session.call_tool("caption", arguments={"src": BANNER_IMAGE_FILEPATH, "read_text": False})
+
+    assert not res.is_error
+    assert "Visible text" not in cast(TextContent, res.content[0]).text
+
+
+@pytest.mark.anyio
 async def test_count_objects_adds_estimates_on_collapse(mcp_client_session: ClientSession) -> None:
     """The documented flower: separable 'no' and an actionable outline estimate."""
     res = await mcp_client_session.call_tool(

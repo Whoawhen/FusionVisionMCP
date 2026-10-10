@@ -17,7 +17,7 @@ from typing import Any, Final, cast
 from PIL.Image import Image, Transpose
 
 from fusion_vision_mcp import geometry, layout, question
-from fusion_vision_mcp.constants import DETECT_BOX_THRESHOLD, CaptionLevel
+from fusion_vision_mcp.constants import CAPTION_TEXT_WORDS, DETECT_BOX_THRESHOLD, CaptionLevel
 from fusion_vision_mcp.detection_policy import execute_detection
 from fusion_vision_mcp.protocols import AppContext, Processor
 
@@ -588,6 +588,18 @@ def ocr_pages(app: AppContext, images: Sequence[Image]) -> list[dict[str, Any]]:
         regions = _read_upright(app, image)
         pages.append({"text": "\n".join(r["text"] for r in regions), "text_regions": regions})
     return pages
+
+
+def visible_text_line(text: str, max_words: int = CAPTION_TEXT_WORDS) -> str:
+    """The `ocr` engine's text as one caption sentence, or "" for a text-free page.
+
+    Lines keep their reading order, joined with " / " and cut at `max_words` words, and
+    are quoted so a caller can tell verbatim text from the captioner's own words.
+    """
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if not lines:
+        return ""
+    return 'Visible text: "' + " ".join(" / ".join(lines).split()[:max_words]).rstrip(" /") + '".'
 
 
 def _dispatch(app: AppContext, operation: str, images: list[Image], *, question: str, object_name: str) -> Any:
