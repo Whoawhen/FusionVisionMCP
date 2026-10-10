@@ -511,6 +511,27 @@ Diffusion 1.x images) made it *worse* on the unseen images (51.1% / 76.6%, AUC 0
 fine, so the CLIP crop probe has plateaued: the next gain has to come from what the probe looks at (a different
 backbone, landmarks), not from more of the same labels.
 
+**2026-10-09: the probe reads DINOv2-large, not CLIP.** Same crops, labels and training rule; only the features
+changed (`dinov2.py`: CLS token + mean patch token, 2,048 floats; `data/defect_probe.json` names its backbone).
+Chosen on VisionBench round 10, 299 user-graded images from six generators no probe trained on (DALL-E 2,
+Midjourney, RealVisXL, SDXL base, FLUX.2 Klein, SANA; 154 defective), by a rule committed before the run
+(`defect_round10.py`, a5efb20): image AUC 0.686 vs CLIP's 0.612, +0.074 with a 95% interval of 0.013-0.135. At
+each probe's own threshold: 44.8% of defective images caught, 84.1% of clean left alone, against 47.4% / 68.3%.
+MediaPipe landmarks were tried too and gave nothing on hands (landmarked on 17% of crops, defective or not).
+
+Four things to know:
+
+- **Feature parity is load-bearing.** The probe was fitted to the slow `AutoImageProcessor` in float32; the server
+  matches the research features to 7e-6 (probe scores to 3e-6). Don't switch to the fast processor or fp16
+  without re-checking.
+- **It is a new model in memory**, ~1.2GB, loaded only by `structured_analysis` when a hand or face is found and
+  idle-released like the rest. CLIP is no longer loaded by `structured_analysis` at all.
+- **Rollback is a data-file change.** `inspection._probe_features` reads the probe file's `backbone`: a CLIP probe
+  file (or one without the field) still runs on CLIP.
+- **DINOv2-base is the open question.** It scored as well on round 10 (0.709) at a quarter of the size, but it
+  was not the candidate named before the run, so it waits for a fresh test set rather than being picked after
+  seeing results.
+
 ## Where things live
 
 `__init__.py` was 1,952 lines with all eleven tool definitions and their helpers inline. It is now ~250 and

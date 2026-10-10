@@ -16,10 +16,11 @@ third leg, and that one limb detected three times is one limb.
 """
 
 import numpy as np
+import pytest
 from PIL import Image
 
 from fusion_vision_mcp import defect_probe, geometry
-from fusion_vision_mcp.inspection import _containment, analyze_inspection
+from fusion_vision_mcp.inspection import _containment, _probe_features, analyze_inspection
 
 
 class _StubDetector:
@@ -43,22 +44,26 @@ class _StubDetector:
         ]
 
 
-class _StubAesthetic:
-    """Stands in for CLIP: every crop gets the same embedding, so the defect probe's score is fixed."""
+class _StubEmbedder:
+    """Stands in for the probe's backbone (DINOv2, or CLIP for a CLIP-backed probe file): every
+    crop gets the same embedding, so the defect probe's score is fixed."""
 
     def __init__(self, embedding: list[float] | None = None) -> None:
         self.embedding = embedding or [0.0] * len(defect_probe.load_probe()["coef"])
         self.calls = 0
 
-    def image_embeddings(self, images: list) -> list[list[float]]:
+    def crop_features(self, images: list) -> list[list[float]]:
         self.calls += 1
         return [self.embedding for _ in images]
 
+    image_embeddings = crop_features
+
 
 class _StubApp:
-    def __init__(self, counter, aesthetic: _StubAesthetic | None = None) -> None:
+    def __init__(self, counter, embedder: _StubEmbedder | None = None) -> None:
         self.counter = counter
-        self.aesthetic = aesthetic or _StubAesthetic()
+        self.defect_embedder = embedder or _StubEmbedder()
+        self.aesthetic = self.defect_embedder
 
 
 def _overcounts(obs: list) -> list:
@@ -266,7 +271,7 @@ def _probe_embedding(logit: float) -> list[float]:
 
 
 def test_defect_probe_flags_a_crop_above_threshold_and_names_it():
-    app = _StubApp(_StubDetector({"hand": [HAND]}), _StubAesthetic(_probe_embedding(4.0)))
+    app = _StubApp(_StubDetector({"hand": [HAND]}), _StubEmbedder(_probe_embedding(4.0)))
     obs, anomalies = analyze_inspection(app, _image(), [])
     assert len(anomalies) == 1
     assert "hand at [150, 100, 190, 150]" in anomalies[0].description
@@ -277,7 +282,7 @@ def test_defect_probe_flags_a_crop_above_threshold_and_names_it():
 
 def test_defect_probe_below_threshold_reports_its_highest_score_without_an_anomaly():
     app = _StubApp(
-        _StubDetector({"hand": [HAND], "face": [[10.0, 10.0, 60.0, 60.0]]}), _StubAesthetic(_probe_embedding(0.0))
+        _StubDetector({"hand": [HAND], "face": [[10.0, 10.0, 60.0, 60.0]]}), _StubEmbedder(_probe_embedding(0.0))
     )
     obs, anomalies = analyze_inspection(app, _image(), [])
     assert anomalies == []
@@ -289,18 +294,44 @@ def test_defect_probe_below_threshold_reports_its_highest_score_without_an_anoma
 def test_defect_probe_threshold_is_strict_and_matches_the_shipped_file():
     probe = defect_probe.load_probe()
     assert 0.5 < probe["threshold"] < 1.0
-    assert len(probe["coef"]) == 768
+    # DINOv2-large: 1,024-float CLS token + 1,024-float mean patch token.
+    assert probe["backbone"] == "dinov2_cls_mean" and probe["backbone_model"] == "facebook/dinov2-large"
+    assert len(probe["coef"]) == 2048
     at = defect_probe.score(_probe_embedding(0.0), probe)
     assert abs(at - 0.5) < 1e-9
 
 
-def test_defect_probe_with_no_hand_or_face_does_not_load_clip():
-    aesthetic = _StubAesthetic()
-    app = _StubApp(_StubDetector({"person": [PERSON]}), aesthetic)
+def test_defect_probe_with_no_hand_or_face_does_not_load_the_backbone():
+    embedder = _StubEmbedder()
+    app = _StubApp(_StubDetector({"person": [PERSON]}), embedder)
     obs, anomalies = analyze_inspection(app, _image(), [])
     assert anomalies == []
-    assert aesthetic.calls == 0
+    assert embedder.calls == 0
     assert any(o.source == "defect_probe" and "not applied" in o.claim for o in obs)
+
+
+def test_probe_features_follow_the_probe_files_backbone():
+    """A CLIP-backed probe file still reads CLIP, so rolling back is a data-file change."""
+
+    class _Clip:
+        def image_embeddings(self, images: list) -> list[list[float]]:
+            return [[1.0]] * len(images)
+
+    class _Dino:
+        def crop_features(self, images: list) -> list[list[float]]:
+            return [[2.0]] * len(images)
+
+    app = _StubApp(_StubDetector({}))
+    app.aesthetic, app.defect_embedder = _Clip(), _Dino()
+    crops = [_image()]
+    assert _probe_features(app, {"backbone": "clip_image_embeds"}, crops) == [[1.0]]
+    assert _probe_features(app, {}, crops) == [[1.0]]  # files from before the backbone field
+    assert _probe_features(app, {"backbone": "dinov2_cls_mean"}, crops) == [[2.0]]
+    app.defect_embedder = None
+    with pytest.raises(RuntimeError, match="DINOv2"):
+        _probe_features(app, {"backbone": "dinov2_cls_mean"}, crops)
+    with pytest.raises(ValueError, match="unknown backbone"):
+        _probe_features(app, {"backbone": "siglip"}, crops)
 
 
 def test_padded_box_clips_to_the_image():

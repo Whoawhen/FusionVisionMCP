@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Final, Literal, cast
 
 from mcp.server.mcpserver import MCPServer
 
+from fusion_vision_mcp import defect_probe
 from fusion_vision_mcp.constants import (
     DEFAULT_AESTHETIC_MODEL,
     DEFAULT_FLORENCE2_MODEL,
@@ -41,6 +42,7 @@ logger = logging.getLogger(__name__)
 # name would be a NameError at `def` time (and ruff TC004 flags it).
 if TYPE_CHECKING:
     from fusion_vision_mcp.aesthetic import Aesthetic
+    from fusion_vision_mcp.dinov2 import Dinov2
     from fusion_vision_mcp.easyocr_engine import EasyOCREngine
     from fusion_vision_mcp.florence2 import Florence2
     from fusion_vision_mcp.grounding_dino import GroundingDino
@@ -54,6 +56,7 @@ if TYPE_CHECKING:
 from fusion_vision_mcp.protocols import (
     AestheticScorer,
     AppContext,
+    CropEmbedder,
     InstanceDetector,
     Processor,
     Segmenter,
@@ -113,6 +116,12 @@ async def app_lifespan(
         from fusion_vision_mcp.aesthetic import Aesthetic
 
         return Aesthetic(aesthetic_model_id, device)
+
+    def _make_dinov2() -> "Dinov2":
+        from fusion_vision_mcp.dinov2 import Dinov2
+
+        # The probe file names the backbone it was trained on, so the two can't drift apart.
+        return Dinov2(defect_probe.load_probe()["backbone_model"], device)
 
     def _make_grounding_dino() -> "GroundingDino":
         from fusion_vision_mcp.grounding_dino import GroundingDino
@@ -198,7 +207,12 @@ async def app_lifespan(
     if reasoner_provider != "none":
         reasoner = IdleProxy(IdleReleased(_make_reasoner, idle_timeout, "VisionReasoner"))
 
-    yield AppContext(florence2, vqa, segmenter, aesthetic, counter, ocr_specialist, ocr_engine, iqa, reasoner)
+    # Only query_image(structured_analysis=true) loads it, and only when an image has a hand or face.
+    defect_embedder = cast(CropEmbedder, IdleProxy(IdleReleased(_make_dinov2, idle_timeout, "DINOv2")))
+
+    yield AppContext(
+        florence2, vqa, segmenter, aesthetic, counter, ocr_specialist, ocr_engine, iqa, reasoner, defect_embedder
+    )
 
 
 def server(

@@ -155,6 +155,14 @@ class AestheticScorer(Protocol):
         ...
 
 
+class CropEmbedder(Protocol):
+    """Represents a protocol for embedding image crops for the learned defect probe."""
+
+    def crop_features(self, images: list[Image]) -> list[list[float]]:
+        """One feature list per image, in the layout the shipped probe was trained on."""
+        ...
+
+
 @dataclass
 class AppContext:
     """Context for the FastMCP app."""
@@ -173,3 +181,6 @@ class AppContext:
     ocr_engine: SpecialistOCR
     iqa: Any | None = None
     reasoner: Any | None = None
+    # The defect probe's backbone (DINOv2), lazy like the rest; None only in tests and callers
+    # that build an AppContext by hand, which then can only run a CLIP-backed probe.
+    defect_embedder: CropEmbedder | None = None

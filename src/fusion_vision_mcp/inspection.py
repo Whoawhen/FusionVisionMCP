@@ -323,6 +323,22 @@ def _check_anatomy(app: AppContext, image: Image.Image) -> tuple[list[Observatio
     return observations, anomalies
 
 
+def _probe_features(app: AppContext, probe: dict[str, Any], crops: list[Image.Image]) -> list[list[float]]:
+    """The features the shipped probe was trained on, from the backbone its file names.
+
+    `dinov2_cls_mean` is the shipped probe (2026-10-09); `clip_image_embeds` is the first one,
+    kept working so a probe file is all a rollback needs.
+    """
+    backbone = probe.get("backbone", "clip_image_embeds")
+    if backbone == "clip_image_embeds":
+        return app.aesthetic.image_embeddings(crops)
+    if backbone == "dinov2_cls_mean":
+        if app.defect_embedder is None:
+            raise RuntimeError("the defect probe needs DINOv2, but this AppContext has no defect_embedder")
+        return app.defect_embedder.crop_features(crops)
+    raise ValueError(f"defect probe names an unknown backbone: {backbone!r}")
+
+
 def _check_defect_probe(app: AppContext, image: Image.Image) -> tuple[list[Observation], list[Anomaly]]:
     """Score every detected hand and face crop with the learned defect probe (see `defect_probe`).
 
@@ -346,7 +362,7 @@ def _check_defect_probe(app: AppContext, image: Image.Image) -> tuple[list[Obser
             )
         ], []
 
-    embeddings = app.aesthetic.image_embeddings([crop for _, _, crop in crops])
+    embeddings = _probe_features(app, probe, [crop for _, _, crop in crops])
     scored = sorted(
         ((defect_probe.score(e, probe), part, box) for (part, box, _), e in zip(crops, embeddings, strict=True)),
         reverse=True,

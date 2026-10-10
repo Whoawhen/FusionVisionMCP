@@ -49,16 +49,17 @@ def register(mcp: MCPServer) -> None:
                 description=(
                     "When true, return structured `observations` and `anomalies` per image instead of "
                     "a plain answer, as a check for AI-generation defects. Three checks raise anomalies: "
-                    "a learned defect probe that scores every detected hand and face crop with CLIP "
+                    "a learned defect probe that scores every detected hand and face crop with DINOv2 "
                     "('Likely generation defect: ...', the main signal: it can see a fused or misshapen "
                     "hand), generator signatures in metadata, and low-confidence text as likely "
-                    "generated gibberish. Measured on 94 images none of these were tuned on, it flagged "
-                    "72% of defective images and 36% of clean ones: an anomaly is a lead to check, not a "
-                    "verdict, and no anomaly does not mean the image is clean. Every probe crop's score "
-                    "is listed in `observations` (source 'defect_probe'). A per-person body-part count "
-                    "also reports any person with too many limbs as an observation (source 'detector'), "
-                    "not an anomaly: on clean images it is usually a detection error. Loads the CLIP "
-                    "model used by score_aesthetics."
+                    "generated gibberish. On 299 AI images from six generators it never trained on, the "
+                    "probe alone caught 45% of images with a defect and flagged 16% of clean ones: an "
+                    "anomaly is a lead to check, not a verdict, and no anomaly does not mean the image is "
+                    "clean. It only looks at hands and faces, so an extra arm or a fused body is usually "
+                    "missed. Every probe crop's score is listed in `observations` (source "
+                    "'defect_probe'). A per-person body-part count also reports any person with too many "
+                    "limbs as an observation (source 'detector'), not an anomaly: on clean images it is "
+                    "usually a detection error. Loads DINOv2-large (~1.2GB) when a hand or face is found."
                 )
             ),
         ] = False,
