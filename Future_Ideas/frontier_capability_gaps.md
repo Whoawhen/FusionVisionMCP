@@ -76,7 +76,9 @@ numbers to the Evidence column as runs come in. The first full 400-image run fin
 Model variants, LoRAs and fine-tunes wait until the whole suite is "good". Since 2026-10-09 (user decision)
 each tool is compared with the best frontier model's figure rather than a fixed target; the fixed targets
 agreed on 2026-10-02 are in git history (before this change). A tool whose failures are caught by a flag or
-stated plainly in its description still counts in its favour.
+stated plainly in its description still counts in its favour. The plan (2026-10-09): work the 🔻 rows one at
+a time; once they are near par and progress stalls, the user decides when to move on to other models and
+fine-tunes. There is no fixed bar; the ~5-point par band below is the reference.
 
 | Tool | Model(s) | Now | Frontier model (best estimate) | Difference |
 | --- | --- | --- | --- | --- |
