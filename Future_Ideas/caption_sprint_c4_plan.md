@@ -104,6 +104,14 @@ run (the OCR text is already cached from C3), so it costs nothing and settles C4
 same caption-keyword procedure as phase 11 (same labeller and prompt), deduplicated against every existing
 VisionBench image by perceptual hash. Not used for anything until a C4 finalist's single confirm run.
 
+**Done (2026-10-11): round 11, 235 images** (25–27 per kind, all kept; 6 near-duplicates within the round
+dropped, none matching earlier VisionBench images), in VisionBench-labels `benchmarks/holdout_round11/`. Use all
+235 rather than trimming to 20 per kind: nobody has seen a result on it, and trimming would only widen the CIs.
+Caveat: its keyword groups are a little looser than round 4's (3.2 groups per image vs 3.65; more groups mixing
+different things, e.g. `[carriages, spectator crowd, Impressionism]`, which are easier to hit). So read it only
+as a paired comparison (candidate vs baseline on the same 235), never as an absolute level against the 280 split.
+Round 11b (36 images labelled again blind) measures how repeatable its labels are.
+
 ## Sprint C4-1: Moondream2 encode-once for `deep` (Opus 5.5 to design, Sonnet 5.5 to run)
 
 **Why:** the theme question gained +1.3 (0 worse) but cost ~22 s, because `model.query(image, …)` encodes the
