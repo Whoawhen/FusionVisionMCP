@@ -5,6 +5,19 @@ memory and **must be verified** before any download (accepted: public domain, CC
 US government works). New images follow the usual route: the worker proposes, the user approves,
 and Claude adds a reproducible, licence-recording download step.
 
+**Annotation licence is not image licence.** A dataset's CC BY 4.0 often covers only its captions
+or boxes; the policy applies to the images. Licences the user's sources state (2026-10-10, still to
+verify against each project's own page):
+
+- Rico, Widget Captioning, Screen2Words: CC BY 4.0. Rico released its screenshots as a dataset under
+  CC BY 4.0, and both annotation sets sit on them, so these are the likeliest to pass whole.
+- Visual Genome: CC BY 4.0 for the annotations; the images are Flickr photos (YFCC100M and COCO)
+  under their own licences, so keep only images whose own licence is on the list, as with COCO.
+- TextCaps: CC BY for the captions; the images are Open Images, which records a licence per image
+  (mostly CC BY 2.0). Filter per image.
+- DocVQA: "CC BY 4.0 / open access academic". The documents come from the UCSF Industry Documents
+  Library with mixed copyright; out unless the actual terms put the images on the list.
+
 ## Worth using
 
 | Source | Gap it would fill | Why | Check first |
