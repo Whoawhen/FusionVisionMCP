@@ -22,6 +22,7 @@ from fusion_vision_mcp.analysis import (
     _separability,
     _size_measurement,
     busy_background,
+    name_main_subject,
     visible_text_line,
 )
 
@@ -399,3 +400,15 @@ class TestBusyBackground:
     def test_states_its_reliability(self) -> None:
         result = busy_background(self._app("yes"), Image.new("RGB", (8, 8)))  # type: ignore[arg-type]
         assert "69%" in result["reliability"]
+
+
+class TestNameMainSubject:
+    """Moondream2's answer is trimmed to a name; 'none' means no single subject."""
+
+    @pytest.mark.parametrize(
+        ("answer", "name"),
+        [("A brown dog.", "A brown dog"), (" two giraffes ", "two giraffes"), ("None", ""), ("none.", "")],
+    )
+    def test_reads_the_answer(self, answer: str, name: str) -> None:
+        app = SimpleNamespace(vqa=SimpleNamespace(query=lambda images, q: [answer]))
+        assert name_main_subject(app, Image.new("RGB", (8, 8))) == name  # type: ignore[arg-type]

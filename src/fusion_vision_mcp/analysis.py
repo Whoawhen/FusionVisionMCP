@@ -21,6 +21,7 @@ from fusion_vision_mcp.constants import (
     BUSY_BACKGROUND_QUESTION,
     CAPTION_TEXT_WORDS,
     DETECT_BOX_THRESHOLD,
+    MAIN_SUBJECT_QUESTION,
     CaptionLevel,
 )
 from fusion_vision_mcp.detection_policy import execute_detection
@@ -473,6 +474,22 @@ def busy_background(app: AppContext, image: Image) -> dict[str, Any]:
     }
 
 
+#: A named subject box covering at least this share of the frame defers to the region pick.
+_WHOLE_FRAME: Final[float] = 0.95
+
+
+def name_main_subject(app: AppContext, image: Image) -> str:
+    """Moondream2's short name for the photo's main subject, or "" when it says there is none.
+
+    `critique_composition` boxes this name with Florence-2 when the caller gives no
+    `target_subject`. VisionBench `composition_critique.py`, against a labeller's boxes: IoU >= 0.5
+    on 79.5% / 82.0% / 84.4% of three photo sets (50, 89, 96 photos) where Florence-2's largest,
+    most central dense region managed 64.1% / 66.3% / 75.0%.
+    """
+    name = app.vqa.query([image], MAIN_SUBJECT_QUESTION)[0].strip().strip(".").strip()
+    return "" if name.lower().startswith("none") else name
+
+
 def _critique_one(
     app: AppContext,
     image: Image,
@@ -486,12 +503,18 @@ def _critique_one(
     Extracted so `critique_composition`'s relative mode can run it for both the
     image and the reference. See that tool's docstring for the return shape.
     """
-    box: list[int] | None
-    if target_subject:
-        detected = app.florence2.detect_objects([image], target_subject)[0]
+    subject = target_subject or name_main_subject(app, image)
+    box: list[int] | None = None
+    if subject:
+        detected = app.florence2.detect_objects([image], subject)[0]
         box = [int(v) for v in detected["bboxes"][0]] if detected["bboxes"] else None
-    else:
+    # A named box over (nearly) the whole frame usually means the "subject" is the scene itself (a
+    # blank image comes back as "a plain gray background"), so the region pick decides instead. On
+    # the three VisionBench sets this never cost a hit and gained two.
+    whole_frame = box is not None and geometry.box_area(box) >= _WHOLE_FRAME * image.width * image.height
+    if not target_subject and (box is None or whole_frame):
         box = _pick_primary_subject(app.florence2.dense_region_caption([image])[0], (image.width, image.height))
+        subject = ""  # the box is no longer the named subject's
 
     style: dict[str, Any] | None = None
     if style_context:
@@ -517,6 +540,7 @@ def _critique_one(
 
     result = {
         "image_size": [image.width, image.height],
+        "subject": subject or None,
         "subject_box": box,
         "aesthetics": aesthetics,
         "framing": geometry.rule_of_thirds(box, (image.width, image.height)),

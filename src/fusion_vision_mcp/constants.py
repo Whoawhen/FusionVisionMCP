@@ -82,6 +82,13 @@ OCR_MIN_CONFIDENCE: Final[float] = 0.75
 #: held-out images it lifted the default caption's keyword recall 53.3% -> 60.9%.
 CAPTION_TEXT_WORDS: Final[int] = 40
 
+#: Without a `target_subject`, `critique_composition` asks Moondream2 this and boxes the answer with
+#: Florence-2. Fixed before measuring (VisionBench `composition_critique.py`, 2026-10-11).
+MAIN_SUBJECT_QUESTION: Final[str] = (
+    "What is the main subject of this photo? Answer with a short noun phrase, "
+    "or 'none' if there is no single main subject."
+)
+
 #: `critique_composition(check_background=true)` asks Moondream2 this, word for word. Fixed before
 #: measuring (VisionBench `composition_critique.py`, 2026-10-11): against a person's blind calls it
 #: agreed 88.1% (balanced) on 25 tune photos and 69.2% on 52 held-out ones.

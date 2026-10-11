@@ -110,7 +110,8 @@ stack answers these on its own:
   aesthetic score, and — only for low-scoring images — a Moondream2 explanation, into one composition critique.
   Since 2026-10-11 it also reports `background: {busy, reliability}` by default (`check_background`), Moondream2's
   yes/no on whether the background competes with the subject: a hint, agreeing with a person's blind calls on 69%
-  of 52 held-out photos.
+  of 52 held-out photos. Without a `target_subject`, Moondream2 now names the subject and Florence-2 boxes it
+  (84.4% of boxes overlapping a labeller's on 96 fresh photos, against 75.0% for the old region pick).
 
 ---
 

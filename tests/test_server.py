@@ -860,6 +860,8 @@ async def test_critique_composition_auto_detects_subject(mcp_client_session: Cli
 
     assert not res.is_error
     assert "aesthetics" in result
+    assert result["subject"]  # Moondream2's name for the subject, boxed by Florence-2
+    assert "subject_box" in result
 
 
 @pytest.mark.anyio

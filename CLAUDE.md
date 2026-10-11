@@ -172,7 +172,7 @@ work, so its quotes cannot trip `auto_verify_text`'s "caption quotes text" trigg
 split and were not shipped: asking Moondream2 for the image type first (-9.2 points; its answers are a third the
 length of its long caption) and a language tag on the text (no recall gain, about 1 in 4 tags wrong).
 
-## `critique_composition` is scored on a checklist now, and only the busy-background hint passed
+## `critique_composition` is scored on a checklist now: a better subject box and a busy-background hint passed
 
 Phase 7 scores the critique's prose by word overlap with frontier critiques, where even Claude, Gemini and GPT only
 reach 29-34% against each other. VisionBench `composition_labels.py` built 150 COCO photos (50 tune / 100 confirm)
@@ -187,10 +187,16 @@ did not. `composition_critique.py` then scored candidates with rules committed b
 - **Not shipped: background blur.** A Laplacian sharpness ratio (subject box vs surroundings) scored 77.6% on tune
   but its threshold was fitted on 7 blurred photos and fell to 61.4% held-out (CI 44.8-77.2). Moondream2's yes/no
   says "no" to nearly everything (54%).
-- **Pending a fresh test: the subject box.** Moondream2 naming the subject and Florence-2 boxing that name (the
-  `target_subject` path) beat the auto-pick on both splits: IoU >= 0.5 79.5 vs 64.1% tune (CI 0.0 to 30.8, short of
-  the rule) and 82.0 vs 66.3% held-out (CI 6.7 to 25.8), ~15 s slower. The rule written before the held-out run made
-  a win there a lead rather than a ship, and the user kept that: it waits for a new labelled set.
+- **Shipped after a fresh test: the subject box.** Without a `target_subject`, Moondream2 names the subject
+  (`MAIN_SUBJECT_QUESTION`, returned as `subject`) and Florence-2 boxes the name, instead of the largest, most
+  central dense region. IoU >= 0.5 against the worker's box: 79.5 vs 64.1% on tune (CI 0.0 to 30.8, short of the
+  rule), 82.0 vs 66.3% held-out (CI 6.7 to 25.8), so the user asked for new photos first: on 120 fresh ones
+  (`composition_box2`, tool boxes committed before the labels existed; the user found 0 of 40 boxes wrong, 18
+  loose) **84.4 vs 75.0%, +9.4, CI 1.0 to 18.8**. The loose labels did not favour it (both methods' boxes match the
+  labels' size; it led 20-18 on the good ones and tied 14-14 on the loose). About 10 s more per call. One guard
+  was added *after* that test: a named box covering 95%+ of the frame (`_WHOLE_FRAME`) defers to the region pick,
+  because a blank image came back as "a plain gray background" boxed edge to edge. On the cached boxes of all
+  three sets it never cost a hit and gained two.
 - **Untestable here:** subject in focus (3 "no" of 150) and awkward crop (no measurement matched the user's calls).
 
 ## Multi-column layouts are handled by geometry, not by asking the model harder
