@@ -214,8 +214,8 @@ processor = AutoProcessor.from_pretrained(base_model_id, trust_remote_code=True)
 | :---: | :--- |
 | **1** | Measured, not shipped: `Florence-2-large-ft` scored 36.9% caption keyword recall vs 55.9% on the tune split, with 38-word captions (VisionBench `caption_ab.py`). Community Florence-2 fine-tunes (PromptGen v2, moredetailed, Flux, Chan) were also tested in caption sprint C2; none shipped. |
 | **2** | Ruled out: Grounding DINO is Chinese-developed (IDEA Research); no tuning on it while it awaits replacement (user rule, 2026-10-08). |
-| **3** | Untested. Check MANIQA's origin first (believed to come from a Chinese university; not verified). |
-| **4** | Untested. A file-format and safety change for the same model, not a quality change. |
+| **3** | Ruled out: MANIQA is from Tsinghua University (model research round 2, 2026-10-11). |
+| **4** | Not worth it: the shunk031 copy is a conversion of the same LAION weights, and its card names no licence (round 2). |
 
 ---
 

@@ -186,11 +186,20 @@ won't beat the 0.77B large on the same task. Only a candidate on `Florence-2-lar
 Moondream2 revision gets one tune run with its card prompt. If it's fast, compare with the default slot; if not,
 compare with `deep`. If none qualifies, C4-3a ends at the paper check.
 
+**Gate 0 result (2026-10-11, VisionBench-labels `worker_handoff/MODEL_RESEARCH_C4_VERIFIED.md`): C4-3a ends at the paper check.** Both NikshepShetty adapters are LoRAs on
+`Florence-2-base-ft`. fal's model is a full fine-tune of a May 2024 Moondream2, older than our pin, so it would
+move `query_image` too. No tune runs.
+
 ### C4-3b: Gemma 3 4B through llama.cpp (Opus 5.5 gate 0, Sonnet 5.5 runs)
 
 The scoreboard says the rest of caption needs a stronger model than CPU allows. C2 ruled out Gemma 3 4B on speed
 in transformers (79 s bf16, 66 s int8), not on quality, and a 4-bit GGUF run through llama.cpp is the one untried
 way to make it fit. This is a model swap, not a fine-tune, so it isn't held back by the "good" rule.
+
+**Gate 0 result (2026-10-11, VisionBench-labels `worker_handoff/MODEL_RESEARCH_C4_VERIFIED.md`): passes.** Google's QAT build has the vision projector
+(`gemma-3-4b-it-q4_0.gguf` 3.16 GB + `mmproj-model-f16-4B.gguf` 0.85 GB; gated, accept the Gemma Terms).
+`llama-cpp-python` 0.3.36 has a Windows CPU wheel on its own index (not PyPI) with `MTMDChatHandler`; llama.cpp's
+prebuilt `win-cpu-x64` binaries are the fallback if the handler doesn't drive Gemma 3. Try that first at gate 1.
 
 1. **Gate 0:** Gemma licence (Gemma Terms of Use, already accepted for PaliGemma 2), the GGUF's publisher (prefer
    Google's own `-qat-q4_0-gguf` release; avoid re-quantisations from unknown uploaders), and the runtime
@@ -233,6 +242,13 @@ length is a tracked metric during training.
 | DOCCI (Google) | Long, detailed captions | Photo-heavy: keep its share small |
 | TextCaps (Meta AI) | Captions that use the text in the image | Overlaps with what `read_text` already does |
 | Distilled captions for game UI, AI images and illustrations | Weakest kinds; little public data | User-sourced images captioned by Gemini (the user already approved Gemini as a grader). **These images leave the machine.** Gate 0 must also check the Gemini API terms on using its outputs to train another model (the same open question `image_sources_to_consider.md` records for ShareGPT4V). If the terms forbid it, this row is out |
+
+**Gate 0 result for the data (2026-10-11, VisionBench-labels `worker_handoff/MODEL_RESEARCH_C4_VERIFIED.md`):** DOCCI (CC BY 4.0, ~136-word descriptions) is the clean
+first source. TextCaps is usable (CC BY 4.0 / CC BY 2.0) but short. Widget Captioning's annotations are CC BY 4.0,
+but its images (and Screen2Words') are Rico's: third-party copyrighted screenshots under research terms, outside
+the project's licence list. Screen2Words has no licence. The Gemini API terms say "You may not use the Services to
+develop models that compete with the Services". **Two user decisions before C4-4: accept Rico's images or not,
+and whether the distilled Gemini set fits that clause.**
 
 Guards against fitting the test:
 - No training image may match a VisionBench or fresh-holdout image (perceptual-hash dedup, logged).
