@@ -17,7 +17,12 @@ from typing import Any, Final, cast
 from PIL.Image import Image, Transpose
 
 from fusion_vision_mcp import geometry, layout, question
-from fusion_vision_mcp.constants import CAPTION_TEXT_WORDS, DETECT_BOX_THRESHOLD, CaptionLevel
+from fusion_vision_mcp.constants import (
+    BUSY_BACKGROUND_QUESTION,
+    CAPTION_TEXT_WORDS,
+    DETECT_BOX_THRESHOLD,
+    CaptionLevel,
+)
 from fusion_vision_mcp.detection_policy import execute_detection
 from fusion_vision_mcp.protocols import AppContext, Processor
 
@@ -451,12 +456,30 @@ def _aesthetic_comparison(
     return out
 
 
+def busy_background(app: AppContext, image: Image) -> dict[str, Any]:
+    """Moondream2's yes/no on whether the background competes with the subject, as a hedged hint.
+
+    `busy` is None when the answer is neither yes nor no. The reliability is stated in the
+    result because a caller reads that, not this docstring.
+    """
+    answer = app.vqa.query([image], BUSY_BACKGROUND_QUESTION)[0].strip().lower()
+    busy = True if answer.startswith("yes") else False if answer.startswith("no") else None
+    return {
+        "busy": busy,
+        "reliability": (
+            "a hint, not a measurement: Moondream2's yes/no agreed with a person's blind calls "
+            "on 69% of 52 held-out photos"
+        ),
+    }
+
+
 def _critique_one(
     app: AppContext,
     image: Image,
     target_subject: str,
     low_score_threshold: float,
     style_context: bool,
+    check_background: bool = True,
 ) -> dict[str, Any]:
     """Single-image composition critique -- the body of `critique_composition`.
 
@@ -488,6 +511,8 @@ def _critique_one(
         if style is not None:
             result["style"] = style["style"]
             result["style_distribution"] = style["distribution"]
+        if check_background:
+            result["background"] = busy_background(app, image)
         return result
 
     result = {
@@ -499,6 +524,8 @@ def _critique_one(
     if style is not None:
         result["style"] = style["style"]
         result["style_distribution"] = style["distribution"]
+    if check_background:
+        result["background"] = busy_background(app, image)
     if aesthetics["score"] < low_score_threshold:
         result["critique"] = app.vqa.query(
             [image], "Critique this photo's composition and framing in 2 concise sentences."

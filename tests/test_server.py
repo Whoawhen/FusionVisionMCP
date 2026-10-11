@@ -835,6 +835,19 @@ async def test_critique_composition(mcp_client_session: ClientSession) -> None:
     assert "aesthetics" in result
     assert "framing" in result
     assert "subject_box" in result
+    assert result["background"]["busy"] in (True, False, None)
+
+
+@pytest.mark.anyio
+async def test_critique_composition_check_background_false_omits_it(mcp_client_session: ClientSession) -> None:
+    res = await mcp_client_session.call_tool(
+        "critique_composition",
+        arguments={"src": SAMPLE_IMAGE_FILEPATH, "target_subject": "person", "check_background": False},
+    )
+    result = json.loads("\n".join(cast(TextContent, c).text for c in res.content))
+
+    assert not res.is_error
+    assert "background" not in result
 
 
 @pytest.mark.anyio

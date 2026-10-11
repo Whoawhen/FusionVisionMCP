@@ -5,6 +5,8 @@ behind `critique_composition`, size questions and `compare_with`. They are pinne
 against stub apps, so a regression shows up in milliseconds rather than in a benchmark run.
 """
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 from PIL import Image
@@ -19,6 +21,7 @@ from fusion_vision_mcp.analysis import (
     _region_label_consensus,
     _separability,
     _size_measurement,
+    busy_background,
     visible_text_line,
 )
 
@@ -376,3 +379,23 @@ class TestVisibleTextLine:
         assert visible_text_line("one two three\nfour five", max_words=5) == 'Visible text: "one two three / four".'
         # The " / " separator counts toward the cut; a cut landing on it does not leave it dangling.
         assert visible_text_line("one two three\nfour five", max_words=4) == 'Visible text: "one two three".'
+
+
+class TestBusyBackground:
+    """The yes/no is read from the start of Moondream2's answer; anything else is None."""
+
+    @staticmethod
+    def _app(answer: str) -> SimpleNamespace:
+        return SimpleNamespace(vqa=SimpleNamespace(query=lambda images, q: [answer]))
+
+    @pytest.mark.parametrize(
+        ("answer", "busy"),
+        [("Yes", True), (" yes, there are people.", True), ("No.", False), ("Maybe", None), ("", None)],
+    )
+    def test_reads_the_answer(self, answer: str, busy: bool | None) -> None:
+        result = busy_background(self._app(answer), Image.new("RGB", (8, 8)))  # type: ignore[arg-type]
+        assert result["busy"] is busy
+
+    def test_states_its_reliability(self) -> None:
+        result = busy_background(self._app("yes"), Image.new("RGB", (8, 8)))  # type: ignore[arg-type]
+        assert "69%" in result["reliability"]

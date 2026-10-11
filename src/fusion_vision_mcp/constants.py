@@ -82,6 +82,14 @@ OCR_MIN_CONFIDENCE: Final[float] = 0.75
 #: held-out images it lifted the default caption's keyword recall 53.3% -> 60.9%.
 CAPTION_TEXT_WORDS: Final[int] = 40
 
+#: `critique_composition(check_background=true)` asks Moondream2 this, word for word. Fixed before
+#: measuring (VisionBench `composition_critique.py`, 2026-10-11): against a person's blind calls it
+#: agreed 88.1% (balanced) on 25 tune photos and 69.2% on 52 held-out ones.
+BUSY_BACKGROUND_QUESTION: Final[str] = (
+    "Is the background busy or cluttered, with things that compete with the main subject for "
+    "attention? Answer yes or no."
+)
+
 #: PP-OCR's detector keeps a candidate text box when its mean probability reaches this.
 #: RapidOCR's default, 0.5, is tuned for documents; on 200 TextVQA photos, answer recall
 #: climbs 55.0% (0.5) -> 57.0 (0.45) -> 58.5 (0.4) and plateaus (58.0 at 0.35 and 0.3).

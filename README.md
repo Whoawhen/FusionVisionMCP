@@ -108,6 +108,9 @@ stack answers these on its own:
   overlap the instant one object is merely in front of another.
 - **`critique_composition`** combines Florence-2 localization, a from-scratch rule-of-thirds check, the CLIP/LAION
   aesthetic score, and — only for low-scoring images — a Moondream2 explanation, into one composition critique.
+  Since 2026-10-11 it also reports `background: {busy, reliability}` by default (`check_background`), Moondream2's
+  yes/no on whether the background competes with the subject: a hint, agreeing with a person's blind calls on 69%
+  of 52 held-out photos.
 
 ---
 

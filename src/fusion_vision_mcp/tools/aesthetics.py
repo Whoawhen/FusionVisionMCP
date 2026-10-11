@@ -148,6 +148,17 @@ def register(mcp: MCPServer) -> None:
                 )
             ),
         ] = False,
+        check_background: Annotated[
+            bool,
+            Field(
+                description=(
+                    "When true (default), ask Moondream2 whether the background competes with the "
+                    "subject and add `background: {busy, reliability}`. A hint, not a measurement: "
+                    "it agreed with a person's blind calls on 69% of 52 held-out photos. About 10 s "
+                    "per image; pass false to skip it."
+                )
+            ),
+        ] = True,
         compare_with: Annotated[
             os.PathLike[str] | str | None,
             Field(
@@ -181,6 +192,13 @@ def register(mcp: MCPServer) -> None:
         soft-failure shape (image size, aesthetic score, and a "note") rather than
         raising. Only the first page of a PDF is assessed.
 
+        By default the result also carries `background: {busy, reliability}`, Moondream2's
+        yes/no on whether the background competes with the subject. Read it as a hint:
+        against a person's blind calls it agreed on 88% of 25 tune photos and 69% of 52
+        held-out ones (VisionBench `composition_critique.py`, 2026-10-11). Whether the
+        background is *blurred* is not reported: neither a sharpness measurement nor
+        Moondream2 held up on held-out photos.
+
         Set `style_context=true` to also get the image's medium (`style` plus
         `style_distribution`), so the aesthetic score is read in the context of its
         medium — the documented photography bias means a non-photographic medium
@@ -197,7 +215,7 @@ def register(mcp: MCPServer) -> None:
         with get_images(src) as images:
             image = images[0]
             if compare_with is None:
-                return _critique_one(app, image, target_subject, low_score_threshold, style_context)
+                return _critique_one(app, image, target_subject, low_score_threshold, style_context, check_background)
 
             # Relative mode: critique both the image and the reference, then report
             # the per-image critiques, the aesthetic delta, and which is preferred --
@@ -206,8 +224,10 @@ def register(mcp: MCPServer) -> None:
             # comparison runs inside the reference's context manager.
             with get_images(compare_with) as ref_images:
                 ref = ref_images[0]
-                img_result = _critique_one(app, image, target_subject, low_score_threshold, style_context)
-                ref_result = _critique_one(app, ref, "", low_score_threshold, style_context)
+                img_result = _critique_one(
+                    app, image, target_subject, low_score_threshold, style_context, check_background
+                )
+                ref_result = _critique_one(app, ref, "", low_score_threshold, style_context, check_background)
                 img_score = img_result.get("aesthetics", {}).get("score")
                 ref_score = ref_result.get("aesthetics", {}).get("score")
                 delta: float | None = None

@@ -172,6 +172,27 @@ work, so its quotes cannot trip `auto_verify_text`'s "caption quotes text" trigg
 split and were not shipped: asking Moondream2 for the image type first (-9.2 points; its answers are a third the
 length of its long caption) and a language tag on the text (no recall gain, about 1 in 4 tags wrong).
 
+## `critique_composition` is scored on a checklist now, and only the busy-background hint passed
+
+Phase 7 scores the critique's prose by word overlap with frontier critiques, where even Claude, Gemini and GPT only
+reach 29-34% against each other. VisionBench `composition_labels.py` built 150 COCO photos (50 tune / 100 confirm)
+labelled with composition facts by the user's Gemini worker, and the user checked the worker blind twice: its subject
+boxes (34 good / 4 loose / 0 wrong of 38) and background blur (89.7%) held up; "cut off", "awkward crop" and "busy"
+did not. `composition_critique.py` then scored candidates with rules committed before each run (2026-10-11):
+
+- **Shipped: `background: {busy, reliability}`** (`check_background`, default on, ~10 s). Moondream2 asked
+  `BUSY_BACKGROUND_QUESTION` agreed with the user's own blind calls 88.1% (balanced) on 25 tune photos and **69.2%
+  on 52 held-out** (CI 56.5-81.0), about as often as the worker agreed with the user. The user chose to state it as
+  a hedged hint, so the reliability travels in the result.
+- **Not shipped: background blur.** A Laplacian sharpness ratio (subject box vs surroundings) scored 77.6% on tune
+  but its threshold was fitted on 7 blurred photos and fell to 61.4% held-out (CI 44.8-77.2). Moondream2's yes/no
+  says "no" to nearly everything (54%).
+- **Pending a fresh test: the subject box.** Moondream2 naming the subject and Florence-2 boxing that name (the
+  `target_subject` path) beat the auto-pick on both splits: IoU >= 0.5 79.5 vs 64.1% tune (CI 0.0 to 30.8, short of
+  the rule) and 82.0 vs 66.3% held-out (CI 6.7 to 25.8), ~15 s slower. The rule written before the held-out run made
+  a win there a lead rather than a ship, and the user kept that: it waits for a new labelled set.
+- **Untestable here:** subject in focus (3 "no" of 150) and awkward crop (no measurement matched the user's calls).
+
 ## Multi-column layouts are handled by geometry, not by asking the model harder
 
 `ocr` reads strictly in raster order, so a document laid out in side-by-side columns (a two-column form, meeting
