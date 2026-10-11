@@ -207,3 +207,39 @@ processor = AutoProcessor.from_pretrained(base_model_id, trust_remote_code=True)
 | **2** | **Grounding DINO** | Switch `DEFAULT_GROUNDING_DINO_MODEL` to `IDEA-Research/grounding-dino-base` | +4.1 mAP zero-shot detection, fewer envelope false-positives, higher counting accuracy. |
 | **3** | **Technical IQA** | Swap `musiq_model.onnx` for `maniqa_model.onnx` in `image_quality.py` | SOTA sensitivity to fine blur, noise, and compression degradation using the same ONNX repository. |
 | **4** | **Aesthetic Predictor** | Migrate `aesthetic.py` to `shunk031/aesthetics-predictor-v2-sac-logos-ava1-l14-linearMSE` | SafeTensors format with Hugging Face Hub caching, removing raw `.pth` pickle download risks. |
+
+### Status of the matrix (2026-10-11)
+
+| Priority | Status |
+| :---: | :--- |
+| **1** | Measured, not shipped: `Florence-2-large-ft` scored 36.9% caption keyword recall vs 55.9% on the tune split, with 38-word captions (VisionBench `caption_ab.py`). Community Florence-2 fine-tunes (PromptGen v2, moredetailed, Flux, Chan) were also tested in caption sprint C2; none shipped. |
+| **2** | Ruled out: Grounding DINO is Chinese-developed (IDEA Research); no tuning on it while it awaits replacement (user rule, 2026-10-08). |
+| **3** | Untested. Check MANIQA's origin first (believed to come from a Chinese university; not verified). |
+| **4** | Untested. A file-format and safety change for the same model, not a quality change. |
+
+---
+
+## 5. Further ideas (Claude, 2026-10-11)
+
+Added at the user's request. Ranked by which 🔻 row of the scoreboard (`frontier_capability_gaps.md`) each could
+close. No Chinese-developed models. Origins and licences below are from memory and need the usual gate 0 paper
+check before any run.
+
+| Rank | Idea | Target gap | Why | Cost and risks |
+| :---: | :--- | :--- | :--- | :--- |
+| **1** | **PaliGemma 2 mix 3B (Google) for `query_image`** | `query_image` −9 to −13 | Its ~12-word answers lost it the caption bake-off (C2) but suit VQA. Trained on VQA mixtures that include TextVQA and DocVQA, and sprint Q1 found Moondream2's limit is reasoning over the text it can see, not reading it | bf16 fits memory (6.7 GB, C2 gate 1). One tune run, text questions first. Gemma Terms of Use (already accepted for C2). Would sit alongside Moondream2, not replace it, unless it wins on all question types |
+| **2** | **Gemma 3 4B (Google) through llama.cpp, 4-bit** for `caption(deep)` and `query_image` | caption −9 (`deep`); `query_image` | One stronger model for both rows that the scoreboard says need one. C2 ruled it out on speed in transformers (66–79 s), not quality | Google's own QAT 4-bit GGUF, ~3 GB. New runtime dependency (`llama-cpp-python`). Already in the caption C4 plan as C4-3b, gate 1 = 20-image timing |
+| **3** | **docTR (Mindee, France, Apache-2.0) as the PP-OCRv6 replacement, then fine-tune it** on scene-text photos | `ocr` on photos −17 to −22 | Already the preferred replacement. Ships training scripts, so a fine-tune is possible without tuning a Chinese-developed model | Gates as listed under "Replacing Chinese-developed models": phase 14 rendered pages, TextVQA photos, empty on text-free images. Fine-tune data licences to check |
+| **4** | **OWLv2 (Google) to replace Grounding DINO**; PaliGemma 2 `detect` as a second candidate | `detect_objects` absent objects (boxed 70% vs 10–20%); `count_objects` | On the replacement list. If idea 1 ships, PaliGemma 2 is already loaded | Envelope filter, adaptive threshold and `spatial_relations` best-match rule all need re-measuring on the new detector |
+| **5** | **Florence-2-large caption LoRA** (trained) | caption −14 (default slot) | Targets the weakest kinds (game UI, AI images, illustrations, charts) with long, dense captions | Caption C4-4: highest build cost, the only idea needing the GPU (guarded local training, user decision 2026-10-11). Adapter kept unmerged so the other Florence-2 tools don't change |
+
+Lower priority:
+- **Fine-tuning DINOv2 for the AI-defect probe** (instead of a linear probe on frozen features): more labels already
+  made the probe worse on unseen images, and ~1,000 crops are likely to be memorised. DINOv2-base (idea 11 on the
+  scoreboard) comes first.
+- **`critique_composition`:** about −7 points; not worth a model change yet.
+- **Retire `caption(auto_verify_text)`** (not a model idea): `read_text` now puts the verbatim text in every
+  caption, and the correction step costs about a point instead of helping.
+
+Suggested order: idea 1 after caption sprint C4-1 (one tune run, already passes memory), then idea 2's timing gate
+(a pass helps two tools).
