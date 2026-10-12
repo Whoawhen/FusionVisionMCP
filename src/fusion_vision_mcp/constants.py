@@ -82,6 +82,15 @@ OCR_MIN_CONFIDENCE: Final[float] = 0.75
 #: held-out images it lifted the default caption's keyword recall 53.3% -> 60.9%.
 CAPTION_TEXT_WORDS: Final[int] = 40
 
+#: `caption(deep=true)` stops Moondream2's long caption once it loops: when LOOP_RUN consecutive
+#: LOOP_NGRAM-word spans all repeat earlier text, the caption is cut where that run began. The
+#: sampled long caption loops on ~7% of images (hundreds of "effects, effects, ..." up to the
+#: 768-token cap, 97-170 s). Replayed on cached tune captions (VisionBench `caption_c4_0.py`,
+#: 2026-10-12) it cut 14 of 120 and cost 0.2 points of keyword recall (one group, hit only
+#: inside a loop).
+LOOP_NGRAM: Final[int] = 8
+LOOP_RUN: Final[int] = 16
+
 #: Without a `target_subject`, `critique_composition` asks Moondream2 this and boxes the answer with
 #: Florence-2. Fixed before measuring (VisionBench `composition_critique.py`, 2026-10-11).
 MAIN_SUBJECT_QUESTION: Final[str] = (

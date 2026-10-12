@@ -6,6 +6,10 @@ from transformers import AutoModelForCausalLM
 
 from .constants import DEFAULT_MOONDREAM_MODEL, DEFAULT_MOONDREAM_REVISION
 from .device import resolve_device
+from .repetition import cut_loop, loop_start
+
+#: Tokens between loop checks while streaming a caption; a check rescans the text so far.
+_LOOP_CHECK_EVERY = 16
 
 
 class Moondream:
@@ -56,9 +60,22 @@ class Moondream:
         return res
 
     def caption(self, images: list[Image], length: str = "long") -> list[str]:
-        """Moondream2's own captioner; `length` is "short", "normal" or "long"."""
+        """Moondream2's own captioner; `length` is "short", "normal" or "long".
+
+        Streamed, and stopped once the caption loops (`repetition.loop_start`): the long caption
+        otherwise repeats a phrase until the 768-token cap on ~7% of images, which is also its slowest
+        tail. The repeated text is cut off.
+        """
         res = []
         for img in images:
             with img.convert("RGB") as rgb_img:
-                res.append(self.model.caption(rgb_img, length=length)["caption"].strip())
+                res.append(self._caption_until_loop(rgb_img, length))
         return res
+
+    def _caption_until_loop(self, image: Image, length: str) -> str:
+        text = ""
+        for n, token in enumerate(self.model.caption(image, length=length, stream=True)["caption"], 1):
+            text += token
+            if n % _LOOP_CHECK_EVERY == 0 and loop_start(text) is not None:
+                break
+        return cut_loop(text)[0]

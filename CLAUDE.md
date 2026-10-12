@@ -172,6 +172,15 @@ work, so its quotes cannot trip `auto_verify_text`'s "caption quotes text" trigg
 split and were not shipped: asking Moondream2 for the image type first (-9.2 points; its answers are a third the
 length of its long caption) and a language tag on the text (no recall gain, about 1 in 4 tags wrong).
 
+**2026-10-12: `deep` stops when Moondream2 loops.** Its long caption is sampled (temperature 0.5, top_p 0.3) and
+on ~7% of images ends in a loop ("effects, effects, ...", hundreds of "Í", a list of languages cycling) up to the
+768-token cap. `Moondream.caption` now streams and stops once 16 consecutive 8-word spans repeat earlier text
+(`repetition.py`, `LOOP_NGRAM`/`LOOP_RUN`), cutting the repeats off. Replayed on cached tune captions it cost 0.2
+points (one group, hit only inside a loop). On 18 tune images that had looped, timed in one session against the
+unstopped call: median 57.3 -> 40.7 s, 9 loops -> 0. Greedy decoding was tried first (VisionBench `caption_c4_0.py`)
+and is *not* shipped: a tie on recall and speed, but it failed the loop guard fixed before the run. Seconds measured
+in different sessions are not comparable here: the same captioner measured 39.3 s one day and 32.1 s the next.
+
 ## `critique_composition` is scored on a checklist now: a better subject box and a busy-background hint passed
 
 Phase 7 scores the critique's prose by word overlap with frontier critiques, where even Claude, Gemini and GPT only
