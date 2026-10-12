@@ -135,6 +135,11 @@ its loop starts costs 0.0 points (sampled) and 0.2 (greedy) on cached captions, 
 repeats one seen earlier and the tail is mostly repeats. Needs: unit tests on the loop detector, and a timing check
 on the 11 looping tune images. No recall run is needed beyond the cached replay.
 
+**C4-0d shipped (2026-10-12, FusionVisionMCP `6538257`).** The online rule (16 consecutive repeated 8-word spans) cut 14
+of 120 cached tune captions for −0.2 points. Timed on 18 tune images that had looped, alternated in one session:
+median 57.3 → 40.7 s, mean 63.8 → 47.2 s, 9 loops → 0 (VisionBench `a913d48`). It's now part of the `deep` baseline
+for C4-1.
+
 **c. Fresh holdout.** Ask a worker round for 150–200 new images across the nine kinds, labelled with the
 same caption-keyword procedure as phase 11 (same labeller and prompt), deduplicated against every existing
 VisionBench image by perceptual hash. Not used for anything until a C4 finalist's single confirm run.
