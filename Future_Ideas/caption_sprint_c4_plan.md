@@ -100,6 +100,41 @@ This decides whether C4-2c and C4-4 target the right misses. Output: `caption_mi
 **b2. C4-2b's go/no-go count, moved here.** Count tune images whose OCR text runs past 40 words. It needs no model
 run (the OCR text is already cached from C3), so it costs nothing and settles C4-2b before C4-2 is planned in detail.
 
+**Results (2026-10-12, Opus 5.5; VisionBench `caption_c4_0.py`, `0c7ae2c`).**
+- **a: greedy fails its guard as written, so sampling stays the `deep` baseline.** Greedy was repeatable (120/120
+  identical) and tied on recall: 68.9% vs 70.7% sampled (−1.8, CI −4.3 to 0.7; 10 images better, 18 worse), with
+  absent objects named 0 vs 1. The loop guard (a repeated 8-word span on at most 2 of 120) failed: 19 captions. But
+  the sampled baseline scores 26 on the same check, because the check also catches ordinary reused phrases. Real
+  runaway loops (the caption's last quarter mostly repeats, e.g. hundreds of "Í" or "effects, effects, …") came to
+  greedy 6, sampled 8, plus 3 sampled captions at the 768-token cap. **So the shipped slot already loops on ~7% of
+  images.** Speed tied in the same session, alternated on 20 tune images: sampled 32.1 s, greedy 31.9 s. The
+  older 39.3 s sampled median came from a busier machine, so compare seconds only within one session. C4-1's
+  equivalence check can still run greedy internally; it only needs determinism for the test, not for shipping.
+- **b: 111 groups missed by both slots** (of 447). Sorted by Opus 5.5 (`caption_c4_0_misses_tune.json`):
+
+  | Kind | Groups |
+  |---|---|
+  | Object or scene detail (4 are game HUD parts) | 34 |
+  | Image type or genre (title screen, invoice/receipt/certificate, engraving/lithograph, comic, packaging, DAW) | 27 |
+  | Concept or story | 13 |
+  | Fine-grained vocabulary (kufi, quail, De Morgan's law, ostracon) | 11 |
+  | Specialist name (Kdenlive, BZFlag, Nadar) | 10 |
+  | Language | 7 |
+  | Text OCR misread (`Meta Al`, `HACIBEKIR`) | 5 |
+  | Scoring artefact ("bar graph" vs "bar chart", unfolded accents) | 4 |
+
+  Image type is the largest kind a model could fix (the CLIP type label was ruled out for its false labels). It's
+  what C4-4's training data should aim at, along with UI and HUD vocabulary. The accent and chart/graph artefacts
+  are a scorer issue. Leave the 400-image numbers alone; fold them in only if the scorer is changed for every
+  variant at once.
+- **b2: 38 of 120** tune images have more than 40 OCR words (18 have more than 80), so C4-2b goes ahead.
+
+**New item C4-0d (proposed, needs a go-ahead): stop the `deep` caption when it loops.** Cutting each caption where
+its loop starts costs 0.0 points (sampled) and 0.2 (greedy) on cached captions, and the loops are the slow tail
+(97 s and 170 s in the timing run). It ships by streaming the caption and stopping when the last 8-word span
+repeats one seen earlier and the tail is mostly repeats. Needs: unit tests on the loop detector, and a timing check
+on the 11 looping tune images. No recall run is needed beyond the cached replay.
+
 **c. Fresh holdout.** Ask a worker round for 150–200 new images across the nine kinds, labelled with the
 same caption-keyword procedure as phase 11 (same labeller and prompt), deduplicated against every existing
 VisionBench image by perceptual hash. Not used for anything until a C4 finalist's single confirm run.
