@@ -112,6 +112,14 @@ different things, e.g. `[carriages, spectator crowd, Impressionism]`, which are 
 as a paired comparison (candidate vs baseline on the same 235), never as an absolute level against the 280 split.
 Round 11b (36 images labelled again blind) measures how repeatable its labels are.
 
+**Repeatability (2026-10-11).** Against 11b, only 62.1% of round 11's groups were hit by the blind description
+plus keywords (round 4 vs 5: 85.4%): its groups were specific multi-word phrases a correct caption wouldn't use
+(`[decision diamonds, swimlanes, tickets]`). Round 11c added plain 1–2-word synonyms for each group's main thing
+(547 words on 273 of 757 groups after the reviewer dropped 9 loose ones: `will`, `game`, `document`), and it rose to
+**80.2%** (description alone 53.4 → 75.0%). That's slightly flattered, because the 36 images in 11b were broadened
+too. It's close enough to round 4 to use, still as a paired comparison only. Before C4, the frozen file is
+VisionBench-labels `fa06afc`.
+
 ## Sprint C4-1: Moondream2 encode-once for `deep` (Opus 5.5 to design, Sonnet 5.5 to run)
 
 **Why:** the theme question gained +1.3 (0 worse) but cost ~22 s, because `model.query(image, …)` encodes the
