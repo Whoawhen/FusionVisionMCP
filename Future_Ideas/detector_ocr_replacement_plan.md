@@ -38,11 +38,8 @@ LLMDet, DINO-X / Rex-Omni (IDEA), and CountGD (Grounding DINO weights underneath
 | PaliGemma 2 3B mix-448 `ocr` prompt (already downloaded) | Google | Gemma Terms | Text only, no boxes, slow on CPU; only as a fallback reader for photos, if at all |
 | Surya | Datalab (US) | Weights free under $5M revenue or funding | Strong on documents, heavy on CPU; kept off the first shortlist |
 
-**A question for the user: does the rule cover architectures, or only who made the model?** Several docTR
-architectures come from papers by Chinese university or company authors (DBNet, FAST, CRNN, SAR, MASTER, VIPTR,
-LW-DETR), though Mindee trained and published the weights. LinkNet, PARSeq and ViTSTR do not. My reading is that
-the rule is about who developed and trained the model, so all of docTR qualifies. The strict reading keeps
-LinkNet + PARSeq / ViTSTR, which are the combinations tried first anyway.
+**Architectures are fine (user, 2026-10-11).** The rule is about who developed and trained the model, so every
+docTR architecture qualifies, including those from Chinese papers (DBNet, FAST, CRNN, SAR, MASTER, VIPTR, LW-DETR).
 
 ## Bake-off, in gates
 
@@ -78,9 +75,12 @@ were fitted to the old outputs:
 Grounding DINO and PP-OCRv6 stay installed until gate 3 passes for their replacement, so rollback is a
 config change.
 
-## Needs from the user before gate 0
+## Status
 
-- An answer to the architecture question above.
-- SAM 3 is gated with manual approval: if you want it tried, request access on its Hugging Face page under
-  your own login. Otherwise the detector bake-off is OWLv2 base and large.
-- Downloads: about 0.6 / 1.7 GB for OWLv2, about 3.4 GB for SAM 3, a few hundred MB for docTR, and the TrOCR checkpoints (sizes to confirm at gate 0).
+- 2026-10-11: user approved gate 0 and requested SAM 3 access (pending Meta's manual review). Gate 0 is
+  VisionBench `replacement_gate0.py` (rules committed b63745d). The candidates run in a separate venv
+  (`VisionBench/.venv-replace`: torch 2.14.1 CPU, transformers 5.19, docTR 1.1.0) because SAM 3 needs
+  transformers 5 and docTR needs `opencv-python`. Shipping either one into the server would therefore mean a
+  transformers 5 upgrade (Moondream2's pinned remote code must be re-checked) or an OpenCV dependency fix.
+- Downloads: about 0.6 / 1.7 GB for OWLv2, about 3.4 GB for SAM 3, a few hundred MB for docTR, and the TrOCR
+  checkpoints.
