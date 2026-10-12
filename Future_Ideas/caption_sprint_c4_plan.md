@@ -304,7 +304,8 @@ first source. TextCaps is usable (CC BY 4.0 / CC BY 2.0) but short. Widget Capti
 but its images (and Screen2Words') are Rico's: third-party copyrighted screenshots under research terms, outside
 the project's licence list. Screen2Words has no licence. The Gemini API terms say "You may not use the Services to
 develop models that compete with the Services". **Two user decisions before C4-4: accept Rico's images or not,
-and whether the distilled Gemini set fits that clause.**
+and whether the distilled Gemini set fits that clause.** 2026-10-12: the user accepted Gemini-made captions for
+the LoRA set. Rico is still open.
 
 Guards against fitting the test:
 - No training image may match a VisionBench or fresh-holdout image (perceptual-hash dedup, logged).
