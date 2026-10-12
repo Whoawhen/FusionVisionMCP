@@ -82,5 +82,12 @@ config change.
   (`VisionBench/.venv-replace`: torch 2.14.1 CPU, transformers 5.19, docTR 1.1.0) because SAM 3 needs
   transformers 5 and docTR needs `opencv-python`. Shipping either one into the server would therefore mean a
   transformers 5 upgrade (Moondream2's pinned remote code must be re-checked) or an OpenCV dependency fix.
+- 2026-10-12: **gate 0 done** (VisionBench `results/replacement_gate0.json`; 10 photos, warm, 18 threads, CPU idle).
+  Detectors, median / max seconds per call and peak memory: Grounding DINO tiny 4.2 / 5.0 s, 1.4 GB (baseline);
+  OWLv2 base 2.2 / 2.4 s, 1.2 GB; OWLv2 large 8.5 / 9.7 s, 2.2 GB; SAM 3 9.5 / 15.4 s, 4.3 GB (155 s to load). OCR:
+  PP-OCRv6 1.3 / 4.2 s (baseline); docTR LinkNet+PARSeq 0.5 / 1.4 s; FAST+PARSeq 0.9 / 5.1 s; DBNet+PARSeq
+  1.0 / 3.3 s; DBNet+ViTSTR 1.4 / 6.4 s; TrOCR-base-str 3.7 / 55 s; **TrOCR-large-str out** (6.7 s median, 130 s
+  on a dense page). OWLv2 returns many overlapping boxes at 0.1 with no NMS, so gate 1 adds NMS before
+  choosing its threshold.
 - Downloads: about 0.6 / 1.7 GB for OWLv2, about 3.4 GB for SAM 3, a few hundred MB for docTR, and the TrOCR
   checkpoints.
