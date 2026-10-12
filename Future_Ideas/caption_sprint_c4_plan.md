@@ -322,7 +322,9 @@ published too.** That splits C4-4 in two:
   screenshots the user takes or that are openly licensed, with **web UI as the main screenshot source (the user's
   choice, 2026-10-12)**: openly licensed sites rendered with Playwright as VisionBench's rendered-pages step already
   does. These are modern, any size, and licence-clean, unlike Rico. Add some desktop and game UI too. Public web-UI
-  datasets (WebUI, Mind2Web) need a licence check first. Caption with a model whose licence permits training on and
+  datasets (WebUI, Mind2Web) need a licence check first. Captioner candidates (user, 2026-10-12): the latest Gemma
+  (Gemma 4 if released), after a terms check; Qwen 3.8 27B was raised too, but it is Chinese-developed, so it needs
+  the user's explicit exception to the no-Chinese-models rule first. Caption with a model whose licence permits training on and
   publishing from its output (Gemma 3 is the candidate). Rico and Gemini captions stay out of it. It then faces the
   full ship gates above, including the fresh holdout. Every training row carries a `source` tag so any subset can be
   retrained.
