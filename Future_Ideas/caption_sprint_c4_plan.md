@@ -308,6 +308,22 @@ and whether the distilled Gemini set fits that clause.** 2026-10-12: the user ac
 the LoRA set, and accepted Rico's screenshots (Widget Captioning, plus Gemini captions on Rico screens) because the
 LoRA stays local: the weights are not to be published. Revisit Rico if that ever changes.
 
+**2026-10-12, revised: FusionVisionMCP itself will be published (GitHub, free local server), so any LoRA it loads is
+published too.** That splits C4-4 in two:
+
+- **C4-4p, proof of concept (go-ahead from the user, 2026-10-12).** Rico screenshots captioned by Gemini (long, dense,
+  multi-sentence, a different prompt from the eval labels), plus a small DOCCI share so photos don't regress. Purpose:
+  find out fast whether a caption LoRA improves Florence-2's captions at all, on the tune and confirm splits with the
+  usual CHAIR check. **These weights are private and never ship**: not committed to this repo, not downloaded by the
+  server, kept under VisionBench's ignored scratch area. Same data guards (dedup against VisionBench and the holdout).
+  Because the eval labels also come from a frontier model, a recall gain without a CHAIR and claim-grading hold counts
+  as style, not content.
+- **C4-4s, shippable LoRA, only if C4-4p shows a gain.** Retrained on redistributable data only: DOCCI and TextCaps,
+  screenshots the user takes or that are openly licensed, captioned by a model whose licence permits training on and
+  publishing from its output (Gemma 3 is the candidate). Rico and Gemini captions stay out of it. It then faces the
+  full ship gates above, including the fresh holdout. Every training row carries a `source` tag so any subset can be
+  retrained.
+
 Guards against fitting the test:
 - No training image may match a VisionBench or fresh-holdout image (perceptual-hash dedup, logged).
 - The eval labels also come from a frontier model. Distilled captions use a different prompt and are judged on
