@@ -338,6 +338,20 @@ published too.** That splits C4-4 in two:
   - At most three quotes of five words or fewer, so the model doesn't learn to invent text.
   - Blank, loading and unreadable screens are skipped.
   - `c4p_data.py check` verifies every batch.
+- **Worker captions done and reviewed (labels `122c3a2`):**
+  - `check` reports 0 problems: 1,186 captions plus 14 skips, median 138 words.
+  - My native-vision spot check of 10 random captions: 8 accurate, 2 with small count errors (four headers for
+    three, four dots for five), none invents anything. A Qwen second opinion wasn't needed.
+- **Two defects the checker couldn't see:**
+  - "A status bar sits across the top." was word for word in 792 captions, with variants in ~83% of them; stock
+    navigation-bar sentences were similar. The handoff's "status bar only in passing" invited this.
+  - 9 captions had more than 3 quotes.
+- **Fix:** `c4p_data.py clean` writes `scratch/c4p/rico_clean.jsonl`.
+  - It drops sentences about the phone's own status and navigation bars (app tab bars stay) and rewrites references
+    to them ("Below the status bar, a toolbar ..." → "At the top, a toolbar ...").
+  - It leaves out the 9 over-quoted captions. `check` now counts quotes too.
+  - Result: 1,177 captions, median 129 words; 59 scattered, varied mentions remain (5%).
+  - Lesson for future handoffs: never prompt for a fixed element every image has.
 - **Still to do, while no CPU job is running:**
   - perceptual-hash dedup against VisionBench and the holdout;
   - the DOCCI share (~400 human captions);
