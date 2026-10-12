@@ -108,5 +108,16 @@ config change.
     blur 37.4). Best is FAST+PARSeq at 54.3, then DBNet+PARSeq 52.5 and DBNet+ViTSTR 50.8. None meets the
     text-free rule at any floor. This is a clear loss, not a threshold artefact.
   - Waiting on the user: either stop here, or amend the counting controls for literal detectors before gate 2.
+- 2026-10-12: **tuned Grounding DINO vs SAM 3** (user asked what the comparison looks like without the
+  no-Chinese-models rule; VisionBench `replacement_gd_tuned.py`, rules 6db6c30, result 0638b50, tune half,
+  replayed from cache). The gate 1 selection rule picks detect 0.4 and count 0.425 (adaptive), holding 8/8
+  controls (fixture positives 9/10 -> 7/10).
+  - **Detection: SAM 3 still leads clearly.** Detect recall 75.7 vs 52.3 (+23.4, CI 16.5 to 29.8); boxes a
+    plausible neighbour that isn't there on 10.5% vs 49.7% (-39.2, CI -47.4 to -31.0). No Grounding DINO
+    threshold gets near both: at 0.55 it boxes 19.9% but its recall is 34.
+  - **Counting: the shipped 0.15 count threshold is the problem.** At 0.425, Grounding DINO's exact counts go
+    40.2 -> 55.6% on real photos. SAM 3 at its best threshold, ignoring controls, reaches 52.0% (-3.6, CI -8.9 to
+    1.9). 0.15 was chosen on synthetic fixtures only. Not shipped: it is a Grounding DINO tune, which the
+    no-Chinese-models rule bars, and it has not been confirmed on held-out images.
 - Downloads: about 0.6 / 1.7 GB for OWLv2, about 3.4 GB for SAM 3, a few hundred MB for docTR, and the TrOCR
   checkpoints.
