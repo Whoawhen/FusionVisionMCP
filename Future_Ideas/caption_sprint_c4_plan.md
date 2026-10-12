@@ -305,7 +305,8 @@ but its images (and Screen2Words') are Rico's: third-party copyrighted screensho
 the project's licence list. Screen2Words has no licence. The Gemini API terms say "You may not use the Services to
 develop models that compete with the Services". **Two user decisions before C4-4: accept Rico's images or not,
 and whether the distilled Gemini set fits that clause.** 2026-10-12: the user accepted Gemini-made captions for
-the LoRA set. Rico is still open.
+the LoRA set, and accepted Rico's screenshots (Widget Captioning, plus Gemini captions on Rico screens) because the
+LoRA stays local: the weights are not to be published. Revisit Rico if that ever changes.
 
 Guards against fitting the test:
 - No training image may match a VisionBench or fresh-holdout image (perceptual-hash dedup, logged).
