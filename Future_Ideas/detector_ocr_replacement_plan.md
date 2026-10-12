@@ -95,5 +95,18 @@ config change.
   questions, 26 rendered pages, 51 sourced-line images, 155 phase 11 text images clean and blurred, 51 text-free
   images, 4 text-free fixtures). Primary metrics: pooled detect recall, pooled exact counts, and mean per-item OCR
   recall. Each candidate's thresholds are chosen on tune under the controls; at most two per role advance to gate 2.
+- 2026-10-12: **gate 1 done, nothing advances under the committed rules** (VisionBench
+  `results/replacement_gate1_tune.json`, 6259e6e).
+  - **Detectors.** None gets a count threshold: no threshold holds all 8 negative controls (OWLv2 base at most
+    3, large 2, SAM 3 1). They don't fragment the controls; they return **0 boxes** for "petal" on a plain disc,
+    ball or rod, where Grounding DINO boxes anything as a petal. SAM 3 counts the distractor fixture's 3 pink
+    circles exactly at every threshold. On real photos SAM 3 leads clearly. At its detect threshold (0.125):
+    COCO recall 88.1 vs 55.8, phase 11 recall 65.0 vs 58.5, plausible-neighbour absent boxed 10.5% vs 62.6%,
+    COCO absent 1.6% (tie). Its best count threshold (0.6) gets 52.0% exact vs 40.2%. OWLv2 large peaks at
+    44.2% exact; OWLv2 base at 43.0%. Median seconds per query: SAM 3 10.2, OWLv2 large 9.7, OWLv2 base 2.1.
+  - **OCR.** No docTR pair or TrOCR comes close to PP-OCRv6 (primary 67.8; TextVQA 59.8, rendered lines 97.5,
+    blur 37.4). Best is FAST+PARSeq at 54.3, then DBNet+PARSeq 52.5 and DBNet+ViTSTR 50.8. None meets the
+    text-free rule at any floor. This is a clear loss, not a threshold artefact.
+  - Waiting on the user: either stop here, or amend the counting controls for literal detectors before gate 2.
 - Downloads: about 0.6 / 1.7 GB for OWLv2, about 3.4 GB for SAM 3, a few hundred MB for docTR, and the TrOCR
   checkpoints.
