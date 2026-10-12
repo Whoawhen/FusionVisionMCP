@@ -89,5 +89,11 @@ config change.
   1.0 / 3.3 s; DBNet+ViTSTR 1.4 / 6.4 s; TrOCR-base-str 3.7 / 55 s; **TrOCR-large-str out** (6.7 s median, 130 s
   on a dense page). OWLv2 returns many overlapping boxes at 0.1 with no NMS, so gate 1 adds NMS before
   choosing its threshold.
+- 2026-10-12: **gate 1 started** (VisionBench `replacement_gate1.py`, rules committed e7ff830 before any scored
+  run). Tune half: 689 detector queries (63 COCO scenes plus their absent categories, 323 phase 11 objects, 171
+  plausible-neighbour probes, 100 reliable counts, 18 synthetic fixtures) and 534 OCR items (92 TextVQA
+  questions, 26 rendered pages, 51 sourced-line images, 155 phase 11 text images clean and blurred, 51 text-free
+  images, 4 text-free fixtures). Primary metrics: pooled detect recall, pooled exact counts, and mean per-item OCR
+  recall. Each candidate's thresholds are chosen on tune under the controls; at most two per role advance to gate 2.
 - Downloads: about 0.6 / 1.7 GB for OWLv2, about 3.4 GB for SAM 3, a few hundred MB for docTR, and the TrOCR
   checkpoints.
