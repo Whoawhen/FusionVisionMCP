@@ -319,7 +319,10 @@ published too.** That splits C4-4 in two:
   Because the eval labels also come from a frontier model, a recall gain without a CHAIR and claim-grading hold counts
   as style, not content.
 - **C4-4s, shippable LoRA, only if C4-4p shows a gain.** Retrained on redistributable data only: DOCCI and TextCaps,
-  screenshots the user takes or that are openly licensed, captioned by a model whose licence permits training on and
+  screenshots the user takes or that are openly licensed, with **web UI as the main screenshot source (the user's
+  choice, 2026-10-12)**: openly licensed sites rendered with Playwright as VisionBench's rendered-pages step already
+  does. These are modern, any size, and licence-clean, unlike Rico. Add some desktop and game UI too. Public web-UI
+  datasets (WebUI, Mind2Web) need a licence check first. Caption with a model whose licence permits training on and
   publishing from its output (Gemma 3 is the candidate). Rico and Gemini captions stay out of it. It then faces the
   full ship gates above, including the fresh holdout. Every training row carries a `source` tag so any subset can be
   retrained.
