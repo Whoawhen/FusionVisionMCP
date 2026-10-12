@@ -324,6 +324,21 @@ published too.** That splits C4-4 in two:
   full ship gates above, including the fresh holdout. Every training row carries a `source` tag so any subset can be
   retrained.
 
+**C4-4p status (2026-10-12):**
+- **Rico screens selected:** VisionBench `c82f048`, `benchmarks/c4p_data.py rico`. From 3 Screen2Words train shards
+  (1,725 apps), 1,200 screens were picked, one per app, round-robin across 27 Play categories. They're in
+  `scratch/c4p/rico/batch_01..12`.
+- **Worker handoff:** VisionBench-labels `975c975`, `worker_handoff/C4P_CAPTIONS_PLAN.md`.
+  - Captions are 100-180 words, structured as image type → layout → UI parts → content → look.
+  - At most three quotes of five words or fewer, so the model doesn't learn to invent text.
+  - Blank, loading and unreadable screens are skipped.
+  - `c4p_data.py check` verifies every batch.
+- **Still to do, while no CPU job is running:**
+  - perceptual-hash dedup against VisionBench and the holdout;
+  - the DOCCI share (~400 human captions);
+  - the PEFT caption-only switch check (`disable_adapters`, outputs identical on `tests/` fixtures);
+  - the untrained-adapter timing (20 tune images).
+
 Guards against fitting the test:
 - No training image may match a VisionBench or fresh-holdout image (perceptual-hash dedup, logged).
 - The eval labels also come from a frontier model. Distilled captions use a different prompt and are judged on
