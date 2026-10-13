@@ -1,7 +1,14 @@
 # SAM 3 beyond `detect_objects` on photos: `spatial_relations` and flat images
 
-Drafted 2026-10-13, after SAM 3 shipped for `detect_objects` on photos (262b9b0). Nothing here has run. Each gate
-waits for the user's go-ahead, and its rules are committed in its VisionBench script before any scored run.
+Drafted 2026-10-13, after SAM 3 shipped for `detect_objects` on photos (262b9b0). Each gate waits for the user's
+go-ahead, and its rules are committed in its VisionBench script before any scored run.
+
+**Status 2026-10-13: gate S passed and shipped (7bb783e).** `sam3_spatial_gate.py` (rules b364c03, results
+ed64fa3): agree of 36, gd_sam2 25, sam3_sam2 27, sam3_mask 25; all located 35 and passed both synthetic
+fixtures; the rule picked `sam3_mask` (faster by 0.7 s, ~15 s vs 8 s shipped). SAM 3 won separate 12-7 and lost
+contact 6-9, every contact loss a held object where the best match was another instance of the name. Round 12
+(VisionBench 87c1063, `worker_handoff/ROUND12_PLAN.md`) builds 171 Open Images test pairs to measure that and to
+test an instance-pairing fix against unheld-instance controls. Gate F has not run.
 
 ## Why these two
 
