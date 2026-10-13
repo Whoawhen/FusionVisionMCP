@@ -15,7 +15,7 @@ from fusion_vision_mcp.analysis import (
     _region_label_consensus,
     _separability,
 )
-from fusion_vision_mcp.constants import DEFAULT_BOX_THRESHOLD, DETECT_BOX_THRESHOLD, MASK_DECODE_RESOLUTION
+from fusion_vision_mcp.constants import COUNT_BOX_THRESHOLD, DETECT_BOX_THRESHOLD, MASK_DECODE_RESOLUTION
 from fusion_vision_mcp.detection_policy import execute_detection
 from fusion_vision_mcp.images import get_images
 from fusion_vision_mcp.params import ImagePath, ObjectName
@@ -161,9 +161,10 @@ def register(mcp: MCPServer) -> None:
             float,
             Field(
                 description=(
-                    "Box confidence floor passed to Grounding DINO (default 0.15: the lowest value "
-                    "at which every single-object control in the project's fixture suite still "
-                    "counts as 1). "
+                    "Box confidence floor passed to Grounding DINO (default 0.425: chosen on real "
+                    "photos, where it counted exactly on 61.8% of held-out cases against 43.8% at "
+                    "the old 0.15, with every single-object control in the fixture suite still "
+                    "counting as 1). "
                     "Raise it for a visually cluttered scene with distractor shapes near the target: "
                     "on one measured case (a target star among 18 muted-color distractors) the "
                     "default threshold counted every distractor, while 0.5 separated the true "
@@ -173,7 +174,7 @@ def register(mcp: MCPServer) -> None:
                     "not by default."
                 )
             ),
-        ] = DEFAULT_BOX_THRESHOLD,
+        ] = COUNT_BOX_THRESHOLD,
         adaptive_threshold: Annotated[
             bool,
             Field(
@@ -208,10 +209,10 @@ def register(mcp: MCPServer) -> None:
         """Count how many instances of a named object an image contains.
 
         Use this, not `detect_objects`, whenever the question is "how many".
-        `detect_objects` keeps only confident boxes (0.35+) so that it can say an
-        object is absent, which makes it miss faint instances a count needs; this
-        tool detects down to 0.15 and adds the silhouette, consensus and
-        separability checks that tell a real tally from a collapsed group.
+        `detect_objects` returns candidate boxes for locating things; this tool uses
+        a score floor tuned for exact counts on real photos (0.425) and adds the
+        silhouette, consensus and separability checks that tell a real tally from a
+        collapsed group.
 
         Returns `count`, plus `bboxes`/`points`/`labels`/`scores` for the instances
         found, index-aligned and in the same pixel-space convention `detect_objects`
@@ -222,10 +223,9 @@ def register(mcp: MCPServer) -> None:
         Accuracy depends heavily on the scene. On synthetic shapes whose counts are
         exact by construction it is right on 9 of 10 cases (mean error 0.1) and
         holds all 8 single-object controls. On real photographs it is reliable for
-        a few instances and weak for many: on COCO scenes it was exact on 11 of 15
-        images with 3 or fewer instances, but on only 1 of 9 with more than 3, where
-        it was off by about 10 on average. Treat a count above a handful on a real
-        photo as a rough estimate.
+        a few instances and weak for many: it was exact on 61.8% of 427 held-out
+        photo counts (383 of them 3 or fewer), and crowded scenes remain far less
+        reliable. Treat a count above a handful on a real photo as a rough estimate.
 
         Three measured limits, worth checking before trusting a count:
 

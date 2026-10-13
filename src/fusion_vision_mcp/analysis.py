@@ -20,6 +20,7 @@ from fusion_vision_mcp import geometry, layout, question
 from fusion_vision_mcp.constants import (
     BUSY_BACKGROUND_QUESTION,
     CAPTION_TEXT_WORDS,
+    COUNT_BOX_THRESHOLD,
     DETECT_BOX_THRESHOLD,
     MAIN_SUBJECT_QUESTION,
     CaptionLevel,
@@ -683,7 +684,8 @@ def _dispatch(app: AppContext, operation: str, images: list[Image], *, question:
             raise ValueError("object_name is required for the 'count' operation")
         # No silhouette check here: batching is the throughput path, and the check
         # would pull SAM2 in behind the caller's back once per collapsed image.
-        return app.counter.detect_objects(images, object_name)
+        # Same floor as the `count_objects` tool, or a batch counts differently.
+        return app.counter.detect_objects(images, object_name, threshold=COUNT_BOX_THRESHOLD)
     raise ValueError(f"Unknown operation: {operation!r}")
 
 

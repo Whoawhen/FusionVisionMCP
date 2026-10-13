@@ -91,3 +91,14 @@ def test_the_default_thresholds_are_the_measured_ones() -> None:
     """
     assert DEFAULT_BOX_THRESHOLD == 0.15
     assert DEFAULT_TEXT_THRESHOLD == 0.25
+
+
+def test_count_objects_uses_the_photo_tuned_floor() -> None:
+    """`count_objects` counts at 0.425, chosen on real photos with every control held.
+
+    VisionBench sprint R gate 2: 43.8% -> 61.8% exact on held-out photo counts. Moving it
+    should come with a re-run of `replacement_gate2.py`, not a one-image check.
+    """
+    from fusion_vision_mcp.constants import COUNT_BOX_THRESHOLD
+
+    assert COUNT_BOX_THRESHOLD == 0.425

@@ -265,8 +265,8 @@ estimate of how many parts it contains.
 - **vqa_estimate**: When `true` and the detector has collapsed overlapping instances (`separable == "no"`), also
   ask Moondream2 "how many `object_name`?" and attach its answer as `estimates.vqa` — a judgment estimate,
   clearly marked, not a tally. Defaults to `false` so a session that never asks keeps Moondream unloaded.
-- **threshold**: Grounding DINO's box-confidence floor. Defaults to `0.15` (see [Why this
-  backend](#why-this-backend) below). A manual lever for a visually cluttered scene with distractor shapes near
+- **threshold**: Grounding DINO's box-confidence floor. Defaults to `0.425`, tuned for exact counts on real photos
+  (see [Measured accuracy](#measured-accuracy) below). A manual lever for a visually cluttered scene with distractor shapes near
   the target — measured on a scene with a target star among 18 muted-color distractors, `0.5` separated the true
   target (score 0.90) from every distractor (0.19–0.32) for an exact count. Raising it is not automatic or safe
   by default: on an ordinary scene it can just as easily drop real instances, so reach for it once clutter is
@@ -363,6 +363,14 @@ excluded that three-box case.
 break the negative controls -- fragmenting a spotted ball into 3-4 objects and a rough-edged rod into 2. That is
 the failure this project refuses to ship, so the shipped value is the lowest threshold at which every control
 still holds. Pass `threshold` explicitly if your images have no such texture.
+
+**2026-10-12: the default is 0.425 now, chosen on real photos.** 0.15 was chosen on these synthetic fixtures
+alone, and on real photos it overcounts. VisionBench sprint R (`replacement_gd_tuned.py`, `replacement_gate2.py`)
+chose 0.425 on half of its photo counts: the most exact counts that still hold all eight negative controls. On
+the other half (427 counts, rules committed before the run) exact counts went **43.8% -> 61.8%** (+18.0, 95% CI
+14.1 to 22.2). The controls held under both the "petal" prompts and literal names ("pink circle", "ball", "rod"),
+and fixture positives went 8/10 -> 7/10. Other Grounding DINO callers (spatial relations, structured analysis's
+part crops) keep 0.15. Pass `threshold=0.15` to count as before.
 
 #### Limits
 

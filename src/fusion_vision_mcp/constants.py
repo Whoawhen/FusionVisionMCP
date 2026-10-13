@@ -40,6 +40,17 @@ DEFAULT_GROUNDING_DINO_MODEL: Final[str] = "IDEA-Research/grounding-dino-tiny"
 #: ship, so 0.15 is the floor: the lowest threshold at which every control still holds.
 DEFAULT_BOX_THRESHOLD: Final[float] = 0.15
 
+#: `count_objects`' Grounding DINO score floor on photos (and the batch `count` operation).
+#: 0.15 above was chosen on the synthetic fixtures alone, and on real photos it overcounts.
+#: VisionBench sprint R (`replacement_gd_tuned.py`, `replacement_gate2.py`, 2026-10-12)
+#: chose 0.425 on the tune half, by the most exact counts that still hold all eight negative
+#: controls. On the held-out half it took exact counts on real photos from 43.8% to 61.8%
+#: (+18.0, 95% CI 14.1 to 22.2). Every control held under both the "petal" and the
+#: literal-name prompts; fixture positives went 8/10 -> 7/10. The adaptive threshold
+#: still runs on top. Other Grounding DINO callers (spatial relations, structured
+#: analysis's part crops) keep 0.15.
+COUNT_BOX_THRESHOLD: Final[float] = 0.425
+
 #: `detect_objects`' Grounding DINO score floor, deliberately higher than counting's
 #: 0.15: locating a named object has to be able to say "not here". Swept on 143 COCO
 #: scenes (VisionBench detect_backend_ab.py), querying each image once for its real

@@ -385,6 +385,9 @@ async def test_count_objects_adaptive_threshold_false_preserves_old_behaviour(
             "object_name": "yellow star",
             "verify_silhouette": False,
             "adaptive_threshold": False,
+            # The pre-Sprint-3 fixed threshold; the default is 0.425 now, which already
+            # drops these distractors (0.19-0.32) without the adaptive step.
+            "threshold": 0.15,
         },
     )
     counted = json.loads("\n".join(cast(TextContent, c).text for c in res.content))

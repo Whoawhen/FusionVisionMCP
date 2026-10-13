@@ -319,6 +319,15 @@ rod into 2. Optimising on positives alone would have shipped exactly the failure
 avoid. 0.15 is the *lowest* threshold at which every control still holds, and that is the reason it is the
 default.
 
+**2026-10-12: `count_objects` now counts at 0.425 (`COUNT_BOX_THRESHOLD`), not 0.15.** 0.15 was right for the
+fixtures and wrong for photos, where counts ran high. VisionBench sprint R picked 0.425 on the tune half of its
+photo counts under the same rule (most exact counts with all 8 controls held). On 427 held-out counts it went
+43.8% -> 61.8% exact (+18.0, CI 14.1 to 22.2), with the controls holding under both the "petal" and literal-name
+prompts (positives 8/10 -> 7/10). `DEFAULT_BOX_THRESHOLD` stays 0.15 for every other Grounding DINO caller
+(spatial relations, structured analysis's part crops, the defect probe's hand and face boxes), because those were
+not re-measured. Gate 2 also showed SAM 3 cannot take over counting: on the literal-name controls it returns 0
+boxes for "ball", "rod", "shape" and "blob" at every threshold.
+
 **The honest negative result: the flower is not counted by anything here.** `tests/sample.jpg` — a paper flower
 with overlapping petals — returns 1 from *every* approach tried: Florence-2 grounding, Moondream's detect head,
 Grounding DINO (at every box threshold down to 0.10), the `count_lobes` outline measurement, SAM2 in
