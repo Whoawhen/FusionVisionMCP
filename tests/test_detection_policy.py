@@ -13,7 +13,7 @@ import pytest
 from PIL import Image, ImageDraw
 
 from fusion_vision_mcp import constants
-from fusion_vision_mcp.detection_policy import execute_detection
+from fusion_vision_mcp.detection_policy import execute_detection, locate_and_segment
 from fusion_vision_mcp.tools import detection as detection_tools
 
 
@@ -247,3 +247,86 @@ class TestLocate:
         app = _StubApp()
         result = execute_detection(app, [_photo()], "mug", backend_preference="auto", locate=True)[0]
         assert result["detector"] == "grounding_dino"
+
+
+class _MaskLocator:
+    """SAM 3's `locate_masks`: boxes, scores and one instance mask per box, labelled by its index."""
+
+    def __init__(self, bboxes: list, scores: list, size: tuple[int, int] = (40, 40)) -> None:
+        self.bboxes, self.scores, self.size = bboxes, scores, size
+        self.calls: list[str] = []
+
+    def locate_masks(self, image, object_name: str) -> dict:
+        self.calls.append(object_name)
+        masks = []
+        for i in range(len(self.bboxes)):
+            m = np.zeros(self.size[::-1], dtype=bool)
+            m[i, i] = True  # identifies which box this mask belongs to
+            masks.append(m)
+        return {"bboxes": [list(b) for b in self.bboxes], "scores": list(self.scores), "masks": masks}
+
+
+class _FailingMaskLocator:
+    def locate_masks(self, image, object_name: str) -> dict:
+        raise OSError("gated repo")
+
+
+class _RecordingSegmenter:
+    def __init__(self) -> None:
+        self.calls: list[list] = []
+
+    def segment(self, image, boxes: list) -> list:
+        self.calls.append(boxes)
+        return [np.ones((image.height, image.width), dtype=bool) for _ in boxes]
+
+
+class TestLocateAndSegment:
+    """`spatial_relations` uses SAM 3's own masks (gate S, 2026-10-13); SAM2 only as the fallback."""
+
+    def _app(self, locator=None) -> _StubApp:
+        app = _StubApp()
+        app.segmenter = _RecordingSegmenter()
+        app.locator = locator
+        return app
+
+    def test_sam3_picks_the_best_scoring_box_and_its_own_mask(self) -> None:
+        locator = _MaskLocator([[0, 0, 5, 5], [10, 10, 20, 20]], [0.3, 0.8])
+        app = self._app(locator)
+        located, masks, used = locate_and_segment(app, Image.new("RGB", (40, 40)), ["cup", "tea"], limit=6)
+        assert used == "sam3"
+        assert [o["id"] for o in located] == ["cup#0", "tea#1"]
+        assert located[0]["box"] == [10, 10, 20, 20]
+        assert masks[0][1, 1] and masks[0].sum() == 1  # the 0.8 box's mask, not the first one's
+        assert app.segmenter.calls == [] and app.counter.calls == []
+
+    def test_unavailable_sam3_falls_back_to_grounding_dino_and_sam2(self) -> None:
+        app = self._app(_FailingMaskLocator())
+        located, masks, used = locate_and_segment(app, Image.new("RGB", (40, 40)), ["cup", "tea"], limit=6)
+        assert used == "grounding_dino"
+        assert [c["object_name"] for c in app.counter.calls] == ["cup", "tea"]
+        assert app.segmenter.calls == [[[1, 1, 5, 5], [1, 1, 5, 5]]]
+        assert len(masks) == len(located) == 2
+
+    def test_a_context_without_a_locator_uses_grounding_dino_and_sam2(self) -> None:
+        app = self._app(None)
+        _, _, used = locate_and_segment(app, Image.new("RGB", (40, 40)), ["cup"], limit=6)
+        assert used == "grounding_dino"
+        assert len(app.segmenter.calls) == 1
+
+    def test_generic_guard_drops_the_full_frame_box_and_keeps_masks_aligned(self) -> None:
+        # The full-frame box scores highest; the guard must drop it *and* its mask.
+        locator = _MaskLocator([[0, 0, 40, 40], [10, 10, 20, 20]], [0.9, 0.5])
+        app = self._app(locator)
+        located, masks, _ = locate_and_segment(app, Image.new("RGB", (40, 40)), ["object"], limit=6)
+        assert located[0]["box"] == [10, 10, 20, 20]
+        assert masks[0][1, 1] and not masks[0][0, 0]
+
+    def test_names_not_found_are_skipped_and_the_limit_holds(self) -> None:
+        locator = _MaskLocator([], [])
+        app = self._app(locator)
+        located, masks, _ = locate_and_segment(app, Image.new("RGB", (40, 40)), ["cup"], limit=6)
+        assert located == [] and masks == []
+        locator = _MaskLocator([[10, 10, 20, 20]], [0.5])
+        app = self._app(locator)
+        located, _, _ = locate_and_segment(app, Image.new("RGB", (40, 40)), ["a", "b", "c"], limit=2)
+        assert len(located) == 2 and locator.calls == ["a", "b"]

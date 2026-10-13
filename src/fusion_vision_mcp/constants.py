@@ -137,3 +137,6 @@ OCR_DET_BOX_THRESHOLD: Final[float] = 0.4
 #: to the image's own pixels for reporting, but detail finer than
 #: `max(image side) / MASK_DECODE_RESOLUTION` pixels is not actually resolved.
 MASK_DECODE_RESOLUTION: Final[int] = 256
+
+#: The same for SAM 3's instance masks, which back `spatial_relations` when SAM 3 is available.
+SAM3_MASK_DECODE_RESOLUTION: Final[int] = 288
