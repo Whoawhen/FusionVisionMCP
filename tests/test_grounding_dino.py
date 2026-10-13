@@ -112,3 +112,14 @@ def test_phrase_position_ids_number_the_closing_delimiter_as_transformers_4_did(
     assert _phrase_position_ids(torch.tensor([[101, 2711, 1012, 102]])).tolist() == [[0, 0, 1, 0]]
     ids = torch.tensor([[101, 4026, 2422, 1012, 2644, 3696, 1012, 102]])
     assert _phrase_position_ids(ids).tolist() == [[0, 0, 1, 2, 0, 1, 2, 0]]
+
+
+def test_text_position_embeddings_stay_float_for_integer_ids() -> None:
+    import transformers.models.grounding_dino.modeling_grounding_dino as modeling
+
+    sine = getattr(modeling, "encode_sinusoidal_position_embedding", None) or modeling.get_sine_pos_embed
+    kwargs = {} if hasattr(modeling, "encode_sinusoidal_position_embedding") else {"exchange_xy": False}
+    as_long = sine(torch.tensor([[0, 1, 2]])[..., None], num_pos_feats=256, **kwargs)
+    as_float = sine(torch.tensor([[0.0, 1.0, 2.0]])[..., None], num_pos_feats=256, **kwargs)
+    assert as_long.is_floating_point()
+    assert torch.allclose(as_long, as_float)

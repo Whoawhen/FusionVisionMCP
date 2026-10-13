@@ -93,6 +93,20 @@ def _masks_and_positions(input_ids: torch.Tensor) -> tuple[torch.Tensor, torch.T
 
 _gd_modeling.generate_masks_with_special_tokens_and_transfer_map = _masks_and_positions  # type: ignore[assignment]
 
+_upstream_sine = getattr(_gd_modeling, "encode_sinusoidal_position_embedding", None)
+
+
+def _float_sine(pos_tensor: torch.Tensor, *args: Any, **kwargs: Any) -> torch.Tensor:
+    """Transformers 5's sine embedding casts its result to the input's dtype, so the integer text position ids came
+    back as 0s and 1s (position 1's embedding became 0, 1, 0, 0, ...). Transformers 4 returned floats."""
+    if not pos_tensor.is_floating_point():
+        pos_tensor = pos_tensor.float()
+    return _upstream_sine(pos_tensor, *args, **kwargs)  # type: ignore[misc,no-any-return]
+
+
+if _upstream_sine is not None:  # transformers 4 has `get_sine_pos_embed` instead, which returns floats
+    _gd_modeling.encode_sinusoidal_position_embedding = _float_sine
+
 
 class GroundingDino:
     """Wraps Grounding DINO for open-vocabulary object detection."""
