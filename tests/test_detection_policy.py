@@ -218,6 +218,7 @@ class TestLocate:
         assert app.locator.calls == [{"object_name": "mug", "threshold": constants.LOCATE_BOX_THRESHOLD}]
         assert app.counter.calls == []
         assert result["detector"] == "sam3"
+        assert result["_routing"]["backend"] == "sam3"
 
     def test_clip_art_still_goes_to_florence2(self) -> None:
         app = self._app()
@@ -230,6 +231,7 @@ class TestLocate:
         result = execute_detection(app, [_photo()], "mug", backend_preference="auto")[0]
         assert app.locator.calls == []
         assert result["detector"] == "grounding_dino"
+        assert result["_routing"]["backend"] == "grounding_dino"
 
     def test_unavailable_sam3_falls_back_to_grounding_dino_at_its_own_threshold(self) -> None:
         app = self._app(_FailingLocator())

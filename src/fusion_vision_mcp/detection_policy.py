@@ -88,10 +88,12 @@ def execute_detection(
                 for img, result in zip(images, results, strict=True)
             ]
 
-    # Attach routing diagnostic metadata to every result if routing fired
+    # Attach routing diagnostic metadata to every result if routing fired. `backend` names the model that
+    # actually ran: the photo branch is SAM 3 for `detect_objects`, or Grounding DINO when counting or as
+    # SAM 3's fallback, so the routing decision's own "grounding_dino" would be wrong half the time.
     if routing_metadata:
         for r in results:
-            r["_routing"] = routing_metadata
+            r["_routing"] = {**routing_metadata, "backend": r.get("detector", routing_metadata["backend"])}
 
     return results
 
