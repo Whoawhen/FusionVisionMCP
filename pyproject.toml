@@ -45,8 +45,8 @@ dependencies = [
     # 5.x for SAM 3 (`Sam3Model`, detect_objects on photos). Moondream2 loads on 5.x only from its
     # commit 5d6c926 on (same weights as 2025-06-21; it adds post_init() and recomputes two buffers
     # transformers 5 no longer loads), so DEFAULT_MOONDREAM_REVISION pins that commit. HfMoondream still
-    # rejects attn_implementation="sdpa", so moondream.py passes "eager". The move was checked for output
-    # equivalence on every model (VisionBench transformers5_equivalence.py).
+    # rejects attn_implementation="sdpa", so moondream.py passes "eager". Every model's outputs were
+    # checked against 4.57 (VisionBench transformers5_equivalence.py); CLAUDE.md lists the fixes it needed.
     "transformers>=5.19,<6",
 ]
 optional-dependencies.cpu = [ "torch>=2.13", "torchvision>=0.18" ]

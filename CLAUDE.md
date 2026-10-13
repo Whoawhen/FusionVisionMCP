@@ -310,10 +310,31 @@ Four things are load-bearing:
   then falls back to Grounding DINO at 0.35, and the result's `detector` says which ran.
 - **It needs transformers 5**, and the old Moondream2 pin (2025-06-21) does not load there. Its commit `5d6c926`
   ships byte-identical weights, tokenizer and config and only fixes buffer initialisation, so
-  `DEFAULT_MOONDREAM_REVISION` pins that commit. The upgrade was checked for output equivalence on every model
-  (VisionBench `transformers5_equivalence.py`). Meta's own `sam3` package was tried and not used: it is GPU-first
+  `DEFAULT_MOONDREAM_REVISION` pins that commit. Meta's own `sam3` package was tried and not used: it is GPU-first
   (hardcoded CUDA, a module-level triton import, a missing vocabulary file) and its scores differ from the
   transformers port the gates measured.
+
+**What transformers 5 changed, found by checking every model's outputs against 4.57** (VisionBench
+`transformers5_equivalence.py`, 40 images, 2026-10-13). Moondream2, SAM2 and DINOv2 matched exactly as they were.
+The rest needed fixes, each verified by a rerun:
+
+- **Fast image processors are now the default.** CLIP's embeddings moved by up to 0.13 and Florence-2's captions
+  changed. `aesthetic.py`, `florence2.py` and `grounding_dino.py` pass `use_fast=False`, as `dinov2.py` already did.
+- **CLIP's `get_*_features` return an output object**, with the embedding in `pooler_output`; `score_aesthetics`
+  crashed. `Aesthetic._projected` reads either.
+- **Florence-2's tokenizer skips `clean_up_tokenization_spaces` for BPE**, so region text read "spa ., Nov". Forced
+  back on in `florence2.py`.
+- **Grounding DINO had two upstream bugs.** The phrase position ids give the closing "." position 0, and
+  `encode_sinusoidal_position_embedding` casts its result to the integer ids' dtype, truncating the text position
+  embeddings to 0s and 1s. Scores moved by up to 0.05 and box counts changed. `grounding_dino.py` restores the 4.57
+  position ids and casts the ids to float (module-level patches, with tests).
+
+After the fixes CLIP, Florence-2 and the three above match exactly. **Grounding DINO does not quite**: box counts are
+identical on all 80 calls and boxes within 0.08 px, but scores differ by a median 2e-4 and at most 0.012, against
+a limit of 1e-4 fixed before the run. That residue starts in transformers 5's rewritten Swin backbone (feature
+differences around 50x float32 epsilon, eager attention barely changes them), so it is arithmetic order rather than
+a logic change, but a score near the 0.35 or 0.425 floor can still cross it. `sam3.py` reproduces the gates'
+replayed boxes on 20 of 20 confirm queries (`sam3_wrapper_parity.py`).
 
 ## Counting is a separate tool from detection, and it is still not solved
 
