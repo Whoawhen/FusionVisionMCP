@@ -21,6 +21,7 @@ __all__ = [
     "AestheticScorer",
     "AppContext",
     "InstanceDetector",
+    "MaskLocator",
     "Processor",
     "Segmenter",
     "VqaProcessor",
@@ -122,6 +123,14 @@ class InstanceDetector(Protocol):
         ...
 
 
+class MaskLocator(InstanceDetector, Protocol):
+    """An `InstanceDetector` that also returns each instance's own mask (SAM 3)."""
+
+    def locate_masks(self, image: Image, object_name: str) -> dict[str, Any]:
+        """`detect_objects` for one image at the locator's own floor, plus `masks` aligned with `bboxes`."""
+        ...
+
+
 class Segmenter(Protocol):
     """Represents a protocol for turning bounding boxes into segmentation masks."""
 
@@ -184,6 +193,7 @@ class AppContext:
     # The defect probe's backbone (DINOv2), lazy like the rest; None only in tests and callers
     # that build an AppContext by hand, which then can only run a CLIP-backed probe.
     defect_embedder: CropEmbedder | None = None
-    # SAM 3, `detect_objects`' photo detector. None in tests and hand-built contexts, where
-    # `detect_objects` falls back to Grounding DINO (`counter`) as it does when SAM 3 can't load.
-    locator: InstanceDetector | None = None
+    # SAM 3: `detect_objects`' photo detector, and `spatial_relations`' locator and segmenter. None in
+    # tests and hand-built contexts, where both fall back to Grounding DINO (`counter`, plus `segmenter`
+    # for masks) as they do when SAM 3 can't load.
+    locator: MaskLocator | None = None
