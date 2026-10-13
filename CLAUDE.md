@@ -333,7 +333,7 @@ After the fixes CLIP, Florence-2 and the three above match exactly. **Grounding 
 identical on all 80 calls and boxes within 0.08 px, but scores differ by a median 2e-4 and at most 0.012, against
 a limit of 1e-4 fixed before the run. That residue starts in transformers 5's rewritten Swin backbone (feature
 differences around 50x float32 epsilon, eager attention barely changes them), so it is arithmetic order rather than
-a logic change, but a score near the 0.35 or 0.425 floor can still cross it. `sam3.py` reproduces the gates'
+a logic change. Replayed on all 719 of gate 1's confirm queries (`gd_tf5_decision_replay.py`, 1,110 scored queries at 0.35 / 0.425), every metric was unchanged (exact counts 61.8%, detect recall 60.2%, controls 8/8 under both prompts) and one box count moved (a chandelier, 3 -> 2). `sam3.py` reproduces the gates'
 replayed boxes on 20 of 20 confirm queries (`sam3_wrapper_parity.py`).
 
 ## Counting is a separate tool from detection, and it is still not solved
