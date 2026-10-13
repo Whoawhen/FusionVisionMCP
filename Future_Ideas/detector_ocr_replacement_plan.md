@@ -119,5 +119,20 @@ config change.
     40.2 -> 55.6% on real photos. SAM 3 at its best threshold, ignoring controls, reaches 52.0% (-3.6, CI -8.9 to
     1.9). 0.15 was chosen on synthetic fixtures only. Not shipped: it is a Grounding DINO tune, which the
     no-Chinese-models rule bars, and it has not been confirmed on held-out images.
+- 2026-10-12: **gate 2 done** (confirm half, run once; VisionBench `replacement_gate2.py`, rules a497117 before
+  any run; results committed after it). Counting fixtures were asked for by literal name ("pink circle", "ball",
+  "rod"). All differences are against shipped Grounding DINO, paired bootstrap 95% CIs.
+  - **SAM 3 for `detect_objects`: passes.** Detect recall 76.4 vs 60.2 (+16.2, CI 10.5 to 21.9). Plausible
+    neighbours boxed 9.0% vs 65.7% (-56.7, CI -64.5 to -48.8). COCO absent boxed 0.0% vs 3.8%. Its boxes are less
+    precise (COCO 33.1 vs 83.1%, phase 11 22.3 vs 38.6%): it finds more, with more strays.
+  - **SAM 3 for `count_objects`: fails.** No threshold held the 8 literal-name controls (at most 4). It never
+    split one object into several: it returned 0 for "ball", "rod", "shape" and "blob". It counted all 10 positive
+    fixtures exactly. For context only: at its best tune threshold (0.6) it gets 51.8% exact on confirm, vs 61.8%
+    for Grounding DINO at 0.425 (CI -16.3 to -3.5).
+  - **Grounding DINO count threshold 0.425: confirmed.** Exact counts 61.8% vs 43.8% (+18.0, CI 14.1 to 22.2),
+    holding 8/8 controls under both prompts (fixture positives 8/10 -> 7/10). Its detect setting of 0.4 costs
+    6.5 points of recall, so only the count threshold is worth taking. Shipping it is a Grounding DINO tune, which
+    the no-tuning rule bars, so it needs the user's call.
+  - Median seconds per query on confirm: Grounding DINO 3.4, SAM 3 7.3.
 - Downloads: about 0.6 / 1.7 GB for OWLv2, about 3.4 GB for SAM 3, a few hundred MB for docTR, and the TrOCR
   checkpoints.
