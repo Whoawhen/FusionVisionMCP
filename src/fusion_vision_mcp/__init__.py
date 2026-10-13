@@ -51,6 +51,7 @@ if TYPE_CHECKING:
     from fusion_vision_mcp.ppocr_engine import PPOCREngine
     from fusion_vision_mcp.reasoner import VisionReasoner
     from fusion_vision_mcp.sam2 import Sam2
+    from fusion_vision_mcp.sam3 import Sam3Detector
 
 
 from fusion_vision_mcp.protocols import (
@@ -127,6 +128,11 @@ async def app_lifespan(
         from fusion_vision_mcp.grounding_dino import GroundingDino
 
         return GroundingDino(grounding_dino_model_id, device)
+
+    def _make_sam3() -> "Sam3Detector":
+        from fusion_vision_mcp.sam3 import Sam3Detector
+
+        return Sam3Detector(device=device)
 
     def _make_easyocr() -> "EasyOCREngine":
         from fusion_vision_mcp.easyocr_engine import EasyOCREngine
@@ -210,8 +216,21 @@ async def app_lifespan(
     # Only query_image(structured_analysis=true) loads it, and only when an image has a hand or face.
     defect_embedder = cast(CropEmbedder, IdleProxy(IdleReleased(_make_dinov2, idle_timeout, "DINOv2")))
 
+    # Only detect_objects (and batch "detect") loads SAM 3, on photographs.
+    locator = cast(InstanceDetector, IdleProxy(IdleReleased(_make_sam3, idle_timeout, "SAM 3")))
+
     yield AppContext(
-        florence2, vqa, segmenter, aesthetic, counter, ocr_specialist, ocr_engine, iqa, reasoner, defect_embedder
+        florence2,
+        vqa,
+        segmenter,
+        aesthetic,
+        counter,
+        ocr_specialist,
+        ocr_engine,
+        iqa,
+        reasoner,
+        defect_embedder,
+        locator,
     )
 
 

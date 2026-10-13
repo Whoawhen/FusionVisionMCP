@@ -8,6 +8,7 @@ logic across the three call sites.
 from __future__ import annotations
 
 # We import AppContext only for type checking to avoid circular imports.
+import logging
 from typing import TYPE_CHECKING, Any, Literal
 
 from PIL import Image
@@ -16,11 +17,14 @@ from fusion_vision_mcp import query_policy
 
 # From constants, not grounding_dino: that module imports torch at its top level, and
 # this one is on the package's eager import path, which must stay torch-free.
-from fusion_vision_mcp.constants import DEFAULT_BOX_THRESHOLD
+from fusion_vision_mcp.constants import DEFAULT_BOX_THRESHOLD, DETECT_BOX_THRESHOLD, LOCATE_BOX_THRESHOLD
 from fusion_vision_mcp.routing import choose_count_backend
 
 if TYPE_CHECKING:
     from fusion_vision_mcp import AppContext
+    from fusion_vision_mcp.protocols import InstanceDetector
+
+logger = logging.getLogger(__name__)
 
 
 def execute_detection(
@@ -30,6 +34,7 @@ def execute_detection(
     backend_preference: Literal["florence2", "grounding_dino", "auto"],
     threshold: float = DEFAULT_BOX_THRESHOLD,
     adaptive_threshold: bool = True,
+    locate: bool = False,
 ) -> list[dict[str, Any]]:
     """Shared detection execution.
 
@@ -75,12 +80,7 @@ def execute_detection(
             for d in detected
         ]
     else:
-        # Grounding DINO. It uses the passed thresholds.
-        results = app.counter.detect_objects(
-            images, object_name, threshold=threshold, adaptive_threshold=adaptive_threshold
-        )
-        for result in results:
-            result["detector"] = "grounding_dino"
+        results = _photo_detect(app, images, object_name, threshold, adaptive_threshold, locate)
         if exclude_full_frame:
             # Drop full frame boxes if the query was generic.
             results = [
@@ -93,6 +93,36 @@ def execute_detection(
         for r in results:
             r["_routing"] = routing_metadata
 
+    return results
+
+
+def _photo_detect(
+    app: AppContext,
+    images: list[Image.Image],
+    object_name: str,
+    threshold: float,
+    adaptive_threshold: bool,
+    locate: bool,
+) -> list[dict[str, Any]]:
+    """SAM 3 when locating (`detect_objects`), otherwise Grounding DINO at the passed thresholds."""
+    locator: InstanceDetector | None = getattr(app, "locator", None)
+    if locate and locator is not None:
+        try:
+            results = locator.detect_objects(images, object_name, threshold=LOCATE_BOX_THRESHOLD)
+        except OSError as exc:
+            # Gated on Hugging Face: without accepted access or a login the download fails with an
+            # OSError subclass. Fall back to what shipped before SAM 3, at its own threshold.
+            logger.warning(f"SAM 3 unavailable ({exc}); detect_objects falls back to Grounding DINO")
+            threshold, adaptive_threshold = DETECT_BOX_THRESHOLD, False
+        else:
+            for result in results:
+                result["detector"] = "sam3"
+            return results
+    results = app.counter.detect_objects(
+        images, object_name, threshold=threshold, adaptive_threshold=adaptive_threshold
+    )
+    for result in results:
+        result["detector"] = "grounding_dino"
     return results
 
 

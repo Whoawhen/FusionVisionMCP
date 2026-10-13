@@ -115,7 +115,7 @@ class Aesthetic:
         self.torch_dtype = torch.float32 if self.device == "cpu" else torch.float16
 
         self.processor = CLIPProcessor.from_pretrained(model_id)
-        self.model = CLIPModel.from_pretrained(model_id, dtype=self.torch_dtype).to(self.device)
+        self.model = CLIPModel.from_pretrained(model_id, dtype=self.torch_dtype).to(self.device)  # type: ignore[arg-type]
         self.model.eval()
 
         # CLIP's learned temperature. Standard zero-shot classification scales the cosine

@@ -215,6 +215,27 @@ specific, and `ocr` to transcribe text rather than describe it. Returns one capt
 Locate a named object in an image, returning `bboxes` (`[x1, y1, x2, y2]` each), `points` (the centre of each
 box) and `labels`, all index-aligned.
 
+On photographs this runs **SAM 3** (`facebook/sam3`, gated: accept its licence on Hugging Face and log in, or
+`detect_objects` falls back to Grounding DINO at 0.35 and says so in `detector`). Clip art and flat vector art
+go to Florence-2's grounding head, which has no scores.
+
+**2026-10-12: SAM 3 replaced Grounding DINO on photos.** VisionBench sprint R measured both on the same queries,
+thresholds chosen on one half of the images and confirmed once on the other (`replacement_gate1.py`,
+`replacement_gate2.py`, rules committed before each run). On the held-out half:
+
+| | Grounding DINO (0.35) | SAM 3 (0.125) |
+| --- | --- | --- |
+| Labelled objects found (COCO + generalist images) | 60.2% | **76.4%** (+16.2, CI 10.5 to 21.9) |
+| Plausible-but-absent neighbour boxed (166 images) | 65.7% | **9.0%** (-56.7, CI -64.5 to -48.8) |
+| Absent COCO category boxed (80 scenes) | 3.8% | **0.0%** |
+| Boxes landing on a labelled instance (COCO / generalist) | 83.1% / 38.6% | 33.1% / 22.3% |
+| Median seconds per call (CPU) | 3.4 | 7.3 |
+
+So it finds more and, unlike any detector before it here, can say "not here" for something plausible -- but it
+returns more stray boxes, so read `scores`. SAM 3 does not count: asked for the synthetic counting fixtures by
+literal name ("ball", "rod", "blob") it returns no box at all, so `count_objects` stays on Grounding DINO. It needs
+transformers 5, which Moondream2 supports only from its commit `5d6c926` (same weights as the old pin).
+
 #### Arguments:
 
 - **src**: A file path or URL to the image file that needs to be processed.

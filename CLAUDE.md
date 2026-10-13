@@ -290,6 +290,31 @@ never intended to solve and does not claim to. Don't read "no longer scrambled" 
 for text this small, a caller that needs the exact wording should still treat the output as approximate rather
 than confirmed.
 
+## `detect_objects` runs SAM 3 on photos, which needs transformers 5
+
+**2026-10-12.** VisionBench sprint R (`Future_Ideas/detector_ocr_replacement_plan.md`) replaced Grounding DINO in
+`detect_objects` on photographs with SAM 3 (`sam3.py`, `facebook/sam3`, threshold `LOCATE_BOX_THRESHOLD` 0.125).
+On the held-out half it found 76.4% of labelled objects against 60.2%, and boxed a plausible-but-absent neighbour
+on 9.0% of probes against 65.7%; its boxes are less precise (about a third land on a labelled instance on COCO).
+Clip art still goes to Florence-2, and every other Grounding DINO caller (`count_objects`, `spatial_relations`,
+structured analysis's part crops and the defect probe) is unchanged.
+
+Four things are load-bearing:
+
+- **`sam3.py`'s post-processing is what the gates measured**: the processor at 0.05, top 300, the 0.125 floor,
+  class-agnostic NMS at IoU 0.5, then Grounding DINO's envelope filter. Change any step and re-run
+  `replacement_gate2.py`.
+- **SAM 3 does not count.** On the literal-name counting controls it returns no box for "ball", "rod", "shape" or
+  "blob" at any threshold, and on real photos it counted worse than Grounding DINO at 0.425.
+- **It is gated.** Without accepted access the load raises an `OSError` subclass; `detection_policy._photo_detect`
+  then falls back to Grounding DINO at 0.35, and the result's `detector` says which ran.
+- **It needs transformers 5**, and the old Moondream2 pin (2025-06-21) does not load there. Its commit `5d6c926`
+  ships byte-identical weights, tokenizer and config and only fixes buffer initialisation, so
+  `DEFAULT_MOONDREAM_REVISION` pins that commit. The upgrade was checked for output equivalence on every model
+  (VisionBench `transformers5_equivalence.py`). Meta's own `sam3` package was tried and not used: it is GPU-first
+  (hardcoded CUDA, a module-level triton import, a missing vocabulary file) and its scores differ from the
+  transformers port the gates measured.
+
 ## Counting is a separate tool from detection, and it is still not solved
 
 `detect_objects`' region count was never a tally (see the `wing` and `sword blade` cases in

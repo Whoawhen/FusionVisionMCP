@@ -61,13 +61,21 @@ COUNT_BOX_THRESHOLD: Final[float] = 0.425
 #: Precision there is 62.7% against Florence-2's 83.7%: more stray boxes, but scored.
 DETECT_BOX_THRESHOLD: Final[float] = 0.35
 
+#: SAM 3 backs `detect_objects` on photographs (`sam3.py`); Grounding DINO at the 0.35 above
+#: remains the fallback when SAM 3 cannot be loaded (it is gated on Hugging Face). 0.125 is the
+#: threshold VisionBench sprint R chose on the tune half (`replacement_gate1.py`): the best mean of
+#: COCO recall, phase 11 recall and 100 minus the plausible-neighbour boxing rate, with absent COCO
+#: categories boxed on <= 5% of scenes. Confirmed on the held-out half (`replacement_gate2.py`).
+LOCATE_BOX_THRESHOLD: Final[float] = 0.125
+DEFAULT_SAM3_MODEL: Final[str] = "facebook/sam3"
+
 DEFAULT_MOONDREAM_MODEL: Final[str] = "vikhyatk/moondream2"
 #: Pinned rather than tracking `main`, since this repository ships its model code via
 #: `trust_remote_code` and reshapes it between revisions. `2025-06-21` is chosen over the
 #: earlier `2025-01-09` pin because it fixed a measured self-consistency failure: asked to
 #: count the petals in `tests/sample.jpg` the old pin answered 12 and then listed 6 colours
 #: for them, while this one answers 10 and lists exactly 10.
-DEFAULT_MOONDREAM_REVISION: Final[str] = "2025-06-21"
+DEFAULT_MOONDREAM_REVISION: Final[str] = "5d6c926f44e26b07957b0dd315bbedcb4c17a5fe"
 
 #: The `-large` checkpoint is the shipped default: it backs caption, OCR-with-region,
 #: grounding and dense-region-caption. `-base` is used only by the CI server test, where

@@ -184,3 +184,6 @@ class AppContext:
     # The defect probe's backbone (DINOv2), lazy like the rest; None only in tests and callers
     # that build an AppContext by hand, which then can only run a CLIP-backed probe.
     defect_embedder: CropEmbedder | None = None
+    # SAM 3, `detect_objects`' photo detector. None in tests and hand-built contexts, where
+    # `detect_objects` falls back to Grounding DINO (`counter`) as it does when SAM 3 can't load.
+    locator: InstanceDetector | None = None
