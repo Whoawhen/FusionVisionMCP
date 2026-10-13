@@ -134,5 +134,16 @@ config change.
     6.5 points of recall, so only the count threshold is worth taking. Shipping it is a Grounding DINO tune, which
     the no-tuning rule bars, so it needs the user's call.
   - Median seconds per query on confirm: Grounding DINO 3.4, SAM 3 7.3.
+- 2026-10-12: user approved both results. **Grounding DINO counts at 0.425 on photos** (bdda661). SAM 3 for
+  `detect_objects` built on branch `sam3-detect` (needs transformers 5, so Moondream2 moved to its commit
+  5d6c926, same weights as 2025-06-21).
+- 2026-10-13: **transformers 5 checked against 4.57 on every model** (VisionBench `transformers5_equivalence.py`,
+  runs 1-4). Moondream2, SAM2 and DINOv2 matched as they were. Fixed on the branch: fast image processors pinned
+  off (CLIP, Florence-2, Grounding DINO), CLIP's `pooler_output`, Florence-2's skipped tokenizer clean-up, and two
+  upstream Grounding DINO bugs (phrase position ids; the sine embedding truncating integer ids). CLIP and Florence-2
+  then matched; Grounding DINO's scores still differ by up to 0.012 (Swin rewrite), but replayed on all 719 gate
+  confirm queries (`gd_tf5_decision_replay.py`, 1,110 scored) every metric was unchanged and one box count moved.
+  The shipped `Sam3Detector` reproduced the gate's replayed boxes on 20 of 20 confirm queries. **Merged and live**
+  (262b9b0): `detect_objects` runs SAM 3 on photos; `count_objects` stays on Grounding DINO at 0.425. PP-OCRv6 stays.
 - Downloads: about 0.6 / 1.7 GB for OWLv2, about 3.4 GB for SAM 3, a few hundred MB for docTR, and the TrOCR
   checkpoints.
