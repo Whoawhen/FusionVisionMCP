@@ -4,10 +4,13 @@
 without a download -- unlike the tool-level tests in `test_server.py`.
 """
 
+import torch
+
 from fusion_vision_mcp.grounding_dino import (
     DEFAULT_BOX_THRESHOLD,
     DEFAULT_TEXT_THRESHOLD,
     GroundingDino,
+    _phrase_position_ids,
 )
 
 envelope_indices = GroundingDino._envelope_indices
@@ -102,3 +105,10 @@ def test_count_objects_uses_the_photo_tuned_floor() -> None:
     from fusion_vision_mcp.constants import COUNT_BOX_THRESHOLD
 
     assert COUNT_BOX_THRESHOLD == 0.425
+
+
+def test_phrase_position_ids_number_the_closing_delimiter_as_transformers_4_did() -> None:
+    # [CLS] person . [SEP] and [CLS] traffic light . stop sign . [SEP]; transformers 5 gives the "." position 0.
+    assert _phrase_position_ids(torch.tensor([[101, 2711, 1012, 102]])).tolist() == [[0, 0, 1, 0]]
+    ids = torch.tensor([[101, 4026, 2422, 1012, 2644, 3696, 1012, 102]])
+    assert _phrase_position_ids(ids).tolist() == [[0, 0, 1, 2, 0, 1, 2, 0]]

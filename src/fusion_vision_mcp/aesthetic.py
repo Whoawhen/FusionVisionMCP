@@ -114,7 +114,9 @@ class Aesthetic:
         self.device = resolve_device(device)
         self.torch_dtype = torch.float32 if self.device == "cpu" else torch.float16
 
-        self.processor = CLIPProcessor.from_pretrained(model_id)
+        # use_fast=False: transformers 5 defaults to the fast (torchvision) image processor, which resizes
+        # differently; the aesthetic head, style prompts and defect probe were all measured through the slow one (equivalence check, 2026-10-13).
+        self.processor = CLIPProcessor.from_pretrained(model_id, use_fast=False)
         self.model = CLIPModel.from_pretrained(model_id, dtype=self.torch_dtype).to(self.device)  # type: ignore[arg-type]
         self.model.eval()
 
