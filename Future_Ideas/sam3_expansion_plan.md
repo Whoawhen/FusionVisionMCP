@@ -8,7 +8,19 @@ ed64fa3): agree of 36, gd_sam2 25, sam3_sam2 27, sam3_mask 25; all located 35 an
 fixtures; the rule picked `sam3_mask` (faster by 0.7 s, ~15 s vs 8 s shipped). SAM 3 won separate 12-7 and lost
 contact 6-9, every contact loss a held object where the best match was another instance of the name. Round 12
 (VisionBench 87c1063, `worker_handoff/ROUND12_PLAN.md`) builds 171 Open Images test pairs to measure that and to
-test an instance-pairing fix against unheld-instance controls. Gate F has not run.
+test an instance-pairing fix against unheld-instance controls.
+
+**Status 2026-10-13: gate F screen passed** (VisionBench `sam3_flat_gate.py`, dc980b5). The selection rule found
+63 flat images, not 20 (the sourced set had grown): absent boxed Florence-2 100.0% vs SAM 3 6.3%, recall 65.9% vs
+65.9%, precision 55.1% vs 33.9%, 9 s vs 24 s per image. SAM 3 lost on game UI (52 vs 70, 13 images) and
+illustrations (69 vs 92, 6 images), and returned up to 55 boxes for one name on some screenshots.
+
+**Gate F confirm, fixed 2026-10-13 before any round 13 image exists.** On round 13's fresh flat images
+(`worker_handoff/ROUND13_PLAN.md`; every `keep` the router sends to Florence-2), the same two candidates and
+grader as the screen. SAM 3 ships for flat images if both hold: absent boxed at least 30 points below Florence-2's,
+and recall no more than 10 points below. Reported, not gated: recall per kind (game UI and illustrations
+especially), precision, the share of queries returning more than 20 boxes, and seconds per image. A failure leaves
+the flat path on Florence-2.
 
 ## Why these two
 
