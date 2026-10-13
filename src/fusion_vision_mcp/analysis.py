@@ -672,6 +672,7 @@ def _dispatch(app: AppContext, operation: str, images: list[Image], *, question:
             backend_preference="auto",
             threshold=DETECT_BOX_THRESHOLD,
             adaptive_threshold=False,
+            locate=True,
         )
     if operation == "dense_caption":
         return app.florence2.dense_region_caption(images)

@@ -57,7 +57,7 @@ root-caused against the exact fixture that exposed it, not patched at the sympto
 |---|---|
 | OCR & document text | PaddleOCR PP-OCRv6 English via RapidOCR (ONNX, CPU) — printed, stylized and low-contrast text through one tool, with a per-span confidence score. EasyOCR covers non-English languages and the generated-gibberish check |
 | Captioning | Florence-2, whole-scene or per-region |
-| Object detection / grounding | Florence-2's grounding head — boxes and center points for a named object |
+| Object detection / grounding | SAM 3 on photos (it can say "not here"), Florence-2's grounding head on clip art — scored boxes and center points for a named object |
 | Instance counting | Grounding DINO — parallel object queries, not a sequential emission, so overlapping-but-separate instances don't collapse into one |
 | Visual question answering | Moondream2 — free-form questions about image content |
 | Spatial measurement | SAM2 masks plus a from-scratch geometry module — touch, gap, containment depth, shape |
@@ -71,7 +71,7 @@ root-caused against the exact fixture that exposed it, not patched at the sympto
 |---|---|---|
 | `ocr` | PP-OCRv6 English | Transcribe any text in an image or PDF — printed, stylized or low-contrast alike — with a per-span confidence score. Multi-column pages are split by geometry and read in reading order. Text-free images return nothing. |
 | `caption` | Florence-2 | Describe what an image shows as one detailed prose caption of the whole scene. `verify_text=true` also corrects close text misses against a verbatim OCR pass; `deep=true` uses Moondream2's longer caption (slower, covers more on charts, documents, signage and game UI). By default (`read_text`) the caption ends with `Visible text: "..."`, the `ocr` engine's verbatim reading of any text in the image. |
-| `detect_objects` | Florence-2 | Locate a named object, returning bounding boxes, center points and labels. |
+| `detect_objects` | SAM 3 (photos), Florence-2 (clip art) | Locate a named object, returning scored bounding boxes, center points and labels. On photos it rarely boxes an object that isn't there. |
 | `dense_region_caption` | Florence-2 | Caption every salient region of an image at once, without naming objects first. |
 | `query_image` | Moondream2 | Ask a free-form question about an image (visual question answering). `check_consistency=true` routes a low-confidence answer to the measurement that actually answers it, when one applies. |
 | `count_objects` | Grounding DINO | Count how many instances of a named object an image contains. Use this, not `detect_objects`, for "how many" questions. On a collapse, adds an actionable outline estimate. |

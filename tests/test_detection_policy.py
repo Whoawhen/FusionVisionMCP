@@ -193,3 +193,55 @@ def test_detect_objects_tool_calls_the_policy_the_right_way(monkeypatch: pytest.
     assert seen["threshold"] == constants.DETECT_BOX_THRESHOLD == 0.35
     assert seen["adaptive_threshold"] is False
     assert seen["object_name"] == "dog"
+
+
+class _FailingLocator:
+    """SAM 3 without Hugging Face access: loading raises an OSError subclass."""
+
+    def detect_objects(self, images: list, object_name: str, **kwargs) -> list[dict]:
+        raise OSError("gated repo")
+
+
+class TestLocate:
+    """`detect_objects` (locate=True) uses SAM 3 on photos; counting never does."""
+
+    def _app(self, locator=None) -> _StubApp:
+        app = _StubApp()
+        app.locator = locator if locator is not None else _RecordingCounter()
+        return app
+
+    def test_photo_goes_to_sam3_at_its_threshold(self) -> None:
+        app = self._app()
+        result = execute_detection(
+            app, [_photo()], "mug", backend_preference="auto", threshold=0.35, adaptive_threshold=False, locate=True
+        )[0]
+        assert app.locator.calls == [{"object_name": "mug", "threshold": constants.LOCATE_BOX_THRESHOLD}]
+        assert app.counter.calls == []
+        assert result["detector"] == "sam3"
+
+    def test_clip_art_still_goes_to_florence2(self) -> None:
+        app = self._app()
+        result = execute_detection(app, [_clip_art()], "mug", backend_preference="auto", locate=True)[0]
+        assert app.locator.calls == []
+        assert result["detector"] == "florence2"
+
+    def test_counting_never_uses_sam3(self) -> None:
+        app = self._app()
+        result = execute_detection(app, [_photo()], "mug", backend_preference="auto")[0]
+        assert app.locator.calls == []
+        assert result["detector"] == "grounding_dino"
+
+    def test_unavailable_sam3_falls_back_to_grounding_dino_at_its_own_threshold(self) -> None:
+        app = self._app(_FailingLocator())
+        result = execute_detection(
+            app, [_photo()], "mug", backend_preference="auto", threshold=0.9, adaptive_threshold=True, locate=True
+        )[0]
+        assert app.counter.calls == [
+            {"object_name": "mug", "threshold": constants.DETECT_BOX_THRESHOLD, "adaptive_threshold": False}
+        ]
+        assert result["detector"] == "grounding_dino"
+
+    def test_a_context_without_a_locator_uses_grounding_dino(self) -> None:
+        app = _StubApp()
+        result = execute_detection(app, [_photo()], "mug", backend_preference="auto", locate=True)[0]
+        assert result["detector"] == "grounding_dino"

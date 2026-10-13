@@ -46,23 +46,26 @@ def register(mcp: MCPServer) -> None:
         regions or coordinates; the centers come free with the boxes. `detector`
         says which model ran and `_routing` why.
 
-        On photographs it uses Grounding DINO and keeps boxes scoring 0.35 or more,
-        which is what lets it answer "not here" -- but only for something unlike
-        anything in the scene. Asked for a COCO category absent from a real photo,
-        it returned boxes on 2.8% of 143 scenes; asked for a plausible neighbour
-        (a fork in a kitchen, a smartphone on a screenshot), it boxed something on
-        62% of 130 generalist images, screenshots, documents and game UI included.
-        It boxed 66% of the objects in COCO scenes with 3 or fewer instances and
-        55% in crowded ones, about half on screenshots and documents. About a third
-        of its boxes miss a real instance, so read `scores`: a box just above 0.35
-        is a weak candidate.
+        On photographs it uses SAM 3 and keeps boxes scoring 0.125 or more. SAM 3
+        can say "not here", including for a plausible neighbour: asked for an
+        object that a labeller named as plausible but absent (a fork in a kitchen,
+        a smartphone on a screenshot), it boxed something on 9% of 166 held-out
+        generalist images, where the previous detector (Grounding DINO) boxed
+        something on 66%; for an absent COCO category, on none of 80 scenes. It
+        found 89% of labelled objects in COCO scenes and 66% across generalist
+        images, screenshots and documents included. Its weakness is strays: only
+        a fifth to a third of its boxes land on a labelled instance, so read `scores`
+        and treat low-scoring extra boxes as candidates, not finds. If SAM 3 cannot
+        be loaded (it is gated on Hugging Face), this falls back to Grounding DINO
+        at 0.35, and `detector` says which ran.
 
         Flat vector art and clip art go to Florence-2's grounding head instead.
         That path has no `scores`, and its label is the query echoed back rather
         than a classification: asked for "elephant" on a drawing of a dog, it
-        boxes the dog and labels it "elephant". Grounding DINO does no better
+        boxes the dog and labels it "elephant". Grounding DINO did no better
         there -- it boxed an absent object on 95% of flat images and found fewer of
-        the real ones. On either path, a box does not confirm the object is
+        the real ones. SAM 3 was not measured on flat art, so it is not used there.
+        On either path, a box does not confirm the object is
         present: confirm presence with `caption` or `query_image`.
 
         If `return_annotated` is true, the return value becomes a dictionary containing
@@ -80,8 +83,8 @@ def register(mcp: MCPServer) -> None:
 
         A maximally vague `object_name` ("object", "thing", "item", ...) on a
         scene with nothing distinctive to point to gets a near-full-frame box
-        filtered out rather than returned as a match -- both detectors fall back
-        to the whole image for such a name. This only applies to the exact generic
+        filtered out rather than returned as a match -- detectors fall back to the
+        whole image for such a name. This only applies to the exact generic
         vocabulary itself: a specific noun that genuinely fills the frame (a
         close-up of wood, asked for "wood") is returned unfiltered.
         """
@@ -94,6 +97,7 @@ def register(mcp: MCPServer) -> None:
                 backend_preference="auto",
                 threshold=DETECT_BOX_THRESHOLD,
                 adaptive_threshold=False,
+                locate=True,
             )
 
             if return_annotated:

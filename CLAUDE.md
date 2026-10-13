@@ -290,6 +290,52 @@ never intended to solve and does not claim to. Don't read "no longer scrambled" 
 for text this small, a caller that needs the exact wording should still treat the output as approximate rather
 than confirmed.
 
+## `detect_objects` runs SAM 3 on photos, which needs transformers 5
+
+**2026-10-12.** VisionBench sprint R (`Future_Ideas/detector_ocr_replacement_plan.md`) replaced Grounding DINO in
+`detect_objects` on photographs with SAM 3 (`sam3.py`, `facebook/sam3`, threshold `LOCATE_BOX_THRESHOLD` 0.125).
+On the held-out half it found 76.4% of labelled objects against 60.2%, and boxed a plausible-but-absent neighbour
+on 9.0% of probes against 65.7%; its boxes are less precise (about a third land on a labelled instance on COCO).
+Clip art still goes to Florence-2, and every other Grounding DINO caller (`count_objects`, `spatial_relations`,
+structured analysis's part crops and the defect probe) is unchanged.
+
+Four things are load-bearing:
+
+- **`sam3.py`'s post-processing is what the gates measured**: the processor at 0.05, top 300, the 0.125 floor,
+  class-agnostic NMS at IoU 0.5, then Grounding DINO's envelope filter. Change any step and re-run
+  `replacement_gate2.py`.
+- **SAM 3 does not count.** On the literal-name counting controls it returns no box for "ball", "rod", "shape" or
+  "blob" at any threshold, and on real photos it counted worse than Grounding DINO at 0.425.
+- **It is gated.** Without accepted access the load raises an `OSError` subclass; `detection_policy._photo_detect`
+  then falls back to Grounding DINO at 0.35, and the result's `detector` says which ran.
+- **It needs transformers 5**, and the old Moondream2 pin (2025-06-21) does not load there. Its commit `5d6c926`
+  ships byte-identical weights, tokenizer and config and only fixes buffer initialisation, so
+  `DEFAULT_MOONDREAM_REVISION` pins that commit. Meta's own `sam3` package was tried and not used: it is GPU-first
+  (hardcoded CUDA, a module-level triton import, a missing vocabulary file) and its scores differ from the
+  transformers port the gates measured.
+
+**What transformers 5 changed, found by checking every model's outputs against 4.57** (VisionBench
+`transformers5_equivalence.py`, 40 images, 2026-10-13). Moondream2, SAM2 and DINOv2 matched exactly as they were.
+The rest needed fixes, each verified by a rerun:
+
+- **Fast image processors are now the default.** CLIP's embeddings moved by up to 0.13 and Florence-2's captions
+  changed. `aesthetic.py`, `florence2.py` and `grounding_dino.py` pass `use_fast=False`, as `dinov2.py` already did.
+- **CLIP's `get_*_features` return an output object**, with the embedding in `pooler_output`; `score_aesthetics`
+  crashed. `Aesthetic._projected` reads either.
+- **Florence-2's tokenizer skips `clean_up_tokenization_spaces` for BPE**, so region text read "spa ., Nov". Forced
+  back on in `florence2.py`.
+- **Grounding DINO had two upstream bugs.** The phrase position ids give the closing "." position 0, and
+  `encode_sinusoidal_position_embedding` casts its result to the integer ids' dtype, truncating the text position
+  embeddings to 0s and 1s. Scores moved by up to 0.05 and box counts changed. `grounding_dino.py` restores the 4.57
+  position ids and casts the ids to float (module-level patches, with tests).
+
+After the fixes CLIP, Florence-2 and the three above match exactly. **Grounding DINO does not quite**: box counts are
+identical on all 80 calls and boxes within 0.08 px, but scores differ by a median 2e-4 and at most 0.012, against
+a limit of 1e-4 fixed before the run. That residue starts in transformers 5's rewritten Swin backbone (feature
+differences around 50x float32 epsilon, eager attention barely changes them), so it is arithmetic order rather than
+a logic change. Replayed on all 719 of gate 1's confirm queries (`gd_tf5_decision_replay.py`, 1,110 scored queries at 0.35 / 0.425), every metric was unchanged (exact counts 61.8%, detect recall 60.2%, controls 8/8 under both prompts) and one box count moved (a chandelier, 3 -> 2). `sam3.py` reproduces the gates'
+replayed boxes on 20 of 20 confirm queries (`sam3_wrapper_parity.py`).
+
 ## Counting is a separate tool from detection, and it is still not solved
 
 `detect_objects`' region count was never a tally (see the `wing` and `sword blade` cases in

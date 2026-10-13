@@ -114,8 +114,10 @@ class Aesthetic:
         self.device = resolve_device(device)
         self.torch_dtype = torch.float32 if self.device == "cpu" else torch.float16
 
-        self.processor = CLIPProcessor.from_pretrained(model_id)
-        self.model = CLIPModel.from_pretrained(model_id, dtype=self.torch_dtype).to(self.device)
+        # use_fast=False: transformers 5 defaults to the fast (torchvision) image processor, which resizes
+        # differently; the aesthetic head, style prompts and defect probe were all measured through the slow one (equivalence check, 2026-10-13).
+        self.processor = CLIPProcessor.from_pretrained(model_id, use_fast=False)
+        self.model = CLIPModel.from_pretrained(model_id, dtype=self.torch_dtype).to(self.device)  # type: ignore[arg-type]
         self.model.eval()
 
         # CLIP's learned temperature. Standard zero-shot classification scales the cosine
@@ -128,12 +130,17 @@ class Aesthetic:
         self.head.load_state_dict(_load_head_state_dict())
         self.head.eval()
 
+    @staticmethod
+    def _projected(out: Any) -> Any:
+        """The projected embedding: transformers 5's `get_*_features` return it as `pooler_output`, 4 as a tensor."""
+        return out if isinstance(out, torch.Tensor) else out.pooler_output
+
     def _encode_images(self, images: list[Image]) -> Any:
         """Unit-normalized CLIP image embeddings; the input both heads share."""
         with torch.no_grad():
             inputs = self.processor(images=images, return_tensors="pt").to(self.device)
             inputs["pixel_values"] = inputs["pixel_values"].to(self.torch_dtype)
-            features = self.model.get_image_features(**inputs)
+            features = self._projected(self.model.get_image_features(**inputs))
             return features / features.norm(dim=-1, keepdim=True)
 
     def _text_features(self) -> Any:
@@ -145,7 +152,7 @@ class Aesthetic:
         if self._cached_text_features is None:
             with torch.no_grad():
                 text_inputs = self.processor(text=_STYLE_PROMPTS, return_tensors="pt", padding=True).to(self.device)
-                text_features = self.model.get_text_features(**text_inputs)
+                text_features = self._projected(self.model.get_text_features(**text_inputs))
                 self._cached_text_features = text_features / text_features.norm(dim=-1, keepdim=True)
         return self._cached_text_features
 
@@ -173,7 +180,7 @@ class Aesthetic:
             for start in range(0, len(images), 16):
                 inputs = self.processor(images=images[start : start + 16], return_tensors="pt").to(self.device)
                 inputs["pixel_values"] = inputs["pixel_values"].to(self.torch_dtype)
-                out.extend(self.model.get_image_features(**inputs).float().cpu().tolist())
+                out.extend(self._projected(self.model.get_image_features(**inputs)).float().cpu().tolist())
         return out
 
     def score(self, images: list[Image]) -> list[dict[str, Any]]:

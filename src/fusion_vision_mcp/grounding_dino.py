@@ -15,6 +15,7 @@ rather than a new dependency.
 from typing import Any, Final
 
 import torch
+import transformers.models.grounding_dino.modeling_grounding_dino as _gd_modeling
 from PIL.Image import Image
 from transformers import AutoModelForZeroShotObjectDetection, AutoProcessor
 
@@ -60,6 +61,53 @@ _MIN_BOXES_FOR_ENVELOPE: Final[int] = 3
 _MAX_MEMBER_MUTUAL_IOU: Final[float] = 0.5
 
 
+_upstream_masks = _gd_modeling.generate_masks_with_special_tokens_and_transfer_map
+
+
+def _phrase_position_ids(input_ids: torch.Tensor) -> torch.Tensor:
+    """Each token's position within its phrase, the closing "." included, as transformers 4 numbered them.
+
+    Transformers 5 rewrote this and gives the closing delimiter position 0 ("person." -> 0, 0, 0, 0 instead of
+    0, 0, 1, 0), which moved scores by up to 0.05 and changed box counts on VisionBench's equivalence check
+    (`transformers5_equivalence.py`, 2026-10-13). Every threshold here was measured with the old numbering.
+    Ported from transformers 4.57's `generate_masks_with_special_tokens_and_transfer_map` (Apache 2.0).
+    """
+    batch_size, num_token = input_ids.shape
+    special = torch.isin(input_ids, torch.tensor(_gd_modeling.SPECIAL_TOKENS, device=input_ids.device))
+    position_ids = torch.zeros((batch_size, num_token), dtype=torch.long, device=input_ids.device)
+    for row in range(batch_size):
+        previous_col = 0
+        for col in torch.nonzero(special[row]).flatten().tolist():
+            if 0 < col < num_token - 1:
+                position_ids[row, previous_col + 1 : col + 1] = torch.arange(
+                    col - previous_col, device=input_ids.device
+                )
+            previous_col = col
+    return position_ids
+
+
+def _masks_and_positions(input_ids: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    attention_mask, _ = _upstream_masks(input_ids)  # type: ignore[arg-type]
+    return attention_mask, _phrase_position_ids(input_ids)
+
+
+_gd_modeling.generate_masks_with_special_tokens_and_transfer_map = _masks_and_positions  # type: ignore[assignment]
+
+_upstream_sine = getattr(_gd_modeling, "encode_sinusoidal_position_embedding", None)
+
+
+def _float_sine(pos_tensor: torch.Tensor, *args: Any, **kwargs: Any) -> torch.Tensor:
+    """Transformers 5's sine embedding casts its result to the input's dtype, so the integer text position ids came
+    back as 0s and 1s (position 1's embedding became 0, 1, 0, 0, ...). Transformers 4 returned floats."""
+    if not pos_tensor.is_floating_point():
+        pos_tensor = pos_tensor.float()
+    return _upstream_sine(pos_tensor, *args, **kwargs)  # type: ignore[misc,no-any-return]
+
+
+if _upstream_sine is not None:  # transformers 4 has `get_sine_pos_embed` instead, which returns floats
+    _gd_modeling.encode_sinusoidal_position_embedding = _float_sine
+
+
 class GroundingDino:
     """Wraps Grounding DINO for open-vocabulary object detection."""
 
@@ -77,7 +125,9 @@ class GroundingDino:
         # 0.15 thresholds, the same as on CPU.
         self.torch_dtype = torch.float32
 
-        self.processor = AutoProcessor.from_pretrained(model_id)
+        # use_fast=False: transformers 5 defaults to the fast (torchvision) image processor, which resizes
+        # differently; every threshold here was measured through the slow one (equivalence check, 2026-10-13).
+        self.processor = AutoProcessor.from_pretrained(model_id, use_fast=False)
         self.model = AutoModelForZeroShotObjectDetection.from_pretrained(model_id, dtype=self.torch_dtype).to(
             self.device
         )

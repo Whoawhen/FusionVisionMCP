@@ -31,7 +31,7 @@ class Sam2:
         self.torch_dtype = torch.float32 if self.device == "cpu" else torch.float16
 
         self.processor = Sam2Processor.from_pretrained(model_id)
-        self.model = Sam2Model.from_pretrained(model_id, dtype=self.torch_dtype).to(self.device)
+        self.model = Sam2Model.from_pretrained(model_id, dtype=self.torch_dtype).to(self.device)  # type: ignore[arg-type]
         self.model.eval()
 
     def segment(self, image: Image, boxes: list[list[int]]) -> list[NDArray[np.bool_]]:

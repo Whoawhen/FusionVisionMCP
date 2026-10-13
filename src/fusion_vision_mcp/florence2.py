@@ -31,9 +31,17 @@ class Florence2:
 
         self.model = Florence2ForConditionalGeneration.from_pretrained(
             model_id, dtype=self.torch_dtype, trust_remote_code=True, attn_implementation="sdpa"
-        ).to(self.device)
+        ).to(self.device)  # type: ignore[arg-type]
+        # use_fast=False: transformers 5 defaults to the fast (torchvision) image processor, which resizes
+        # differently; its tuning was measured through the slow one (equivalence check, 2026-10-13).
         self.processor = AutoProcessor.from_pretrained(
-            model_id, trust_remote_code=True, clean_up_tokenization_spaces=True
+            model_id,
+            trust_remote_code=True,
+            clean_up_tokenization_spaces=True,
+            # Transformers 5 ignores the clean-up above for BPE tokenizers unless forced, and region text then
+            # reads "spa ., Nov" where it read "spa., Nov". Forced, it decodes as it did when measured.
+            clean_up_tokenization_spaces_for_bpe_even_though_it_will_corrupt_output=True,
+            use_fast=False,
         )
 
     def ocr(self, images: list[Image]) -> list[str]:
