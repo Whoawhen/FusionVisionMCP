@@ -299,6 +299,17 @@ on 9.0% of probes against 65.7%; its boxes are less precise (about a third land 
 Clip art still goes to Florence-2, and every other Grounding DINO caller (`count_objects`, `spatial_relations`,
 structured analysis's part crops and the defect probe) is unchanged.
 
+**`spatial_relations` stays on Grounding DINO + SAM2: SAM 3 was shipped there and reverted the same day
+(2026-10-13).** Gate S (VisionBench `sam3_spatial_gate.py`) tied it on 36 Open Images relations (25 each; SAM 3 12/12
+on separate, 6/12 on contact). Round 12, 171 held-object pairs labelled by the worker and blind-checked by the user,
+then showed the regression the 12 contact scenes were too few to see (`gd_sam2_held_compare.py`): on 106 held pairs
+Grounding DINO + SAM2 agreed on 88, SAM 3 on 54 (+32 points, CI 23 to 42), 37 vs 22 of 39 with one of each object,
+equal on separate pairs at a table, and twice as fast. SAM 3 fails both ways: its best-scoring match is a different
+instance more often (labelled objects chosen 86 vs 59), and its instance masks stop a few pixels short of a hand.
+Picking the closest near-best pair fixed held objects but broke separate scenes (`sam3_held_gate.py`); a 5 px contact
+tolerance is waiting on a fresh set (round 12b). SAM 3's box with SAM2's mask (27/36 in gate S) was not shipped:
+it removes no model, since SAM2 also backs `count_objects`' silhouette check and Grounding DINO its counts.
+
 Four things are load-bearing:
 
 - **`sam3.py`'s post-processing is what the gates measured**: the processor at 0.05, top 300, the 0.125 floor,
