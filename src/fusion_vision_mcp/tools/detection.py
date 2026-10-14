@@ -59,13 +59,15 @@ def register(mcp: MCPServer) -> None:
         be loaded (it is gated on Hugging Face), this falls back to Grounding DINO
         at 0.35, and `detector` says which ran.
 
-        Flat vector art and clip art go to Florence-2's grounding head instead.
-        That path has no `scores`, and its label is the query echoed back rather
-        than a classification: asked for "elephant" on a drawing of a dog, it
-        boxes the dog and labels it "elephant". Grounding DINO did no better
-        there -- it boxed an absent object on 95% of flat images and found fewer of
-        the real ones. SAM 3 was not measured on flat art, so it is not used there.
-        On either path, a box does not confirm the object is
+        Flat images (clip art, logos, vector charts, plain UI screenshots: few
+        distinct colours) use SAM 3 too, since 2026-10-14. On 88 fresh flat images
+        it boxed an absent object on 11% where Florence-2's grounding head, used
+        there before, boxed something on 100%, and it found 54% of labelled objects
+        against 41%. It can return many boxes on a busy screenshot (over 20 for
+        about 1 query in 13), so read `scores`. If SAM 3 cannot load, flat images
+        fall back to Florence-2, which has no `scores` and echoes the query as its
+        label (asked for "elephant" on a drawing of a dog, it boxes the dog).
+        On every path, a box does not confirm the object is
         present: confirm presence with `caption` or `query_image`.
 
         If `return_annotated` is true, the return value becomes a dictionary containing

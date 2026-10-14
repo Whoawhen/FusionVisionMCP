@@ -62,7 +62,15 @@ def execute_detection(
         backend = backend_preference
         routing_metadata = None
 
-    if backend == "florence2":
+    flat_sam3 = _flat_locate(app, images, object_name) if backend == "florence2" and locate else None
+    if flat_sam3 is not None:
+        results = flat_sam3
+        if exclude_full_frame:
+            results = [
+                query_policy.suppress_generic_full_frame(object_name, result, img.width, img.height)
+                for img, result in zip(images, results, strict=True)
+            ]
+    elif backend == "florence2":
         # Florence-2's grounding head. We always pass exclude_full_frame based
         # on the query policy, fixing the bug where explicit clip_art=True
         # blindly dropped legitimate full-frame matches (like a close-up of wood).
@@ -95,6 +103,26 @@ def execute_detection(
         for r in results:
             r["_routing"] = {**routing_metadata, "backend": r.get("detector", routing_metadata["backend"])}
 
+    return results
+
+
+def _flat_locate(app: AppContext, images: list[Image.Image], object_name: str) -> list[dict[str, Any]] | None:
+    """SAM 3 for `detect_objects` on flat images; None (use Florence-2) without it.
+
+    VisionBench gate F (2026-10-14): on 88 fresh flat images SAM 3 boxed the absent object on 11.4% against
+    Florence-2's 100%, and found 53.8% of labelled objects against 40.5% (`sam3_flat_confirm.py`; the screen on 63
+    other images agreed). Counting keeps Florence-2 on flat images.
+    """
+    locator: InstanceDetector | None = getattr(app, "locator", None)
+    if locator is None:
+        return None
+    try:
+        results = locator.detect_objects(images, object_name, threshold=LOCATE_BOX_THRESHOLD)
+    except OSError as exc:
+        logger.warning(f"SAM 3 unavailable ({exc}); detect_objects on a flat image falls back to Florence-2")
+        return None
+    for result in results:
+        result["detector"] = "sam3"
     return results
 
 
