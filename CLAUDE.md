@@ -296,7 +296,16 @@ than confirmed.
 `detect_objects` on photographs with SAM 3 (`sam3.py`, `facebook/sam3`, threshold `LOCATE_BOX_THRESHOLD` 0.125).
 On the held-out half it found 76.4% of labelled objects against 60.2%, and boxed a plausible-but-absent neighbour
 on 9.0% of probes against 65.7%; its boxes are less precise (about a third land on a labelled instance on COCO).
-Clip art still goes to Florence-2, and every other Grounding DINO caller (`count_objects`, `spatial_relations`,
+**2026-10-14: flat images too.** VisionBench gate F (`sam3_flat_gate.py` screen on 63 images, then
+`sam3_flat_confirm.py` on 88 fresh ones, rule fixed in `Future_Ideas/sam3_expansion_plan.md` before they existed):
+on the confirm set SAM 3 boxed the absent object on 11.4% against Florence-2's 100%, and found 53.8% of labelled
+objects against 40.5%; precision 22.4% vs 35.9%, ~29 s vs ~12 s per image, and 21 of 275 queries returned more than
+20 boxes. "Flat" is the router's pixel test (under 10 colours per 1,000 pixels, not greyscale with tonal range),
+which most JPEG screenshots fail, so the flat path is mostly clip art, logos, vector charts and lossless UI
+captures. `detection_policy._flat_locate`; without SAM 3 it falls back to Florence-2. Counting on flat images
+keeps Florence-2.
+
+Every other Grounding DINO caller (`count_objects`, `spatial_relations`,
 structured analysis's part crops and the defect probe) is unchanged.
 
 **`spatial_relations` stays on Grounding DINO + SAM2: SAM 3 was shipped there and reverted the same day

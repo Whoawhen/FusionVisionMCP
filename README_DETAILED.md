@@ -216,8 +216,10 @@ Locate a named object in an image, returning `bboxes` (`[x1, y1, x2, y2]` each),
 box) and `labels`, all index-aligned.
 
 On photographs this runs **SAM 3** (`facebook/sam3`, gated: accept its licence on Hugging Face and log in, or
-`detect_objects` falls back to Grounding DINO at 0.35 and says so in `detector`). Clip art and flat vector art
-go to Florence-2's grounding head, which has no scores.
+`detect_objects` falls back to Grounding DINO at 0.35 and says so in `detector`). Since 2026-10-14 flat images
+(clip art, logos, vector charts, lossless UI captures) use SAM 3 too: on 88 fresh flat images it boxed an absent
+object on 11% against Florence-2's 100%, and found 54% of labelled objects against 41%. Without SAM 3 they fall
+back to Florence-2's grounding head, which has no scores.
 
 **2026-10-12: SAM 3 replaced Grounding DINO on photos.** VisionBench sprint R measured both on the same queries,
 thresholds chosen on one half of the images and confirmed once on the other (`replacement_gate1.py`,

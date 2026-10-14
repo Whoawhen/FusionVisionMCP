@@ -10,6 +10,11 @@ contact 6-9, every contact loss a held object where the best match was another i
 (VisionBench 87c1063, `worker_handoff/ROUND12_PLAN.md`) builds 171 Open Images test pairs to measure that and to
 test an instance-pairing fix against unheld-instance controls.
 
+**Status 2026-10-14: gate F confirmed and shipped.** On round 13's 88 fresh flat images (`sam3_flat_confirm.py`):
+absent boxed Florence-2 100.0% vs SAM 3 11.4%, recall 40.5% vs 53.8%, precision 35.9% vs 22.4%, 11.5 vs 29 s per
+image; 21 of 275 queries over 20 boxes. The user's label check: absent objects right 20/20, boxes had problems on
+9/20 (recall noisy for both). `detect_objects` now uses SAM 3 on flat images.
+
 **Status 2026-10-13 (night): gate S reverted.** Round 12 (171 held-object pairs) showed SAM 3 well behind on held
 objects: Grounding DINO + SAM2 88 vs SAM 3 54 of 106 (+32, CI 23-42), equal on separate pairs, twice as fast
 (VisionBench `gd_sam2_held_compare.py`). Gate H's pair search failed its guard; gate T's tolerance guard was written

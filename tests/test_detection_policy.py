@@ -220,11 +220,32 @@ class TestLocate:
         assert result["detector"] == "sam3"
         assert result["_routing"]["backend"] == "sam3"
 
-    def test_clip_art_still_goes_to_florence2(self) -> None:
+    def test_clip_art_goes_to_sam3_at_its_threshold(self) -> None:
+        # Gate F (2026-10-14): SAM 3 replaced Florence-2 for detect_objects on flat images too.
         app = self._app()
         result = execute_detection(app, [_clip_art()], "mug", backend_preference="auto", locate=True)[0]
+        assert app.locator.calls == [{"object_name": "mug", "threshold": constants.LOCATE_BOX_THRESHOLD}]
+        assert app.florence2.calls == []
+        assert result["detector"] == "sam3"
+        assert result["_routing"]["backend"] == "sam3"
+
+    def test_clip_art_counting_still_uses_florence2(self) -> None:
+        app = self._app()
+        result = execute_detection(app, [_clip_art()], "mug", backend_preference="auto")[0]
         assert app.locator.calls == []
         assert result["detector"] == "florence2"
+
+    def test_unavailable_sam3_on_clip_art_falls_back_to_florence2(self) -> None:
+        app = self._app(_FailingLocator())
+        result = execute_detection(app, [_clip_art()], "mug", backend_preference="auto", locate=True)[0]
+        assert result["detector"] == "florence2"
+        assert len(app.florence2.calls) == 1
+
+    def test_generic_name_on_clip_art_drops_a_full_frame_sam3_box(self) -> None:
+        image = _clip_art()
+        app = self._app(_RecordingCounter([[0, 0, image.width, image.height], [1, 1, 5, 5]]))
+        result = execute_detection(app, [image], "object", backend_preference="auto", locate=True)[0]
+        assert result["bboxes"] == [[1, 1, 5, 5]]
 
     def test_counting_never_uses_sam3(self) -> None:
         app = self._app()
