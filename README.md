@@ -75,7 +75,7 @@ root-caused against the exact fixture that exposed it, not patched at the sympto
 | `dense_region_caption` | Florence-2 | Caption every salient region of an image at once, without naming objects first. |
 | `query_image` | Moondream2 | Ask a free-form question about an image (visual question answering). `check_consistency=true` routes a low-confidence answer to the measurement that actually answers it, when one applies. |
 | `count_objects` | Grounding DINO | Count how many instances of a named object an image contains. Use this, not `detect_objects`, for "how many" questions. On a collapse, adds an actionable outline estimate. |
-| `spatial_relations` | SAM 3 (Grounding DINO + SAM2 if SAM 3 can't load) | Measure contact, gaps, containment depth and shape between two named objects. |
+| `spatial_relations` | Grounding DINO + SAM2 | Measure contact, gaps, containment depth and shape between two named objects. |
 | `score_aesthetics` | CLIP + LAION | Rate how aesthetically pleasing an image looks on a 1-10 scale. `compare_with` switches to a calibrated like-with-like comparison against a reference image. |
 | `critique_composition` | Florence-2 + CLIP/LAION + Moondream2 | Check framing against the rule of thirds; for low-scoring shots, explain what looks off. Also supports `compare_with`. |
 | `batch_analyze_images` | (routes to any tool above) | Run one operation across many images in a single call, isolating failures per image. |
@@ -103,7 +103,7 @@ by hand. For example, asking *"How many bolts are in this photo?"* with an image
 Most tools above expose one underlying model's own capability directly. Two do not — no single model in the
 stack answers these on its own:
 
-- **`spatial_relations`** combines SAM 3's instance masks and a from-scratch geometry module to measure
+- **`spatial_relations`** combines Florence-2 boxes, SAM2 masks, and a from-scratch geometry module to measure
   whether two objects actually touch, contain, or overlap — a bounding box alone can't answer that, since boxes
   overlap the instant one object is merely in front of another.
 - **`critique_composition`** combines Florence-2 localization, a from-scratch rule-of-thirds check, the CLIP/LAION
@@ -219,7 +219,7 @@ Five models, each loaded on-demand and released on its own idle timer:
 
 - **Florence-2** (Microsoft) — captioning, OCR, object detection/grounding, dense region captioning
 - **Moondream2** (Vikhyat) — visual question answering
-- **SAM2** (Meta) — segmentation masks for `count_objects`' silhouette check, and `spatial_relations`' fallback
+- **SAM2** (Meta) — segmentation masks, the basis for `spatial_relations`
 - **Grounding DINO** (IDEA-Research) — open-vocabulary detection backing `count_objects`
 - **CLIP + LAION aesthetic head** — aesthetic quality scoring
 

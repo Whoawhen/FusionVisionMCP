@@ -10,6 +10,12 @@ contact 6-9, every contact loss a held object where the best match was another i
 (VisionBench 87c1063, `worker_handoff/ROUND12_PLAN.md`) builds 171 Open Images test pairs to measure that and to
 test an instance-pairing fix against unheld-instance controls.
 
+**Status 2026-10-13 (night): gate S reverted.** Round 12 (171 held-object pairs) showed SAM 3 well behind on held
+objects: Grounding DINO + SAM2 88 vs SAM 3 54 of 106 (+32, CI 23-42), equal on separate pairs, twice as fast
+(VisionBench `gd_sam2_held_compare.py`). Gate H's pair search failed its guard; gate T's tolerance guard was written
+wrongly and waits on round 12b. `spatial_relations` is back on Grounding DINO + SAM2. The SAM 3 box + SAM2 mask
+hybrid is left out: it removes no model (user decision).
+
 **Status 2026-10-13: gate F screen passed** (VisionBench `sam3_flat_gate.py`, dc980b5). The selection rule found
 63 flat images, not 20 (the sourced set had grown): absent boxed Florence-2 100.0% vs SAM 3 6.3%, recall 65.9% vs
 65.9%, precision 55.1% vs 33.9%, 9 s vs 24 s per image. SAM 3 lost on game UI (52 vs 70, 13 images) and

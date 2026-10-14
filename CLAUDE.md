@@ -296,21 +296,19 @@ than confirmed.
 `detect_objects` on photographs with SAM 3 (`sam3.py`, `facebook/sam3`, threshold `LOCATE_BOX_THRESHOLD` 0.125).
 On the held-out half it found 76.4% of labelled objects against 60.2%, and boxed a plausible-but-absent neighbour
 on 9.0% of probes against 65.7%; its boxes are less precise (about a third land on a labelled instance on COCO).
-Clip art still goes to Florence-2, and every other Grounding DINO caller (`count_objects`, structured analysis's
-part crops and the defect probe) is unchanged. `spatial_relations` moved to SAM 3 on 2026-10-13 (next paragraph).
+Clip art still goes to Florence-2, and every other Grounding DINO caller (`count_objects`, `spatial_relations`,
+structured analysis's part crops and the defect probe) is unchanged.
 
-**2026-10-13: `spatial_relations` locates and segments with SAM 3 alone** (`Sam3Detector.locate_masks`,
-`detection_policy.locate_and_segment`): the best-scoring box per name at 0.125 and SAM 3's own instance mask, no
-SAM2. VisionBench gate S (`sam3_spatial_gate.py`, rules fixed before the run, one run on all 36 Open Images VRD
-fixtures) scored three variants against each fixture's labelled relation: Grounding DINO + SAM2 25/36, SAM 3 box +
-SAM2 mask 27/36, SAM 3 alone 25/36, all locating both objects on 35 and passing both synthetic fixtures. The rule
-(a tie passes; the faster of two passing variants wins) picked SAM 3 alone, by 0.7 s. Calls take about 15 s, twice
-the old 8 s. The totals hide two opposite patterns: SAM 3 is right on 12 of 12 separate scenes against 7
-(Grounding DINO's boxes made a chair and a desk touch) and worse on contact, 6 against 9, because on held objects
-(racket, violin, surfboard) the best-scoring match for one name was a *different* instance in the frame (its box
-overlaps the labelled one by 0.00-0.03), not a bad mask. Without SAM 3 the tool falls back to Grounding DINO +
-SAM2 and says so in `locator`. Gate S also showed that the old 25/36 had been scored with labelled boxes standing
-in for missed detections; the gate counts a miss as a disagreement.
+**`spatial_relations` stays on Grounding DINO + SAM2: SAM 3 was shipped there and reverted the same day
+(2026-10-13).** Gate S (VisionBench `sam3_spatial_gate.py`) tied it on 36 Open Images relations (25 each; SAM 3 12/12
+on separate, 6/12 on contact). Round 12, 171 held-object pairs labelled by the worker and blind-checked by the user,
+then showed the regression the 12 contact scenes were too few to see (`gd_sam2_held_compare.py`): on 106 held pairs
+Grounding DINO + SAM2 agreed on 88, SAM 3 on 54 (+32 points, CI 23 to 42), 37 vs 22 of 39 with one of each object,
+equal on separate pairs at a table, and twice as fast. SAM 3 fails both ways: its best-scoring match is a different
+instance more often (labelled objects chosen 86 vs 59), and its instance masks stop a few pixels short of a hand.
+Picking the closest near-best pair fixed held objects but broke separate scenes (`sam3_held_gate.py`); a 5 px contact
+tolerance is waiting on a fresh set (round 12b). SAM 3's box with SAM2's mask (27/36 in gate S) was not shipped:
+it removes no model, since SAM2 also backs `count_objects`' silhouette check and Grounding DINO its counts.
 
 Four things are load-bearing:
 
@@ -462,7 +460,7 @@ whole case table, negative controls included.
 
 ## `spatial_relations` measures; it does not judge
 
-`spatial_relations` (SAM 3 boxes and masks, or Grounding DINO boxes → SAM2 masks without it → `geometry.py`) reports numbers and deliberately stops
+`spatial_relations` (Grounding DINO boxes → SAM2 masks → `geometry.py`) reports numbers and deliberately stops
 there. That split came out of testing, not taste: Moondream answered a plain "describe anything wrong in this
 image" with a flat `"None"` on six different images that all contained a real, human-visible defect, and closed
 yes/no questions gave the *same* answer across genuinely different images often enough that the answer was

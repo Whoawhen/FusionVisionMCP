@@ -59,7 +59,6 @@ from fusion_vision_mcp.protocols import (
     AppContext,
     CropEmbedder,
     InstanceDetector,
-    MaskLocator,
     Processor,
     Segmenter,
     VqaProcessor,
@@ -217,8 +216,8 @@ async def app_lifespan(
     # Only query_image(structured_analysis=true) loads it, and only when an image has a hand or face.
     defect_embedder = cast(CropEmbedder, IdleProxy(IdleReleased(_make_dinov2, idle_timeout, "DINOv2")))
 
-    # Only detect_objects (and batch "detect") on photographs and spatial_relations load SAM 3.
-    locator = cast(MaskLocator, IdleProxy(IdleReleased(_make_sam3, idle_timeout, "SAM 3")))
+    # Only detect_objects (and batch "detect") loads SAM 3, on photographs.
+    locator = cast(InstanceDetector, IdleProxy(IdleReleased(_make_sam3, idle_timeout, "SAM 3")))
 
     yield AppContext(
         florence2,

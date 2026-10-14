@@ -9,8 +9,7 @@ from __future__ import annotations
 
 # We import AppContext only for type checking to avoid circular imports.
 import logging
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal
 
 from PIL import Image
 
@@ -22,11 +21,8 @@ from fusion_vision_mcp.constants import DEFAULT_BOX_THRESHOLD, DETECT_BOX_THRESH
 from fusion_vision_mcp.routing import choose_count_backend
 
 if TYPE_CHECKING:
-    import numpy as np
-    from numpy.typing import NDArray
-
     from fusion_vision_mcp import AppContext
-    from fusion_vision_mcp.protocols import InstanceDetector, MaskLocator
+    from fusion_vision_mcp.protocols import InstanceDetector
 
 logger = logging.getLogger(__name__)
 
@@ -132,46 +128,4 @@ def _photo_detect(
     return results
 
 
-def locate_and_segment(
-    app: AppContext, image: Image.Image, names: list[str], limit: int
-) -> tuple[list[dict[str, Any]], list[NDArray[np.bool_]], str]:
-    """The best-scoring instance of each name and its mask, for `spatial_relations`.
-
-    SAM 3 locates and segments in one call (its own instance mask, no SAM2): VisionBench gate S
-    (2026-10-13) scored it 25 of 36 Open Images relations against 25 for Grounding DINO + SAM2, and it
-    passed both synthetic fixtures. Without SAM 3 (gated, or a hand-built context) this falls back to the
-    old path at its old threshold. Returns `(located, masks, locator)`; `located` holds `id`, `label` and
-    `box` per name found, in request order, at most `limit` of them.
-    """
-    locator: MaskLocator | None = getattr(app, "locator", None)
-    if locator is not None:
-        try:
-            located, masks = _located(names, limit, lambda name: locator.locate_masks(image, name), image)
-            return located, masks, "sam3"
-        except OSError as exc:
-            logger.warning(f"SAM 3 unavailable ({exc}); spatial_relations falls back to Grounding DINO + SAM2")
-    located, _ = _located(names, limit, lambda name: app.counter.detect_objects([image], name)[0], image)
-    masks = app.segmenter.segment(image, [cast(list[int], obj["box"]) for obj in located]) if located else []
-    return located, masks, "grounding_dino"
-
-
-def _located(
-    names: list[str], limit: int, detect: Callable[[str], dict[str, Any]], image: Image.Image
-) -> tuple[list[dict[str, Any]], list[NDArray[np.bool_]]]:
-    """Each name's single best-scoring box after the generic-name guard, and its mask if `detect` gave masks."""
-    located: list[dict[str, Any]] = []
-    masks: list[NDArray[np.bool_]] = []
-    for call_index, name in enumerate(names):
-        if len(located) >= limit:
-            break
-        detected = query_policy.suppress_generic_full_frame(name, detect(name), image.width, image.height)
-        if not detected["bboxes"]:
-            continue
-        best = max(range(len(detected["bboxes"])), key=lambda i: detected["scores"][i])
-        located.append({"id": f"{name}#{call_index}", "label": name, "box": [int(v) for v in detected["bboxes"][best]]})
-        if "masks" in detected:
-            masks.append(detected["masks"][best])
-    return located, masks
-
-
-__all__ = ["execute_detection", "locate_and_segment"]
+__all__ = ["execute_detection"]
