@@ -22,8 +22,8 @@ task heads exposed as their own tools (`detect_objects`,
 no VQA head), Grounding DINO for instance counting (`count_objects`, since Florence-2's grounding head's region
 count is not a tally), a CLIP/LAION aesthetic scorer (`score_aesthetics`), a batch dispatch convenience
 (`batch_analyze_images`), and configurable memory release. Two tools aren't just a new model wired in: no model
-here answers "does this actually touch that" on its own, so `spatial_relations` is built from SAM 3's instance
-masks and a from-scratch geometry module; and no model combines localization, framing, and a quality
+here answers "does this actually touch that" on its own, so `spatial_relations` is built from Florence-2 boxes,
+SAM2 masks, and a from-scratch geometry module; and no model combines localization, framing, and a quality
 judgment into one answer, so `critique_composition` combines Florence-2, a rule-of-thirds geometry function, the
 aesthetic predictor, and (for low-scoring images) Moondream2. See the tags on each tool below.
 
@@ -39,8 +39,7 @@ image, and rate how aesthetically pleasing an image looks.
 Florence-2 handles captioning, OCR, detection and grounding. Moondream2 backs the `query_image` tool, because
 Florence-2 has no open-ended visual question answering task. Grounding DINO backs `count_objects`, because a
 sequence-emitting grounding head cannot produce a reliable tally and is sensitive to how the object is named.
-SAM 3's masks back `spatial_relations` (SAM2's, if SAM 3 can't load), because bounding boxes cannot answer
-questions about contact or containment.
+SAM2 backs `spatial_relations`, because bounding boxes cannot answer questions about contact or containment.
 A CLIP ViT-L/14 backbone plus a small trained head backs `score_aesthetics`, because none of the other models has
 any notion of how good an image looks.
 
@@ -503,11 +502,8 @@ For a single image, call the named tool directly: its arguments are checked up f
 
 Measures how named objects sit relative to one another: whether they touch, how far apart they are, how much of
 one lies inside the other and how deeply, plus each object's elongation, straightness and end-to-end width
-profile. SAM 3 locates each object (the single best-scoring match per name) and segments it with its own
-instance mask, and the geometry is computed from the masks. If SAM 3 can't load (it is gated on Hugging Face),
-Grounding DINO locates and SAM2 segments instead; `locator` in the result says which ran. SAM 3 took over on
-2026-10-13 after matching the old pair on 36 labelled Open Images relations (25 each); it is right more often on
-separate objects and less often on held ones, where it can pick another instance of the same name.
+profile. Grounding DINO locates the objects (the single best-scoring match per name), SAM2 segments them, and
+the geometry is computed from the masks.
 
 This answers questions a bounding box cannot. Two boxes overlap as soon as one object is merely *in front of*
 another, so boxes cannot tell contact from occlusion; silhouettes can. It reports measurements rather than
@@ -548,8 +544,8 @@ The containment figures separate cleanly and in order. `end_symmetry` separates 
 0.94 against 0.83 — so it is better read as evidence alongside the width numbers themselves than as a threshold
 to trust on its own.
 
-Note that `spatial_relations` loads SAM 3 (shared with `detect_objects`) on first use — a server that is only
-ever asked for captions or OCR never pays for it.
+Note that `spatial_relations` is the only tool that loads SAM2, and it loads it on first use — a server that is
+only ever asked for captions or OCR never pays for it.
 
 #### Limits
 

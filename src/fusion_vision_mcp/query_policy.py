@@ -94,7 +94,7 @@ def suppress_generic_full_frame(
 
     filtered = dict(result)
     filtered["bboxes"] = [bboxes[i] for i in keep]
-    for key in ("points", "labels", "scores", "masks"):
+    for key in ("points", "labels", "scores"):
         values = result.get(key)
         if values is not None:
             filtered[key] = [values[i] for i in keep]

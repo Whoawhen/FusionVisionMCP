@@ -25,7 +25,7 @@ from fusion_vision_mcp.constants import (
     MAIN_SUBJECT_QUESTION,
     CaptionLevel,
 )
-from fusion_vision_mcp.detection_policy import execute_detection, locate_and_segment
+from fusion_vision_mcp.detection_policy import execute_detection
 from fusion_vision_mcp.protocols import AppContext, Processor
 
 #: Ceiling on objects compared in one `spatial_relations` call. Relations grow as
@@ -297,15 +297,27 @@ def _size_measurement(app: AppContext, image: Image, object_name: str, question_
 def _spatial_measurement(app: AppContext, image: Image, names: list[str]) -> dict[str, Any] | None:
     """Detect and segment two named objects and measure their relation.
 
-    Mirrors ``spatial_relations`` for the two-object case (``locate_and_segment``: SAM 3, or
-    Grounding DINO + SAM2 without it), and returns ``geometry.relation`` between
+    Mirrors ``spatial_relations`` for the two-object case: detect each name, keep
+    the best-scoring box, segment both, and return ``geometry.relation`` between
     the two masks. Returns None when fewer than two objects could be located, so the
     cross-check is omitted rather than reporting a half-measurement.
     """
-    located, masks, _ = locate_and_segment(app, image, names, _MAX_RELATED_OBJECTS)
+    located: list[dict[str, Any]] = []
+    boxes: list[list[int]] = []
+    for call_index, object_name in enumerate(names):
+        if len(located) >= _MAX_RELATED_OBJECTS:
+            break
+        detected = app.counter.detect_objects([image], object_name)[0]
+        if not detected["bboxes"]:
+            continue
+        best = max(range(len(detected["bboxes"])), key=lambda i: detected["scores"][i])
+        box = [int(v) for v in detected["bboxes"][best]]
+        located.append({"label": object_name, "box": box})
+        boxes.append(box)
     if len(located) < 2:
         return None
 
+    masks = app.segmenter.segment(image, boxes)
     return {
         "tool": "spatial_relations",
         "objects": [obj["label"] for obj in located],

@@ -6,9 +6,6 @@ found 16 points more of the labelled objects and boxed a plausible-but-absent ne
 instead of 66%. It did not take over counting: asked for the synthetic fixtures by name it returns no box
 for "ball", "rod" or "blob", so `count_objects` stays on Grounding DINO.
 
-Since VisionBench gate S (2026-10-13) it also backs `spatial_relations`, through `locate_masks`: its own
-instance mask replaces Grounding DINO's box plus a SAM2 mask (25 of 36 Open Images relations either way).
-
 The post-processing here is exactly what the gates replayed (`replacement_gate1.py`): the processor's
 instance post-processing at 0.05, the top 300 boxes, the score floor, class-agnostic NMS at IoU 0.5, then
 Grounding DINO's envelope filter. Changing any step means re-running `replacement_gate2.py`.
@@ -45,8 +42,7 @@ class Sam3Detector:
         self.processor = Sam3Processor.from_pretrained(model_id)
         self.model = Sam3Model.from_pretrained(model_id).to(self.device).eval()  # type: ignore[arg-type]
 
-    def _instances(self, image: Image, object_name: str) -> tuple[list[list[float]], list[float], Any]:
-        """Boxes and scores sorted by score, highest first, with the instance masks in the same order."""
+    def _raw(self, image: Image, object_name: str) -> tuple[list[list[float]], list[float]]:
         inputs = self.processor(images=image, text=object_name, return_tensors="pt").to(self.device)
         with torch.inference_mode():
             out = self.model(**inputs)
@@ -55,11 +51,7 @@ class Sam3Detector:
         )[0]
         boxes, scores = r["boxes"].tolist(), r["scores"].tolist()
         order = sorted(range(len(scores)), key=lambda i: -scores[i])[:_RAW_TOP_K]
-        return [boxes[i] for i in order], [scores[i] for i in order], r["masks"][order]
-
-    def _raw(self, image: Image, object_name: str) -> tuple[list[list[float]], list[float]]:
-        boxes, scores, _ = self._instances(image, object_name)
-        return boxes, scores
+        return [boxes[i] for i in order], [scores[i] for i in order]
 
     @staticmethod
     def postprocess(
@@ -101,17 +93,3 @@ class Sam3Detector:
                 boxes, scores = self._raw(rgb, object_name)
             res.append(self.postprocess(boxes, scores, object_name, threshold))
         return res
-
-    def locate_masks(self, image: Image, object_name: str, threshold: float = LOCATE_BOX_THRESHOLD) -> dict[str, Any]:
-        """`detect_objects` for one image, plus `masks`: SAM 3's own instance mask for each kept box.
-
-        Backs `spatial_relations` since VisionBench gate S (2026-10-13), in place of Grounding DINO's box
-        followed by a SAM2 mask. Each mask is a boolean array on the image's own pixel grid, thresholded at
-        0.5 as the gates' post-processing did.
-        """
-        with image.convert("RGB") as rgb:
-            boxes, scores, masks = self._instances(rgb, object_name)
-        result = self.postprocess(boxes, scores, object_name, threshold)
-        # postprocess keeps a subset of the sorted boxes in order, so each kept box is found by identity.
-        result["masks"] = [masks[boxes.index(b)].cpu().numpy().astype(bool) for b in result["bboxes"]]
-        return result

@@ -1,7 +1,7 @@
 """Detection and measurement tools: `detect_objects`, `dense_region_caption`,
 `count_objects` and `spatial_relations`."""
 
-from typing import Annotated, Any, Final, Literal
+from typing import Annotated, Any, Final, Literal, cast
 
 from mcp.server.mcpserver import Context, MCPServer
 from pydantic import Field
@@ -15,13 +15,8 @@ from fusion_vision_mcp.analysis import (
     _region_label_consensus,
     _separability,
 )
-from fusion_vision_mcp.constants import (
-    COUNT_BOX_THRESHOLD,
-    DETECT_BOX_THRESHOLD,
-    MASK_DECODE_RESOLUTION,
-    SAM3_MASK_DECODE_RESOLUTION,
-)
-from fusion_vision_mcp.detection_policy import execute_detection, locate_and_segment
+from fusion_vision_mcp.constants import COUNT_BOX_THRESHOLD, DETECT_BOX_THRESHOLD, MASK_DECODE_RESOLUTION
+from fusion_vision_mcp.detection_policy import execute_detection
 from fusion_vision_mcp.images import get_images
 from fusion_vision_mcp.params import ImagePath, ObjectName
 from fusion_vision_mcp.protocols import AppContext
@@ -404,15 +399,7 @@ def register(mcp: MCPServer) -> None:
         query — color alone doesn't reliably discriminate same-shaped objects — but the
         correctly-matching box scored highest every time, which is what this relies on.
         For several instances of one kind of thing, give them distinguishing names, or
-        use `count_objects` for a tally instead. The same rule can pick the wrong one of
-        several: on 36 labelled photos, a racket, a violin and a surfboard each came
-        back `separate` from the person holding them because the best-scoring match for
-        one name was a different person or object of that name elsewhere in the frame.
-        Check each returned `box` sits on the object you meant before trusting a "not
-        touching" result.
-
-        `locator` names the model that found and segmented the objects: SAM 3, or
-        Grounding DINO + SAM2 if SAM 3 can't load.
+        use `count_objects` for a tally instead.
 
         A maximally vague name in `objects` ("object", "thing", "item", ...) is guarded
         the same way `detect_objects`/`count_objects` are: a near-full-frame box from a
@@ -424,17 +411,28 @@ def register(mcp: MCPServer) -> None:
         with get_images(src) as images:
             image = images[0]
 
-            located, masks, locator = locate_and_segment(app, image, objects, _MAX_RELATED_OBJECTS)
+            located: list[dict[str, Any]] = []
+            for call_index, object_name in enumerate(objects):
+                if len(located) >= _MAX_RELATED_OBJECTS:
+                    break
+                detected = execute_detection(app, [image], object_name, backend_preference="grounding_dino")[0]
+                if not detected["bboxes"]:
+                    continue
+                best = max(range(len(detected["bboxes"])), key=lambda i: detected["scores"][i])
+                box = detected["bboxes"][best]
+                located.append(
+                    {"id": f"{object_name}#{call_index}", "label": object_name, "box": [int(v) for v in box]}
+                )
 
             if not located:
                 return {
                     "image_size": [image.width, image.height],
                     "objects": [],
                     "relations": [],
-                    "locator": locator,
                     "note": "None of the requested objects were found.",
                 }
 
+            masks = app.segmenter.segment(image, [cast(list[int], obj["box"]) for obj in located])
             for obj, mask in zip(located, masks, strict=True):
                 obj.update(geometry.describe(mask))
 
@@ -446,8 +444,7 @@ def register(mcp: MCPServer) -> None:
 
             return {
                 "image_size": [image.width, image.height],
-                "mask_resolution": SAM3_MASK_DECODE_RESOLUTION if locator == "sam3" else MASK_DECODE_RESOLUTION,
-                "locator": locator,
+                "mask_resolution": MASK_DECODE_RESOLUTION,
                 "objects": located,
                 "relations": relations,
             }
