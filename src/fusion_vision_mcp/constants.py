@@ -59,6 +59,13 @@ COUNT_BOX_THRESHOLD: Final[float] = 0.425
 COUNT_RANGE_FLOOR: Final[float] = 0.18
 COUNT_RANGE_VETO: Final[float] = 0.5
 
+#: `caption(region=...)`: the caller's box is widened by this share of its width and height on each side, to at
+#: least `REGION_MIN_SIDE` px each way, then clipped to the image. Exactly the crop VisionBench gate R measured
+#: (`region_inspect_gate.py`, 2026-10-15): on 528 questions about a worker-chosen region, the default caption of the
+#: crop named the answer 80.3% of the time against 67.8% for the whole image (+12.5, 95% CI 8.3 to 16.9).
+REGION_PAD: Final[float] = 0.15
+REGION_MIN_SIDE: Final[int] = 32
+
 #: `detect_objects`' Grounding DINO score floor, deliberately higher than counting's
 #: 0.15: locating a named object has to be able to say "not here". Swept on 143 COCO
 #: scenes (VisionBench detect_backend_ab.py), querying each image once for its real

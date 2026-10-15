@@ -172,6 +172,15 @@ work, so `verify_text` checks only the prose's own quotes. Two things lost on th
 split and were not shipped: asking Moondream2 for the image type first (-9.2 points; its answers are a third the
 length of its long caption) and a language tag on the text (no recall gain, about 1 in 4 tags wrong).
 
+**2026-10-15: `caption(region=[x1, y1, x2, y2])` captions one part of the image.** The caller points; the tool
+crops (`images.crop_region`: the box widened 15% each side, at least 32 px, clipped), so the region gets the
+captioner's whole input resolution. VisionBench gate R (`region_inspect_gate.py`): the Gemini worker drew, for 1,055
+phase 11 questions, where it would look **without seeing the answer** (round 15; the user found 3 of 40 boxes wrong).
+The caption of the crop named the answer 80.3% of the time against 67.8% for the whole image (+12.5, CI 8.3 to 16.9;
+528 colour, text and object questions); the server reproduces the gate's crop captions 8 of 8. The same crop was
+**not** shipped on `ocr` (71.6 -> 54.5%: tight crops cut words at the edge, and 51 of 341 read nothing) or
+`query_image` (79.0 -> 80.3%, CI -1.0 to +3.7). Changing the pad means re-running the gate on fresh questions.
+
 **2026-10-12: `deep` stops when Moondream2 loops.** Its long caption is sampled (temperature 0.5, top_p 0.3) and
 on ~7% of images ends in a loop ("effects, effects, ...", hundreds of "Í", a list of languages cycling) up to the
 768-token cap. `Moondream.caption` now streams and stops once 16 consecutive 8-word spans repeat earlier text
