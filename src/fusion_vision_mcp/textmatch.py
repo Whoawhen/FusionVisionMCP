@@ -189,46 +189,4 @@ def correct_text(caption: str, text_regions: list[dict[str, object]]) -> tuple[l
     return corrections, corrected
 
 
-_SIGNAGE_WORDS: set[str] = {
-    "reading",
-    "says",
-    "saying",
-    "sign",
-    "signage",
-    "text",
-    "labeled",
-    "labelled",
-    "titled",
-    "logo",
-    "logotype",
-    "words",
-    "word",
-    "written",
-    "letters",
-    "lettering",
-    "banner",
-    "reads",
-}
-
-
-def contains_likely_text(caption: str) -> bool:
-    """Checks if a caption likely contains transcribed text, signage, or quoted names.
-
-    Used by auto_verify_text to decide whether to trigger OCR automatically (Spec 13).
-    A capitalised long word alone does not count: proper nouns and sentence starts
-    are in most captions, and with them this fired on 60% of VisionBench's
-    text-free images (phase 12, 2026-10-01).
-    """
-    lower_caption = caption.lower()
-    for word in re.findall(r"\b[a-z]+\b", lower_caption):
-        if word in _SIGNAGE_WORDS:
-            return True
-
-    for pattern in (_QUOTED, _CAMEL, _ALLCAPS):
-        if pattern.search(caption):
-            return True
-
-    return False
-
-
-__all__ = ["Correction", "contains_likely_text", "correct_text", "extract_candidates", "should_correct"]
+__all__ = ["Correction", "correct_text", "extract_candidates", "should_correct"]

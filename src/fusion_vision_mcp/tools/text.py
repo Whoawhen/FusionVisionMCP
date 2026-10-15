@@ -10,7 +10,6 @@ from typing import Annotated, Any
 from mcp.server.mcpserver import Context, MCPServer
 from pydantic import Field
 
-from fusion_vision_mcp import textmatch
 from fusion_vision_mcp.analysis import ocr_pages, visible_text_line
 from fusion_vision_mcp.constants import CaptionLevel
 from fusion_vision_mcp.images import get_images
@@ -93,19 +92,6 @@ def register(mcp: MCPServer) -> None:
                 )
             ),
         ] = False,
-        auto_verify_text: Annotated[
-            bool,
-            Field(
-                description=(
-                    "When true, run the `verify_text` check only if the caption's wording suggests "
-                    "it quotes text (signage, labels, quotation marks), and additionally cross-check "
-                    "each text region with the `ocr` engine on an upscaled crop, which is what fills in "
-                    "`text_consensus` and `caption_text_warning`. When the caption "
-                    "does not look like it quotes text, nothing extra runs and the plain list[str] "
-                    "is returned -- so check the return shape rather than assuming dicts."
-                )
-            ),
-        ] = False,
         deep: Annotated[
             bool,
             Field(
@@ -180,13 +166,6 @@ def register(mcp: MCPServer) -> None:
         is set. The correction is best-effort and only fires for high-similarity
         same-word matches; the raw `corrections` list is always present so a
         caller can audit or reject any change.
-
-        Set `auto_verify_text=true` to pay for that check only when it is needed:
-        it fires when the caption's wording suggests quoted text, and adds a
-        cross-check by the `ocr` engine on upscaled crops (`text_consensus`,
-        `caption_text_warning`). The trigger reads the caption, not the image, so
-        text the caption never mentions is not checked; when it does not fire the
-        return stays the plain list[str].
         """
         app = ctx.request_context.lifespan_context
         with get_images(src) as images:
@@ -194,8 +173,8 @@ def register(mcp: MCPServer) -> None:
                 captions = app.vqa.caption(images, length="long")
             else:
                 captions = app.florence2.caption(images, CaptionLevel.MORE_DETAILED)
-            # Read before any verify step runs, but append after it, so the quoted text
-            # cannot itself trip `auto_verify_text`'s "caption quotes text" trigger.
+            # Appended after any verify step, so `verify_text` checks only the prose's own
+            # quotes, never the verbatim line.
             lines = (
                 [visible_text_line(page["text"]) for page in ocr_pages(app, images)]
                 if read_text
@@ -205,26 +184,17 @@ def register(mcp: MCPServer) -> None:
             def with_text(caption_text: str, line: str) -> str:
                 return f"{caption_text.rstrip()} {line}" if line else caption_text
 
-            should_verify = verify_text
-            if auto_verify_text and any(textmatch.contains_likely_text(c) for c in captions):
-                should_verify = True
-
-            if not should_verify:
+            if not verify_text:
                 return [with_text(c, line) for c, line in zip(captions, lines, strict=True)]
 
             regioned = app.florence2.ocr_with_regions(images)
             results = []
-            for image, caption_text, page_regions, line in zip(images, captions, regioned, lines, strict=True):
+            for caption_text, page_regions, line in zip(captions, regioned, lines, strict=True):
                 text_regions = [
                     {"text": text, "box": [int(v) for v in box]}
                     for text, box in zip(page_regions.get("labels", []), page_regions.get("bboxes", []))
                 ]
-                fused = fuse_caption_ocr(
-                    caption_text,
-                    text_regions,
-                    image,
-                    specialist=app.ocr_engine if auto_verify_text else None,
-                )
+                fused = fuse_caption_ocr(caption_text, text_regions)
                 for key in ("caption", "caption_corrected"):
                     if isinstance(fused.get(key), str):
                         fused[key] = with_text(fused[key], line)

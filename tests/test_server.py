@@ -1003,48 +1003,6 @@ async def test_caption_verify_text_returns_corrections_and_corrected_caption(
 
 
 @pytest.mark.anyio
-async def test_caption_auto_verify_text_banner_disagreement_and_consensus(
-    mcp_client_session: ClientSession,
-) -> None:
-    """`auto_verify_text=true` automatically detects embedded text, runs OCR fusion, and reports consensus."""
-    res = await mcp_client_session.call_tool(
-        "caption",
-        arguments={"src": BANNER_IMAGE_FILEPATH, "auto_verify_text": True},
-    )
-    results = [json.loads(cast(TextContent, c).text) for c in res.content]
-
-    assert not res.is_error
-    assert len(results) == 1
-    data = results[0]
-    assert "caption" in data
-    assert "caption_corrected" in data
-    assert "text_regions" in data
-    assert "corrections" in data
-    assert data["caption_text_warning"] is True
-    assert "text_consensus" in data
-    consensus = data["text_consensus"]
-    assert "FusionVision" in consensus["caption"]
-    assert "FusionVisionMCP" in consensus["florence_ocr"]
-    assert consensus["agreeing_sources"] >= 1
-    assert "FusionVisionMCP" in data["caption_corrected"]
-
-
-@pytest.mark.anyio
-async def test_caption_auto_verify_text_plain_photo_negative_control(
-    mcp_client_session: ClientSession,
-) -> None:
-    """`auto_verify_text=true` on an ordinary photo without text does not trigger OCR verification."""
-    res = await mcp_client_session.call_tool(
-        "caption",
-        arguments={"src": SAMPLE_IMAGE_FILEPATH, "auto_verify_text": True},
-    )
-    captions = [cast(TextContent, c).text for c in res.content]
-    assert not res.is_error
-    assert len(captions) == 1
-    assert isinstance(captions[0], str)
-
-
-@pytest.mark.anyio
 async def test_caption_reads_text_by_default(mcp_client_session: ClientSession) -> None:
     """The caption ends with the `ocr` engine's verbatim text, which reads the banner exactly."""
     res = await mcp_client_session.call_tool("caption", arguments={"src": BANNER_IMAGE_FILEPATH})

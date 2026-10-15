@@ -1,30 +1,23 @@
-"""OCR Fusion: combines Florence-2 captioning and OCR with the specialist OCR engine.
+"""OCR Fusion: checks the text a caption quotes against Florence-2's OCR regions (`verify_text`).
 
-The specialist is `AppContext.ocr_engine` -- PP-OCRv6 English, or EasyOCR for
-non-English --ocr-languages.
+Measures agreement between each token the caption quotes and the closest OCR span, warns when
+they differ, and produces an auditable corrected caption.
 
-Implements:
-- Automatic caption text verification (Spec 13): detects likely text in captions
-  and triggers specialist OCR cross-checking.
-- Small-text OCR crops (Spec 14): crops text regions from the full image,
-  upscales small text (2x/3x bicubic), and transcribes with the specialist.
-- Text consensus: measures agreement between caption, Florence OCR, and specialist OCR,
-  warning when the caption misreads embedded text and producing an actionable corrected caption.
+`caption(auto_verify_text)` used to add a third reading here: the `ocr` engine re-reading each
+matched region on an upscaled crop. It was retired 2026-10-15: since every caption ends with the
+`ocr` engine's `Visible text` line, it added 0.0 points of key text on 60 images (VisionBench
+`caption_text_recheck.py`) at twice the time. `SpecialistOCR` stays: it types the `ocr` engine.
 """
 
 from __future__ import annotations
 
-import logging
 import re
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from PIL import Image
 from PIL.Image import Image as PILImage
 
 from .textmatch import _MIN_SIMILARITY, Correction, _ratio, extract_candidates, should_correct
-
-logger = logging.getLogger(__name__)
 
 
 class SpecialistOCR(Protocol):
@@ -44,71 +37,34 @@ class SpecialistOCR(Protocol):
 
 @dataclass(frozen=True)
 class TextConsensus:
-    """Consensus measurement across caption, Florence OCR, and specialist OCR.
+    """Agreement between a token the caption quotes and Florence-2's OCR of the matching region.
 
     Attributes:
         caption: The candidate token as quoted/written in the caption prose.
         florence_ocr: The verbatim text transcribed by Florence-2's OCR head.
-        specialist_ocr: The verbatim text transcribed by the specialist OCR engine.
-        agreeing_sources: Number of sources agreeing on the correct reading (1 to 3).
+        agreeing_sources: 2 when the caption and the OCR agree, else 1.
     """
 
     caption: str
     florence_ocr: str
-    specialist_ocr: str
     agreeing_sources: int
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "caption": self.caption,
             "florence_ocr": self.florence_ocr,
-            "specialist_ocr": self.specialist_ocr,
             "agreeing_sources": self.agreeing_sources,
         }
 
 
-def crop_and_upscale_text_region(
-    image: PILImage,
-    box: list[int],
-    padding: int = 4,
-) -> PILImage:
-    """Crop a text region from the full image and upscale if small (Spec 14).
-
-    Small text (<35px tall) is upscaled 3x using bicubic interpolation.
-    Medium text (<100px tall) is upscaled 2x.
-    """
-    img_w, img_h = image.size
-    x1 = max(0, int(box[0]) - padding)
-    y1 = max(0, int(box[1]) - padding)
-    x2 = min(img_w, int(box[2]) + padding)
-    y2 = min(img_h, int(box[3]) + padding)
-
-    if x2 <= x1 or y2 <= y1:
-        return image
-
-    crop = image.crop((x1, y1, x2, y2))
-    h = crop.height
-    scale = 3 if h < 35 else (2 if h < 100 else 1)
-    if scale > 1:
-        new_size = (crop.width * scale, crop.height * scale)
-        crop = crop.resize(new_size, Image.Resampling.BICUBIC)
-
-    return crop
-
-
-def fuse_caption_ocr(
-    caption: str,
-    text_regions: list[dict[str, Any]],
-    image: PILImage,
-    specialist: SpecialistOCR | None = None,
-) -> dict[str, Any]:
-    """Fuse caption text with Florence-2 OCR and specialist OCR.
+def fuse_caption_ocr(caption: str, text_regions: list[dict[str, Any]]) -> dict[str, Any]:
+    """Check the text a caption quotes against Florence-2's OCR regions.
 
     Returns a dict with:
         caption: Original caption prose (never overwritten).
-        caption_text_warning: True if any quoted/embedded text is disputed or corrected.
+        caption_text_warning: True if any quoted/embedded text differs from the OCR.
         text_consensus: Primary TextConsensus dict (or None if no text was evaluated).
-        caption_corrected: Corrected copy of the caption with consensus text substituted.
+        caption_corrected: Corrected copy of the caption with the OCR text substituted.
         text_regions: Raw OCR text regions with bounding boxes.
         corrections: List of Correction dicts for auditing changes.
     """
@@ -124,22 +80,6 @@ def fuse_caption_ocr(
 
     ocr_texts = [str(r.get("text", "")) for r in text_regions]
     ocr_boxes = [list(r.get("box", [])) for r in text_regions]
-
-    # The specialist re-reads a region only once a caption token has been paired
-    # with it. It used to read every region up front: about 80 upscaled crops on one
-    # screenshot, which put caption's p90 latency past 200s in VisionBench phase 12.
-    specialist_texts: dict[int, str] = {}
-
-    def specialist_text(i: int) -> str:
-        if i not in specialist_texts:
-            specialist_texts[i] = ""
-            box = ocr_boxes[i]
-            if specialist is not None and len(box) == 4:
-                try:
-                    specialist_texts[i] = specialist.ocr(crop_and_upscale_text_region(image, box)).strip()
-                except (RuntimeError, ValueError, TypeError, AttributeError, OSError) as e:
-                    logger.warning("Specialist OCR crop failed: %s", e)
-        return specialist_texts[i]
 
     corrections: list[Correction] = []
     consensuses: list[TextConsensus] = []
@@ -160,39 +100,19 @@ def fuse_caption_ocr(
         if best_idx is None:
             continue
 
-        florence_val = ocr_texts[best_idx]
-        specialist_val = specialist_text(best_idx)
-        if not specialist_val:
-            specialist_val = florence_val
-
+        target_text = ocr_texts[best_idx]
         box = [int(v) for v in ocr_boxes[best_idx]]
         used_ocr.add(best_idx)
-
-        # Consensus counting
-        sources_agreeing = 1
-        if florence_val.lower() == specialist_val.lower():
-            target_text = specialist_val
-            sources_agreeing = 3 if candidate.lower() == target_text.lower() else 2
-        elif candidate.lower() == specialist_val.lower():
-            target_text = specialist_val
-            sources_agreeing = 2
-        elif candidate.lower() == florence_val.lower():
-            target_text = florence_val
-            sources_agreeing = 2
-        else:
-            target_text = specialist_val if specialist_val else florence_val
-            sources_agreeing = 1
-
-        consensus = TextConsensus(
-            caption=candidate,
-            florence_ocr=florence_val,
-            specialist_ocr=specialist_val,
-            agreeing_sources=sources_agreeing,
+        consensuses.append(
+            TextConsensus(
+                caption=candidate,
+                florence_ocr=target_text,
+                agreeing_sources=2 if candidate.lower() == target_text.lower() else 1,
+            )
         )
-        consensuses.append(consensus)
 
         if candidate != target_text and should_correct(
-            candidate, target_text, _ratio(candidate, target_text), [*ocr_texts, *specialist_texts.values()]
+            candidate, target_text, _ratio(candidate, target_text), ocr_texts
         ):
             corrections.append(Correction(candidate, target_text, box, best_ratio))
             replacement = target_text.replace("\\", "\\\\")
@@ -203,7 +123,7 @@ def fuse_caption_ocr(
                 count=1,
             )
 
-    has_warning = any(c.agreeing_sources < 3 or c.caption != c.florence_ocr for c in consensuses)
+    has_warning = any(c.caption != c.florence_ocr for c in consensuses)
 
     return {
         "caption": caption,

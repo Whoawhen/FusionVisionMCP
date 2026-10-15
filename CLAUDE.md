@@ -168,7 +168,7 @@ paraphrase text and cannot read most of it, so `caption` runs `ocr_pages` and en
 text-free image gets no line, so its caption is unchanged. On VisionBench's 280 held-out images (variants fixed
 before running, `caption_text_grounding.py`): default 53.3% -> 60.9% of key facts, `deep` 61.5% -> 66.3%, no image
 worse, and none of the absent objects named came from the text. The line is appended *after* any `verify_text`
-work, so its quotes cannot trip `auto_verify_text`'s "caption quotes text" trigger. Two things lost on the tune
+work, so `verify_text` checks only the prose's own quotes. Two things lost on the tune
 split and were not shipped: asking Moondream2 for the image type first (-9.2 points; its answers are a third the
 length of its long caption) and a language tag on the text (no recall gain, about 1 in 4 tags wrong).
 
@@ -580,13 +580,20 @@ We needed `count_objects` to handle both real photographs and flat vector art wi
 Similarly, `count_objects` using Grounding DINO on photographs originally used a static threshold (`0.30`). On dense scenes (like a flock of birds), it failed entirely. Sprint 6 introduced adaptive thresholding: it sweeps the threshold down to `0.10` if no boxes are found at `0.30`. This introduces a known risk (the "danger zone" of hallucinated boxes), so it is strictly gated: the lower thresholds are only accepted if `score_aesthetics` (or rather, its internal confidence) confirms the image is actually densely populated. We measure, we don't blindly lower the bar.
 
 **Specialist OCR & Text Fusion (Sprints 7 & 8; specialist replaced in v0.8.1)**
-Florence-2's caption head paraphrases and misspells text in the image, so `caption(auto_verify_text=true)` scans
-the generated prose for signage words and, if it finds any, crops and upscales those regions, cross-checks them
-against a specialist OCR model, and substitutes the verbatim text back into the caption. The heavy model is
-loaded lazily, so a non-text image never pays for it.
+Florence-2's caption head paraphrases and misspells text in the image, so `caption(auto_verify_text=true)` scanned
+the generated prose for signage words and, if it found any, cropped and upscaled those regions, cross-checked them
+against a specialist OCR model, and substituted the verbatim text back into the caption.
+
+**Retired 2026-10-15.** Once every caption ended with the `ocr` engine's `Visible text` line (2026-10-10), the
+reliable text was already in the caption. VisionBench `caption_text_recheck.py` re-measured it on 60 phase 11 text
+images: key text phrases 52.9% -> 52.9% (+0.0), firing on 73% of them, median 31.6 s against 14.5 s. The parameter,
+its caption-wording trigger (`textmatch.contains_likely_text`) and the crop-and-upscale re-read are gone;
+`verify_text` (Florence-2's text regions, `corrections`, `caption_corrected`) is unchanged, its `text_consensus`
+now comparing the caption with Florence-2 alone (`agreeing_sources` 1 or 2; it never had the third reading). Nothing
+outside this machine called it: the server is not in the MCP registry.
 
 The specialist was originally `ibm-granite/granite-docling-258M`, then **EasyOCR** (`easyocr_engine.py`), and
-since 2026-09-29 is the `ocr` engine, PP-OCRv6 English (see the `ocr` section above). The `granite_docling`
+from 2026-09-29 the `ocr` engine, PP-OCRv6 English (see the `ocr` section above). The `granite_docling`
 module is gone. If you find a reference to Granite-Docling anywhere, it is stale — two
 test files importing the deleted module survived the swap and broke `pytest` collection outright until v0.8.2.
 
