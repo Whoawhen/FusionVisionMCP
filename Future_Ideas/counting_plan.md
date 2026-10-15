@@ -93,7 +93,9 @@ wrong but GitHub reports MIT).
   excluded it. On sprint R's confirm half (427, mostly 1-object; reported only) `detect` 65.1%, `answer` 62.5%,
   shipped 61.8%, so `answer`'s lead is a multi-object one. One rule bug was fixed after the first score and recorded (ef52f85): the control check required 1
   where neg_distractors' truth is 3.
-- **Open for the user:** (a) option 1's `count_range`; (b) whether to build a PaliGemma `answer` candidate guarded
+- 2026-10-15: the user chose to ship option 1 as `count_objects`' `possibly_more` hint (FusionVisionMCP f6bb615;
+  server matches the gate replay 20/20) and to park PaliGemma (too big for the gain).
+- **Was open for the user:** (a) option 1's `count_range` (shipped); (b) whether to build a PaliGemma `answer` candidate guarded
   against the sub-object failure (for instance, trust `answer` only when `detect`'s boxes don't contain one another)
   and test it on a fresh round 15, since round 14 has been seen; (c) a 3B model in the server (~12 GB RAM in
   float32, ~6 s per count on CPU) under the Gemma Terms of Use.
