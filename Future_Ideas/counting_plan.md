@@ -47,7 +47,7 @@ since Open Images boxes are often incomplete, and the user blind-checks a sample
 until the counts are committed.
 
 **Worker counts and blind check (2026-10-14):** 134 kept (104 exact, 30 approximate), 26 excluded (mostly Open
-Images naming the wrong class). The user counted 30 blind: 21 of 27 agree; the worker's `exact` counts 19 of 22, its
+Images naming the wrong class). The user counted 30 blind: 21 of 27 agree; the worker's `exact` counts 19 of 22 (21 of 22 after the user corrected two of their own counts: Pillow 3, Van 4), its
 `approximate` ones 2 of 5, and the user could not count 3 (all approximate). So C1's confirm should be scored on the
 worker's `exact` counts (with the user's counts replacing the worker's where given), and the approximate ones
 reported separately, not mixed in. That goes into C1's committed rules.
