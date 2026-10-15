@@ -52,6 +52,23 @@ Images naming the wrong class). The user counted 30 blind: 21 of 27 agree; the w
 worker's `exact` counts (with the user's counts replacing the worker's where given), and the approximate ones
 reported separately, not mixed in. That goes into C1's committed rules.
 
+## Replacement candidates (worker survey, 2026-10-14)
+
+VisionBench `worker_handoff/RESEARCH_COUNT_DETECTORS_REPORT.md`: non-Chinese, permissive, ≤3B models that take a
+text name. Licences spot-checked (GLIP MIT, Detic and MDETR Apache-2.0, FIBER MIT; FIBER's cited LICENSE URL is
+wrong but GitHub reports MIT).
+
+- **Worth a test: PaliGemma (Google, 3B).** The only candidate that counts natively ("count X", TallyQA simple
+  81.7%) as well as boxing ("detect X"), and it runs in `transformers`. The newer PaliGemma 2 mix checkpoints
+  (`google/paligemma2-3b-mix-448`) are the version to test. A VLM counts by knowing what the object is, which is
+  the wall the detector methods hit. Costs: ~3B parameters on CPU (seconds per call, several GB), gated on
+  Hugging Face, and the **Gemma Terms of Use** are a custom licence with a use policy, not Apache/MIT: the user's
+  call.
+- **Not worth testing:** GLIP, FIBER, Detic, RegionCLIP, ViLD, F-VLM, RO-ViT and MDETR. All 2021–2023, mostly
+  weaker zero-shot than Grounding DINO, and nearly all need Detectron2, maskrcnn-benchmark or TensorFlow builds,
+  which are a poor fit for a Windows CPU install. MDETR grounds a phrase to one region; it does not count.
+- **Too large:** Molmo-7B (AI2, Apache-2.0), which counts by pointing.
+
 ## Status
 
 - 2026-10-14: options triaged; round 14 built and handed to the worker; gate C1 waits for the go-ahead.
