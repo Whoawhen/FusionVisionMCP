@@ -87,4 +87,12 @@ wrong but GitHub reports MIT).
 
 - 2026-10-14: options triaged; round 14 built and handed to the worker; gate C1 waits for the go-ahead.
 - 2026-10-14 (night): gate C1 run: option 7 failed on round 14; option 1's `count_range` waits on the user. Gate P1
-  (PaliGemma 2 mix, VisionBench `count_gate_paligemma.py`, rules 1a67565) running overnight.
+  (PaliGemma 2 mix, VisionBench `count_gate_paligemma.py`, rules 1a67565, result 3fe3308): `detect` ties the
+  shipped count on round 14 (57.3 vs 57.3%, CI −9.7 to +10.7), no pass. `answer en How many X are there?` scored
+  **75.7%** there (34 of 35 two-object counts) but fails 2 of 8 controls (spotted ball 24, logo 4), so the rule
+  excluded it. One rule bug was fixed after the first score and recorded (ef52f85): the control check required 1
+  where neg_distractors' truth is 3.
+- **Open for the user:** (a) option 1's `count_range`; (b) whether to build a PaliGemma `answer` candidate guarded
+  against the sub-object failure (for instance, trust `answer` only when `detect`'s boxes don't contain one another)
+  and test it on a fresh round 15, since round 14 has been seen; (c) a 3B model in the server (~12 GB RAM in
+  float32, ~6 s per count on CPU) under the Gemma Terms of Use.
