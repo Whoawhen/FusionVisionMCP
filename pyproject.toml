@@ -6,9 +6,9 @@ requires = [ "hatchling" ]
 name = "fusion-vision-mcp"
 version = "0.8.2"
 description = """\
-    An MCP server for processing images using Florence-2, Moondream2, SAM2, CLIP, Grounding DINO, PP-OCRv6, EasyOCR, and ONNX \
-    IQA models for captioning, OCR, object detection/grounding, instance counting, visual question answering, spatial \
-    measurement and aesthetic scoring\
+    An MCP server for processing images using Florence-2, Moondream2, SAM2, CLIP, Grounding DINO, PP-OCRv6, EasyOCR, \
+    and ONNX IQA models for captioning, OCR, object detection/grounding, instance counting, visual question answering, \
+    spatial measurement and aesthetic scoring\
     """
 readme = "README.md"
 authors = [
@@ -76,6 +76,10 @@ dev = [
 ]
 
 [tool.uv]
+# easyocr needs opencv-python-headless and rapidocr needs opencv-python. Both install the
+# same `cv2` package, so whichever lands last silently overwrites the other. This drops
+# opencv-python; rapidocr uses only image functions, which the headless build has.
+override-dependencies = [ "opencv-python; sys_platform == 'never'" ]
 # easyocr depends on torch and torchvision too, so these redirects have to hold for
 # a transitive requirement, not just a direct one -- verify with
 # `uv sync --extra cpu --extra ocr-specialist` that no nvidia-* package appears.
@@ -99,10 +103,6 @@ index = [
 conflicts = [
     [ { extra = "cpu" }, { extra = "cu130" } ],
 ]
-# easyocr needs opencv-python-headless and rapidocr needs opencv-python. Both install the
-# same `cv2` package, so whichever lands last silently overwrites the other. This drops
-# opencv-python; rapidocr uses only image functions, which the headless build has.
-override-dependencies = [ "opencv-python; sys_platform == 'never'" ]
 
 [tool.ruff]
 target-version = "py312"

@@ -77,8 +77,8 @@ import torch
 
 model_id = "MiaoshouAI/Florence-2-large-PromptGen-v2.0"
 model = AutoModelForCausalLM.from_pretrained(
-    model_id, 
-    trust_remote_code=True, 
+    model_id,
+    trust_remote_code=True,
     torch_dtype=torch.float16
 ).to("cuda").eval()
 
@@ -95,8 +95,8 @@ base_model_id = "microsoft/Florence-2-large"
 adapter_id = "anushreeberlia/fashion-florence"
 
 base_model = AutoModelForCausalLM.from_pretrained(
-    base_model_id, 
-    trust_remote_code=True, 
+    base_model_id,
+    trust_remote_code=True,
     torch_dtype=torch.float16
 ).to("cuda")
 
