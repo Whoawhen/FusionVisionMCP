@@ -46,6 +46,12 @@ VisionBench; by Open Images' own box count 1: 30, 2: 40, 3: 40, 4–6: 30, 7–1
 since Open Images boxes are often incomplete, and the user blind-checks a sample. No tool runs on these images
 until the counts are committed.
 
+**Worker counts and blind check (2026-10-14):** 134 kept (104 exact, 30 approximate), 26 excluded (mostly Open
+Images naming the wrong class). The user counted 30 blind: 21 of 27 agree; the worker's `exact` counts 19 of 22, its
+`approximate` ones 2 of 5, and the user could not count 3 (all approximate). So C1's confirm should be scored on the
+worker's `exact` counts (with the user's counts replacing the worker's where given), and the approximate ones
+reported separately, not mixed in. That goes into C1's committed rules.
+
 ## Status
 
 - 2026-10-14: options triaged; round 14 built and handed to the worker; gate C1 waits for the go-ahead.
