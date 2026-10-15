@@ -23,7 +23,7 @@ before it runs, as usual.
 those boxes were still counted, so the misses then were more likely merges or overcounts. C1's first step
 measures which.
 
-## Gate C1 (next; awaiting go-ahead)
+## Gate C1 (run 2026-10-14: option 7 failed, option 1 to the user)
 
 - **Diagnose (tune half only):** for each 2- and 3-object count missed at 0.425, where the labelled instances'
   best boxes sit (above 0.425, in [0.15, 0.425), or not boxed at all) and whether the extra boxes on overcounts
@@ -37,6 +37,20 @@ measures which.
   is reported by how often the true count falls inside `count_range` and how wide the range is on 1-object
   scenes.
 - **Model choice:** Opus 5.5 to set the rules, Sonnet 5.5 to run.
+
+**Result (VisionBench `count_gate_c1.py`, rules 04ec7b9, result 0f7636f).**
+- *The claim, checked:* the missed 2s and 3s are undercounts. For 15 of 17 missed 3s and 8 of 16 missed 2s, enough
+  distinct boxes sit in [0.15, 0.425). But the shipped count also overcounts 1-object scenes (204 of 325 exact on
+  tune), so a lower floor trades one error for the other.
+- *Option 7 fails.* Tau 0.30, controls 16/16, tune 60.0 vs 55.6%, all of it on 1-object scenes. Round 14: **51.5 vs
+  57.3% exact (103 counts), CI −11.7 to 0.0**, losing on 2s (19 vs 21 of 35) and 3s (7 vs 11 of 21). Box geometry and
+  score alone don't tell a second object from a part.
+- *Option 1, for the user to decide:* a `count_range` whose upper end adds the distinct boxes in [0.18, 0.425)
+  holds the truth 78.6–79.4% of the time on three sets, against 55.6–61.8% for `count` exact; mean width 1.1–1.9,
+  and 47–68% of 1-object scenes get no range. Every control keeps width 0. It changes what the tool reports, not
+  `count`.
+- *Next if counting continues:* option 2 (SAM2 "new territory") targets exactly the 2/3 undercounts found here, or
+  PaliGemma (gate P1, below).
 
 ## Round 14: the confirm set
 
@@ -72,3 +86,5 @@ wrong but GitHub reports MIT).
 ## Status
 
 - 2026-10-14: options triaged; round 14 built and handed to the worker; gate C1 waits for the go-ahead.
+- 2026-10-14 (night): gate C1 run: option 7 failed on round 14; option 1's `count_range` waits on the user. Gate P1
+  (PaliGemma 2 mix, VisionBench `count_gate_paligemma.py`, rules 1a67565) running overnight.
