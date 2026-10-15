@@ -90,7 +90,8 @@ wrong but GitHub reports MIT).
   (PaliGemma 2 mix, VisionBench `count_gate_paligemma.py`, rules 1a67565, result 3fe3308): `detect` ties the
   shipped count on round 14 (57.3 vs 57.3%, CI −9.7 to +10.7), no pass. `answer en How many X are there?` scored
   **75.7%** there (34 of 35 two-object counts) but fails 2 of 8 controls (spotted ball 24, logo 4), so the rule
-  excluded it. One rule bug was fixed after the first score and recorded (ef52f85): the control check required 1
+  excluded it. On sprint R's confirm half (427, mostly 1-object; reported only) `detect` 65.1%, `answer` 62.5%,
+  shipped 61.8%, so `answer`'s lead is a multi-object one. One rule bug was fixed after the first score and recorded (ef52f85): the control check required 1
   where neg_distractors' truth is 3.
 - **Open for the user:** (a) option 1's `count_range`; (b) whether to build a PaliGemma `answer` candidate guarded
   against the sub-object failure (for instance, trust `answer` only when `detect`'s boxes don't contain one another)
