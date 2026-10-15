@@ -81,11 +81,12 @@ class Sam3Detector:
         object_name: str,
         threshold: float = LOCATE_BOX_THRESHOLD,
         adaptive_threshold: bool = False,
+        candidates_floor: float | None = None,
     ) -> list[dict[str, Any]]:
         """Scored boxes for every instance of `object_name`, one entry per image.
 
-        `adaptive_threshold` is accepted for the `InstanceDetector` protocol and ignored: the gates measured
-        SAM 3 at a fixed floor.
+        `adaptive_threshold` and `candidates_floor` are accepted for the `InstanceDetector` protocol and
+        ignored: the gates measured SAM 3 at a fixed floor, and it does not count.
         """
         res = []
         for img in images:

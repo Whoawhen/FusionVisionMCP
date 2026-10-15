@@ -35,6 +35,7 @@ def execute_detection(
     threshold: float = DEFAULT_BOX_THRESHOLD,
     adaptive_threshold: bool = True,
     locate: bool = False,
+    candidates_floor: float | None = None,
 ) -> list[dict[str, Any]]:
     """Shared detection execution.
 
@@ -88,7 +89,7 @@ def execute_detection(
             for d in detected
         ]
     else:
-        results = _photo_detect(app, images, object_name, threshold, adaptive_threshold, locate)
+        results = _photo_detect(app, images, object_name, threshold, adaptive_threshold, locate, candidates_floor)
         if exclude_full_frame:
             # Drop full frame boxes if the query was generic.
             results = [
@@ -133,6 +134,7 @@ def _photo_detect(
     threshold: float,
     adaptive_threshold: bool,
     locate: bool,
+    candidates_floor: float | None = None,
 ) -> list[dict[str, Any]]:
     """SAM 3 when locating (`detect_objects`), otherwise Grounding DINO at the passed thresholds."""
     locator: InstanceDetector | None = getattr(app, "locator", None)
@@ -148,8 +150,11 @@ def _photo_detect(
             for result in results:
                 result["detector"] = "sam3"
             return results
+    # Only counting asks for the candidates, and only then is the keyword passed, so detectors
+    # written before it existed (and test doubles) keep working.
+    extra = {"candidates_floor": candidates_floor} if candidates_floor is not None else {}
     results = app.counter.detect_objects(
-        images, object_name, threshold=threshold, adaptive_threshold=adaptive_threshold
+        images, object_name, threshold=threshold, adaptive_threshold=adaptive_threshold, **extra
     )
     for result in results:
         result["detector"] = "grounding_dino"

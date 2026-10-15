@@ -51,6 +51,14 @@ DEFAULT_BOX_THRESHOLD: Final[float] = 0.15
 #: analysis's part crops) keep 0.15.
 COUNT_BOX_THRESHOLD: Final[float] = 0.425
 
+#: `count_objects`' `possibly_more`: Grounding DINO boxes from this floor up to the count threshold
+#: that sit neither on (IoU) nor inside (share of their area) a counted box or an already-accepted
+#: one, at `COUNT_RANGE_VETO` or more. VisionBench gate C1 (`count_gate_c1.py` option 1, 2026-10-14):
+#: the truth lay in [count, count + extras] on 78.6-79.4% of three photo-count sets against 55.6-61.8%
+#: exact, and no negative control got an extra. Both values came with the proposal, not from a fit.
+COUNT_RANGE_FLOOR: Final[float] = 0.18
+COUNT_RANGE_VETO: Final[float] = 0.5
+
 #: `detect_objects`' Grounding DINO score floor, deliberately higher than counting's
 #: 0.15: locating a named object has to be able to say "not here". Swept on 143 COCO
 #: scenes (VisionBench detect_backend_ab.py), querying each image once for its real

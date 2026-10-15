@@ -21,6 +21,7 @@ from fusion_vision_mcp.constants import (
     BUSY_BACKGROUND_QUESTION,
     CAPTION_TEXT_WORDS,
     COUNT_BOX_THRESHOLD,
+    COUNT_RANGE_VETO,
     DETECT_BOX_THRESHOLD,
     MAIN_SUBJECT_QUESTION,
     CaptionLevel,
@@ -456,6 +457,41 @@ def _aesthetic_comparison(
                 )
         out.append(entry)
     return out
+
+
+def _inside_share(a: Sequence[float], b: Sequence[float]) -> float:
+    """Share of box a's area that lies inside box b."""
+    area = max(0.0, a[2] - a[0]) * max(0.0, a[3] - a[1])
+    if area <= 0:
+        return 0.0
+    w = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+    h = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    return w * h / area
+
+
+def possibly_more(counted: Sequence[Sequence[float]], candidates: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """How many more instances the boxes just under the count threshold could add, as a hedged hint.
+
+    Candidates come highest score first; each is accepted unless it overlaps (IoU) or sits inside a
+    counted or already-accepted box at `COUNT_RANGE_VETO` or more, so a duplicate box or a part of
+    an object is not read as another instance. `count` itself is never changed.
+    """
+    kept = [list(b) for b in counted]
+    extra = 0
+    for c in candidates:
+        box = list(c["box"])
+        if all(geometry.box_iou(box, k) < COUNT_RANGE_VETO and _inside_share(box, k) < COUNT_RANGE_VETO for k in kept):
+            kept.append(box)
+            extra += 1
+    return {
+        "upper": len(counted) + extra,
+        "extra_candidates": extra,
+        "reliability": (
+            "a hint, not a tally: on 953 photo counts, when upper > count the true count was "
+            "higher than count 38-58% of the time; when upper == count it was too low only 7-14% of "
+            "the time (it can still be too high). Measured at the default threshold"
+        ),
+    }
 
 
 def busy_background(app: AppContext, image: Image) -> dict[str, Any]:

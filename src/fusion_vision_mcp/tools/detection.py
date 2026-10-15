@@ -14,8 +14,14 @@ from fusion_vision_mcp.analysis import (
     _first_int,
     _region_label_consensus,
     _separability,
+    possibly_more,
 )
-from fusion_vision_mcp.constants import COUNT_BOX_THRESHOLD, DETECT_BOX_THRESHOLD, MASK_DECODE_RESOLUTION
+from fusion_vision_mcp.constants import (
+    COUNT_BOX_THRESHOLD,
+    COUNT_RANGE_FLOOR,
+    DETECT_BOX_THRESHOLD,
+    MASK_DECODE_RESOLUTION,
+)
 from fusion_vision_mcp.detection_policy import execute_detection
 from fusion_vision_mcp.images import get_images
 from fusion_vision_mcp.params import ImagePath, ObjectName
@@ -226,6 +232,15 @@ def register(mcp: MCPServer) -> None:
         detections is visible rather than implied. `group_boxes_dropped` counts
         detections that enclosed the whole arrangement rather than one instance.
 
+        On photos (Grounding DINO) the result also carries `possibly_more:
+        {upper, extra_candidates, reliability}`: boxes scoring just under the
+        threshold that are neither duplicates of nor inside a counted box, so the
+        count may be too low by up to `extra_candidates`. It is a hint and only
+        points upward. Measured on 953 photo counts: when `upper` > `count` the
+        true count was higher than `count` about half the time (38-58%); when
+        `upper` == `count` it was too low only 7-14% of the time, though it can
+        still be too high. `count` is never changed by it.
+
         Accuracy depends heavily on the scene. On synthetic shapes whose counts are
         exact by construction it is right on 9 of 10 cases (mean error 0.1) and
         holds all 8 single-object controls. On real photographs it is reliable for
@@ -305,9 +320,13 @@ def register(mcp: MCPServer) -> None:
                 backend_preference=backend_pref,
                 threshold=threshold,
                 adaptive_threshold=adaptive_threshold,
+                candidates_floor=COUNT_RANGE_FLOOR,
             )
 
             for image, result in zip(images, results, strict=True):
+                candidates = result.pop("candidates_below", None)
+                if candidates is not None:
+                    result["possibly_more"] = possibly_more(result.get("bboxes") or [], candidates)
                 if verify_silhouette:
                     _add_silhouette(app, image, result)
                 if consensus:

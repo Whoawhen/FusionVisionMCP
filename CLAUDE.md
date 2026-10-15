@@ -394,6 +394,18 @@ prompts (positives 8/10 -> 7/10). `DEFAULT_BOX_THRESHOLD` stays 0.15 for every o
 not re-measured. Gate 2 also showed SAM 3 cannot take over counting: on the literal-name controls it returns 0
 boxes for "ball", "rod", "shape" and "blob" at every threshold.
 
+**2026-10-15: `possibly_more` says when a photo count may be too low; `count` is unchanged.** VisionBench gate
+C1 (`count_gate_c1.py`, Future_Ideas/counting_plan.md) found the missed 2- and 3-object counts are undercounts whose
+extra objects are mostly boxed just under 0.425, while lowering the floor overcounts single objects (a learned box
+scorer that tried to tell them apart failed, 51.5 vs 57.3% on round 14). So `count_objects` reports the gap instead:
+Grounding DINO's unreturned boxes in [`COUNT_RANGE_FLOOR` 0.18, threshold), each kept only if it is neither on (IoU)
+nor inside a counted or accepted box at 0.5 (`analysis.possibly_more`), give `possibly_more: {upper,
+extra_candidates, reliability}`. On 953 photo counts the truth lay in [count, upper] 78.6-79.4% of the time against
+55.6-61.8% exact; when `upper` > `count` the truth was higher about half the time (38-58%), and when they are equal
+it was too low only 7-14%. No negative control gets an extra. The boxes come from the same pass
+(`candidates_floor` on `GroundingDino.detect_objects`); the server reproduced the gate's replay on 20 of 20 round 14
+images. The user chose to ship it as a hedged hint.
+
 **The honest negative result: the flower is not counted by anything here.** `tests/sample.jpg` — a paper flower
 with overlapping petals — returns 1 from *every* approach tried: Florence-2 grounding, Moondream's detect head,
 Grounding DINO (at every box threshold down to 0.10), the `count_lobes` outline measurement, SAM2 in

@@ -117,8 +117,13 @@ class InstanceDetector(Protocol):
         object_name: str,
         threshold: float = DEFAULT_BOX_THRESHOLD,
         adaptive_threshold: bool = True,
+        candidates_floor: float | None = None,
     ) -> list[dict[str, Any]]:
-        """Locates every instance of the named object, with a count and per-box scores."""
+        """Locates every instance of the named object, with a count and per-box scores.
+
+        With `candidates_floor`, also `candidates_below`: unreturned boxes scoring from the floor up to
+        `threshold`, for `count_objects`' `possibly_more`. A detector that does not count ignores it.
+        """
         ...
 
 

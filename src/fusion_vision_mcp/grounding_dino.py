@@ -193,6 +193,7 @@ class GroundingDino:
         text_threshold: float = DEFAULT_TEXT_THRESHOLD,
         drop_group_box: bool = True,
         adaptive_threshold: bool = True,
+        candidates_floor: float | None = None,
     ) -> list[dict[str, Any]]:
         """Locate every instance of a named object, one entry per image.
 
@@ -211,6 +212,10 @@ class GroundingDino:
         the score distribution's "confidence cliff". The result includes an
         `adaptive_threshold` field with the selected threshold, whether it was used,
         confidence, and reason.
+
+        `candidates_floor`, when set, adds `candidates_below`: every raw box scoring at least
+        the floor but under `threshold` that was not returned, as `{box, score}` from the
+        highest score down. `count_objects` reads it for `possibly_more`; it costs no extra pass.
         """
         prompt = self._as_prompt(object_name)
         results = []
@@ -253,6 +258,7 @@ class GroundingDino:
 
                 envelopes = self._envelope_indices(bboxes) if drop_group_box else set()
                 keep = [i for i in range(len(bboxes)) if i not in envelopes]
+                returned = {keep_scores[i] for i in keep}
                 bboxes = [bboxes[i] for i in keep]
                 scores = [scores[i] for i in keep]
                 labels = [labels[i] for i in keep]
@@ -265,6 +271,14 @@ class GroundingDino:
                     "scores": scores,
                     "group_boxes_dropped": len(envelopes),
                 }
+                if candidates_floor is not None:
+                    below = [
+                        i for i, s in enumerate(raw_scores) if candidates_floor <= s < threshold and i not in returned
+                    ]
+                    result["candidates_below"] = [
+                        {"box": raw_bboxes[i], "score": raw_scores[i]}
+                        for i in sorted(below, key=lambda i: -raw_scores[i])
+                    ]
                 if threshold_result is not None:
                     result["adaptive_threshold"] = {
                         "threshold": threshold_result.threshold,
