@@ -156,6 +156,18 @@ class Aesthetic:
                 self._cached_text_features = text_features / text_features.norm(dim=-1, keepdim=True)
         return self._cached_text_features
 
+    def zero_shot(self, images: list[Image], prompts: list[str]) -> list[list[float]]:
+        """CLIP zero-shot probabilities of each prompt, one softmax row per image (caller-supplied prompts)."""
+        image_features = self._encode_images(images)
+        with torch.no_grad():
+            text_inputs = self.processor(text=prompts, return_tensors="pt", padding=True, truncation=True).to(
+                self.device
+            )
+            text_features = self._projected(self.model.get_text_features(**text_inputs))
+            text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+            logits = (image_features.float() @ text_features.float().T) * self._logit_scale
+            return [[float(p) for p in row] for row in torch.softmax(logits, dim=-1).tolist()]
+
     def _score_from_features(self, features: Any) -> list[dict[str, Any]]:
         with torch.no_grad():
             # The head is shallow and was trained in float32; casting here avoids fp16
