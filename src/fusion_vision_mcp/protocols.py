@@ -159,6 +159,10 @@ class AestheticScorer(Protocol):
         """
         ...
 
+    def zero_shot(self, images: list[Image], prompts: list[str]) -> list[list[float]]:
+        """CLIP zero-shot probabilities of each caller-supplied prompt, one softmax row per image."""
+        ...
+
 
 class CropEmbedder(Protocol):
     """Represents a protocol for embedding image crops for the learned defect probe."""

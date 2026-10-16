@@ -499,6 +499,35 @@ Ask a free-form question about an image (visual question answering). Backed by M
   above). Defaults to `false`, which keeps the original `list[str]` return; `true` returns one
   `{answer, control_answer, consistent, confidence, cross_check?}` dict per image.
 
+### classify_image ➕
+
+Pick which of the caller's labels an image shows, with a probability for each: CLIP zero-shot (the ViT-L/14 that
+`score_aesthetics` already loads), each label put in `a photo of {label}` and ranked by softmax. Use it whenever the
+possible answers can be listed: which species, which landmark, which art style, photo or screenshot or chart.
+
+Measured in VisionBench before shipping, against `query_image` asked the same multiple-choice question:
+
+| Set | `classify_image` | `query_image` |
+|---|---|---|
+| Gate Z2 (2026-10-16): 200 fresh images, 20 species, 20 landmarks, 12 art styles | **98.5%** | 77.5% |
+| species / landmarks / styles | 100 / 100 / 95.0% | 80.0 / 91.7 / 60.0% |
+| Gate Z (2026-10-15): COCO objects and kinds of image | 79.9% | 74.1% |
+| Median seconds per image | 0.25 | 10 |
+
+Z2's difference is +21.0 points (95% CI 15.5 to 27.0). Its images were well-known Wikimedia Commons files, which CLIP
+may have seen in training, so expect results nearer gate Z's on your own photos. The probability is usable: right 197
+of 198 times at 0.5 or more in Z2; in Z, 190 of 230 at 0.5 or more against 29 of 44 below.
+
+It does not answer an open question: it ranks only the labels given and always returns one of them, even when none
+is in the image (include a catch-all such as "something else" if that can happen). Use `caption` or `query_image`
+for "what is this?".
+
+- **src**: A file path or URL to the image file that needs to be processed.
+- **labels**: 2 to 200 candidate labels, as short names. Blank and repeated (case-insensitive) labels are dropped.
+
+Returns one `{label, probability, ranking}` dict per page/image; `ranking` lists every label with its probability,
+highest first, summing to 1.
+
 ### batch_analyze_images ➕
 
 Run one operation across many images in a single call — the batch form of `caption`, `ocr`, `detect_objects`,

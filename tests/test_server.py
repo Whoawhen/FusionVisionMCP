@@ -71,6 +71,7 @@ async def test_list_tools(mcp_client_session: ClientSession) -> None:
         "count_objects",
         "dense_region_caption",
         "query_image",
+        "classify_image",
         "batch_analyze_images",
         "process",
         "spatial_relations",
@@ -709,6 +710,31 @@ async def test_score_aesthetics(mcp_client_session: ClientSession) -> None:
     assert len(results) == 1
     assert "score" in results[0]
     assert "rating" in results[0]
+
+
+@pytest.mark.anyio
+async def test_classify_image(mcp_client_session: ClientSession) -> None:
+    """`tests/sample.jpg` is a paper flower: CLIP must pick it over unrelated labels, probabilities summing to 1."""
+    res = await mcp_client_session.call_tool(
+        "classify_image",
+        arguments={"src": SAMPLE_IMAGE_FILEPATH, "labels": ["paper flower", "car", "dog", " car ", "city skyline"]},
+    )
+    results = [json.loads(cast(TextContent, c).text) for c in res.content]
+
+    assert not res.is_error
+    assert len(results) == 1
+    assert results[0]["label"] == "paper flower"
+    assert results[0]["ranking"][0]["label"] == "paper flower"
+    assert len(results[0]["ranking"]) == 4  # " car " is a duplicate of "car"
+    assert abs(sum(r["probability"] for r in results[0]["ranking"]) - 1) < 1e-3
+
+
+@pytest.mark.anyio
+async def test_classify_image_needs_two_labels(mcp_client_session: ClientSession) -> None:
+    res = await mcp_client_session.call_tool(
+        "classify_image", arguments={"src": SAMPLE_IMAGE_FILEPATH, "labels": ["flower", "  "]}
+    )
+    assert res.is_error
 
 
 @pytest.mark.anyio

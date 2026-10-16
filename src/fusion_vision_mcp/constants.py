@@ -66,6 +66,14 @@ COUNT_RANGE_VETO: Final[float] = 0.5
 REGION_PAD: Final[float] = 0.15
 REGION_MIN_SIDE: Final[int] = 32
 
+#: `classify_image`: each caller label is put through this template and CLIP ranks them by softmax of
+#: `logit_scale` x cosine similarity. The template is gate Z's tune choice (`classify_gate.py`, 2026-10-15), and gate
+#: Z2 (`classify_gate2.py`, 2026-10-16) measured exactly it: top-1 98.5% vs `query_image`'s 77.5% on 200 fresh
+#: species, landmark and style images (CI +15.5 to +27.0). Changing it means re-running the gate on fresh images.
+CLASSIFY_TEMPLATE: Final[str] = "a photo of {}"
+#: More labels than this is a vocabulary search rather than a choice, and the text batch grows with it.
+CLASSIFY_MAX_LABELS: Final[int] = 200
+
 #: `detect_objects`' Grounding DINO score floor, deliberately higher than counting's
 #: 0.15: locating a named object has to be able to say "not here". Swept on 143 COCO
 #: scenes (VisionBench detect_backend_ab.py), querying each image once for its real

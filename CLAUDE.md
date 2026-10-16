@@ -190,6 +190,25 @@ unstopped call: median 57.3 -> 40.7 s, 9 loops -> 0. Greedy decoding was tried f
 and is *not* shipped: a tie on recall and speed, but it failed the loop guard fixed before the run. Seconds measured
 in different sessions are not comparable here: the same captioner measured 39.3 s one day and 32.1 s the next.
 
+## `classify_image` is CLIP zero-shot over the caller's labels (2026-10-16)
+
+`classify_image(src, labels)` puts each label in `CLASSIFY_TEMPLATE` ("a photo of {}") and ranks them with
+`Aesthetic.zero_shot` (softmax of `logit_scale` x cosine), on the CLIP ViT-L/14 `score_aesthetics` already loads. Two
+VisionBench gates against `query_image` asked the same multiple-choice question (gate Z's `QUESTION`, pick = longest
+label in the reply):
+
+- **Gate Z** (`classify_gate.py`, image kinds and COCO objects): 79.9 vs 74.1%, CI 0.0 to +11.7 -- on the boundary,
+  not shipped. The template was chosen on its tune half.
+- **Gate Z2** (`classify_gate2.py`, rule fixed before the images existed): round 16, 200 Commons images the worker
+  sourced (20 species x 4, 20 landmarks x 3, 12 art styles x 5; the build re-verified all 200). **98.5 vs 77.5%,
+  CI +15.5 to +27.0**, ships. Styles were the weak set (95 vs 60%); CLIP's 3 misses were Klimt's *The Kiss*,
+  de Feure and Vermeer. 0.25 s vs 10 s. Right 197 of 198 at p >= 0.5.
+
+Read Z2 as an upper bound: the images are famous Commons files CLIP may have trained on; gate Z is the everyday-photo
+estimate. The server reproduced Z2's pick and probability on 13 of 13 images (the 3 misses included). It is a new tool,
+not a gain on an existing one: no scoreboard phase asks a multiple-choice question. Routing `query_image` questions
+that list options to it would be the gain on an existing tool, and would need its own gate.
+
 ## `critique_composition` is scored on a checklist now: a better subject box and a busy-background hint passed
 
 Phase 7 scores the critique's prose by word overlap with frontier critiques, where even Claude, Gemini and GPT only
