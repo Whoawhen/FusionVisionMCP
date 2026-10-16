@@ -99,3 +99,9 @@ wrong but GitHub reports MIT).
   against the sub-object failure (for instance, trust `answer` only when `detect`'s boxes don't contain one another)
   and test it on a fresh round 15, since round 14 has been seen; (c) a 3B model in the server (~12 GB RAM in
   float32, ~6 s per count on CPU) under the Gemma Terms of Use.
+- 2026-10-16: **`crowd_range` shipped.** Grounding DINO runs low on crowds and SAM 3 high; on sprint R's tune half
+  the truth lay between them on 36 of 38 counts of 4-10 (VisionBench `count_sam3_crowd_look.py`). Round 17 (160 fresh
+  Open Images crowds, worker-counted; the user's blind check agreed with the worker's exact counts on 18 of 25) and
+  gate K (`count_range_gate.py`, rules fixed before counting): truth inside [min, max] 85.9% vs `possibly_more`'s
+  64.1% (CI +13.0 to +30.4), median width 0.61 of the count, shown on 17.5% of counts of 1-3. Server reproduces the
+  gate 12 of 12. SAM 3 still does not *count* (10-31% exact on crowds); it is the upper bound only.

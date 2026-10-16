@@ -59,6 +59,14 @@ COUNT_BOX_THRESHOLD: Final[float] = 0.425
 COUNT_RANGE_FLOOR: Final[float] = 0.18
 COUNT_RANGE_VETO: Final[float] = 0.5
 
+#: `count_objects`' `crowd_range` on photos: Grounding DINO's count runs low on crowds and SAM 3's, at this floor (with
+#: `detect_objects`' NMS and envelope filter), runs high, so `[min, max]` of the two brackets the truth; shown when the
+#: higher is at least `CROWD_RANGE_SHOW`. VisionBench gate K (`count_range_gate.py`, 2026-10-16, round 17: fresh Open
+#: Images photos of 4-30 objects): truth inside 85.9% vs `possibly_more`'s 65.2% (CI +12.0 to +29.3), median width 0.61
+#: of the count, shown on 17.5% of counts of 1-3. The 0.3 came from sprint R's tune half; change it, re-run the gate.
+CROWD_RANGE_SAM3_FLOOR: Final[float] = 0.3
+CROWD_RANGE_SHOW: Final[int] = 4
+
 #: `caption(region=...)`: the caller's box is widened by this share of its width and height on each side, to at
 #: least `REGION_MIN_SIDE` px each way, then clipped to the image. Exactly the crop VisionBench gate R measured
 #: (`region_inspect_gate.py`, 2026-10-15): on 528 questions about a worker-chosen region, the default caption of the
