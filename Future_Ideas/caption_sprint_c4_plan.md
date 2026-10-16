@@ -352,11 +352,27 @@ published too.** That splits C4-4 in two:
   - It leaves out the 9 over-quoted captions. `check` now counts quotes too.
   - Result: 1,177 captions, median 129 words; 59 scattered, varied mentions remain (5%).
   - Lesson for future handoffs: never prompt for a fixed element every image has.
-- **Still to do, while no CPU job is running:**
-  - perceptual-hash dedup against VisionBench and the holdout;
-  - the DOCCI share (~400 human captions);
-  - the PEFT caption-only switch check (`disable_adapters`, outputs identical on `tests/` fixtures);
-  - the untrained-adapter timing (20 tune images).
+- **2026-10-16, built and checked (VisionBench `benchmarks/c4p_lora.py`, environment `.venv-lora`: torch 2.14.1
+  cu130, transformers 5.19 as the server, peft 0.21.2):**
+  - DOCCI: 400 training-split images streamed from Google's archive (~200 MB of the 7.6 GB), median 112 words.
+  - Dedup (dHash, Hamming <= 4) against all 4,004 images under `benchmarks/`, holdout included: 2 DOCCI photos
+    dropped (likely chance matches). 1,575 rows: 1,496 train, 79 validation (5%, seeded).
+  - Switch check: with a random LoRA loaded but disabled, `<OD>`, dense regions, OCR regions and phrase grounding on
+    8 `tests/` fixture cases, and the caption, are byte-identical to the base model; enabled, the caption changes.
+  - LoRA: rank 16, alpha 32, on the text model's attention (encoder self-attention, decoder self- and
+    cross-attention q/k/v/out); vision tower untouched.
+
+**C4-4p rule, fixed 2026-10-16 before any training.** Train once (rank 16, 3 epochs, lr 2e-4, effective batch 8).
+Score the three epoch checkpoints on tune (120) with `c4p_lora.py caption`/`score`, against the shipped
+`florence_detailed+text`. Pick the checkpoint with the highest `lora+text` recall whose absent-object count is not
+above the base's. Run that one checkpoint on confirm (280) once. **"LoRA helps" means, on confirm:**
+1. `lora+text` minus `base+text` recall has a 95% bootstrap CI above 0;
+2. the gain holds at matched length (each caption's prose cut to the shorter of the pair): point estimate above 0;
+3. the absent object is named no more than 2 more times than by the base.
+
+If all three hold, C4-4s goes ahead (clean data, then the full ship gates: default slot <= 15 s, CHAIR, holdout).
+If not, the LoRA route stops here. Speed isn't part of this verdict; it's measured separately by `overhead`. Nothing
+is tuned after confirm.
 
 Guards against fitting the test:
 - No training image may match a VisionBench or fresh-holdout image (perceptual-hash dedup, logged).
