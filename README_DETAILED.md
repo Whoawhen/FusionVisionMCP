@@ -209,6 +209,13 @@ specific, and `ocr` to transcribe text rather than describe it. Returns one capt
   (55.2%, CI includes zero), so the gain is coverage from saying more, not sharper wording. A fine-tuned
   Florence-2 (PromptGen v2.0) was also tested and rejected: +2.9 points, all of it length, for a second
   1.5 GB model.
+- **region**: `[x1, y1, x2, y2]` in the image's pixels: caption only that part, so it gets the captioner's whole
+  input resolution (Florence-2 shrinks every image to 768 px). The box is widened by 15% on each side, to at
+  least 32 px, and clipped to the image; the caption then describes the region, not the image. Measured
+  2026-10-15 (VisionBench gate R): for 528 questions, a worker drew where it would look without seeing the
+  answer, and the region's caption named the answer 80.3% of the time against 67.8% for the whole image
+  (+12.5, CI 8.3 to 16.9). Not offered on `ocr` (the same crops cut words at the edge: 71.6 → 54.5%) or
+  `query_image` (no measurable change).
 
 ### detect_objects ➕
 
@@ -340,6 +347,15 @@ from. **`count` is never overwritten** — `estimates` is added alongside it, ne
 (`{value, raw, note}`), off by default so a session that never opts in keeps Moondream unloaded. Re-verified
 live on the flower: `separable: "no"`, `estimates.outline: 8`, `count` still `1`. Limit: both numbers are
 estimates, not tallies — the detector could not separate the instances, so treat either accordingly.
+
+**2026-10-15: `possibly_more` says when a photo count may be too low.** On the Grounding DINO path every result
+carries `possibly_more: {upper, extra_candidates, reliability}`: the boxes Grounding DINO scored between 0.18 and
+the threshold that are neither duplicates of, nor inside, a counted box. `upper` > `count` means about even odds
+(38–58% across three test sets, 953 photo counts) that there are more than `count`; `upper` == `count` means the
+count was too low only 7–14% of the time, though it can still be too high. It only ever points upward, comes from
+the same model pass (no extra time), and `count` is never changed by it. VisionBench gate C1 measured it: the
+truth lay in [count, upper] 78.6–79.4% of the time against 55.6–61.8% for `count` exact, and no negative control
+got an extra.
 
 #### Why this backend
 
