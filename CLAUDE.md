@@ -441,6 +441,18 @@ it was too low only 7-14%. No negative control gets an extra. The boxes come fro
 (`candidates_floor` on `GroundingDino.detect_objects`); the server reproduced the gate's replay on 20 of 20 round 14
 images. The user chose to ship it as a hedged hint.
 
+**2026-10-16: `crowd_range` brackets crowds with SAM 3.** Grounding DINO's count runs low on crowds and SAM 3's
+(`detect_objects`' model, at `CROWD_RANGE_SAM3_FLOOR` 0.3 with its NMS and envelope filter) runs high, so photo counts
+at the default threshold carry `crowd_range: {low, high, sam3_count, reliability}` when either is at least
+`CROWD_RANGE_SHOW` 4 (`analysis.crowd_range`). VisionBench gate K (`count_range_gate.py`; round 17, 160 fresh Open
+Images crowds of 4-30, counted by the worker and blind-checked by the user, who agreed with its exact counts on only 18
+of 25): truth inside 85.9% vs `possibly_more`'s 64.1%, +21.8 (CI 13.0 to 30.4), on every band from 4-6 to 21-30;
+median width 0.61 of the count; shown on 17.5% of sprint R's counts of 1-3; on the user's own 27 counts 25 inside vs
+18. One gate bug was fixed after the first score and recorded: its raw cache was not sorted by score, which NMS
+depends on; sorting moved `possibly_more` 65.2 -> 64.1 and nothing else, and the server then reproduced the gate 12 of
+12. Costs SAM 3's ~7 s on every photo count. The 0.3 was picked on sprint R's tune half by looking; changing it means
+a fresh set.
+
 **The honest negative result: the flower is not counted by anything here.** `tests/sample.jpg` — a paper flower
 with overlapping petals — returns 1 from *every* approach tried: Florence-2 grounding, Moondream's detect head,
 Grounding DINO (at every box threshold down to 0.10), the `count_lobes` outline measurement, SAM2 in

@@ -357,6 +357,22 @@ the same model pass (no extra time), and `count` is never changed by it. VisionB
 truth lay in [count, upper] 78.6–79.4% of the time against 55.6–61.8% for `count` exact, and no negative control
 got an extra.
 
+**2026-10-16: `crowd_range` brackets a crowd.** On crowds Grounding DINO's count runs low (by 6 at 21–30 objects)
+while SAM 3's, the `detect_objects` model at a stricter 0.3 floor, runs high, so photo counts also carry
+`crowd_range: {low, high, sam3_count, reliability}` = the two counts in order, whenever either is 4 or more. VisionBench
+gate K (rules fixed before the images were counted) measured it on round 17, fresh Open Images photos of 4–30 objects:
+
+| | truth inside the range |
+|---|---|
+| `crowd_range` (92 photos with an exact count) | **85.9%** |
+| `possibly_more`'s [count, upper] | 64.1% |
+| 4–6 / 7–10 / 11–20 / 21–30 objects | 89 / 79 / 94 / 82% (vs 75 / 57 / 65 / 45%) |
+
+The difference is +21.8 points (95% CI 13.0 to 30.4); the typical range is 0.6 of the count wide ("8 to 13" for 10),
+and on counts of 1–3 it appears 17.5% of the time. Running SAM 3 adds about 7 s to every photo count. `count` is still
+Grounding DINO's number; prefer the range for a crowd. It is left out when the caller changes `threshold` or turns off
+`adaptive_threshold` (the gate measured the defaults) and when SAM 3 cannot load.
+
 #### Why this backend
 
 Measured head-to-head against Moondream2's detection head, which previously backed this tool, on eight identical

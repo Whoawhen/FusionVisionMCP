@@ -14,6 +14,7 @@ from fusion_vision_mcp.analysis import (
     _first_int,
     _region_label_consensus,
     _separability,
+    crowd_range,
     possibly_more,
 )
 from fusion_vision_mcp.constants import (
@@ -245,12 +246,22 @@ def register(mcp: MCPServer) -> None:
         `upper` == `count` it was too low only 7-14% of the time, though it can
         still be too high. `count` is never changed by it.
 
+        On crowds, photos also get `crowd_range: {low, high, sam3_count,
+        reliability}`: Grounding DINO's count tends to run low on crowds and SAM 3's
+        (the `detect_objects` model, at a stricter floor) high, so the range between
+        them brackets the truth. It appears when either count is 4 or more. On 92
+        fresh photos of 4-30 objects the true count lay inside it 85.9% of the time,
+        against 65.2% for `possibly_more`'s range, and its typical width was 0.6 of
+        the count. Prefer it to `count` for a crowd. Running SAM 3 adds about 7 s to
+        every photo count. Absent if SAM 3 is unavailable.
+
         Accuracy depends heavily on the scene. On synthetic shapes whose counts are
         exact by construction it is right on 9 of 10 cases (mean error 0.1) and
         holds all 8 single-object controls. On real photographs it is reliable for
         a few instances and weak for many: it was exact on 61.8% of 427 held-out
         photo counts (383 of them 3 or fewer), and crowded scenes remain far less
-        reliable. Treat a count above a handful on a real photo as a rough estimate.
+        reliable. Treat a count above a handful on a real photo as a rough estimate,
+        and read `crowd_range` with it.
 
         Three measured limits, worth checking before trusting a count:
 
@@ -331,6 +342,11 @@ def register(mcp: MCPServer) -> None:
                 candidates = result.pop("candidates_below", None)
                 if candidates is not None:
                     result["possibly_more"] = possibly_more(result.get("bboxes") or [], candidates)
+                    # Gate K measured the range against the default Grounding DINO count only.
+                    if threshold == COUNT_BOX_THRESHOLD and adaptive_threshold:
+                        span = crowd_range(app, image, object_name, int(result.get("count") or 0))
+                        if span is not None:
+                            result["crowd_range"] = span
                 if verify_silhouette:
                     _add_silhouette(app, image, result)
                 if consensus:
