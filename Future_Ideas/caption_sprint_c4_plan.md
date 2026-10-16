@@ -360,7 +360,15 @@ published too.** That splits C4-4 in two:
   - Switch check: with a random LoRA loaded but disabled, `<OD>`, dense regions, OCR regions and phrase grounding on
     8 `tests/` fixture cases, and the caption, are byte-identical to the base model; enabled, the caption changes.
   - LoRA: rank 16, alpha 32, on the text model's attention (encoder self-attention, decoder self- and
-    cross-attention q/k/v/out); vision tower untouched.
+    cross-attention q/k/v/out); vision tower untouched. 4.7M trainable weights (0.6%).
+  - Overhead (`results/c4p_overhead.json`): the unmerged, untrained adapter adds a median 1.4 s to the default
+    caption (8.7 → 10.0 s on 20 tune images, CPU, 18 threads, alternating order; all 20 captions identical). That's
+    within the 15 s limit here. If it ships, merging into a caption-only copy of the weights would remove it, at
+    the cost of the memory for a second copy.
+  - Prep: 1,575 images stored as uint8 tensors that reproduce the processor's output exactly (max difference 0).
+    Labels: median 157 tokens, max 367, none truncated.
+  - Label check: the base model scores its own captions at loss ~0.16 and the worker's at 5.2–5.7. The labels are
+    built correctly; the target style is just far from Florence-2's own.
 
 **C4-4p rule, fixed 2026-10-16 before any training.** Train once (rank 16, 3 epochs, lr 2e-4, effective batch 8).
 Score the three epoch checkpoints on tune (120) with `c4p_lora.py caption`/`score`, against the shipped
