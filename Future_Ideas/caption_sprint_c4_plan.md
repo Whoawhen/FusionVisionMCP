@@ -378,6 +378,22 @@ above the base's. Run that one checkpoint on confirm (280) once. **"LoRA helps" 
 2. the gain holds at matched length (each caption's prose cut to the shorter of the pair): point estimate above 0;
 3. the absent object is named no more than 2 more times than by the base.
 
+**Training (2026-10-16):** on the local GPU with the guards above. A 5-minute smoke run went clean, so the full run
+went next: it took 15 minutes, against the 30-minute stage it would have replaced. Peak 3.7 GB VRAM, 84 °C,
+~114 W, 0 new WHEA events, exit 0. Validation loss 5.48 → 2.44 / 2.30 / 2.26 by epoch.
+
+**Tune (120, `results/c4p_score_tune.json`), against `florence_detailed+text` at 61.5%:**
+
+| Checkpoint | Recall | CI95 | At matched length | Absent named | Median words |
+|---|---|---|---|---|---|
+| epoch 1 | 64.7% | -0.4 to +6.8 | 63.8% | 0 | 132 (base 122) |
+| epoch 2 | 62.4% | -2.2 to +4.2 | 62.2% | 1 | 130 |
+| epoch 3 | 64.0% | -0.9 to +5.7 | 63.1% | 1 | 134 |
+
+The rule picks **epoch 1**. Its gains by kind: everyday photos 67.4 → 78.3, charts 66.0 → 72.0, signage 54.2 → 60.4,
+illustrations 67.3 → 73.5, screenshots 67.9 → 71.7. AI-generated images lost (48.1 → 44.2); documents and game UI
+were flat. Confirm runs epoch 1 only.
+
 If all three hold, C4-4s goes ahead (clean data, then the full ship gates: default slot <= 15 s, CHAIR, holdout).
 If not, the LoRA route stops here. Speed isn't part of this verdict; it's measured separately by `overhead`. Nothing
 is tuned after confirm.
