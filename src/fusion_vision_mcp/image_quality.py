@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -5,7 +6,7 @@ from PIL import Image
 
 try:
     import onnxruntime as ort  # type: ignore
-    from huggingface_hub import hf_hub_download
+    from huggingface_hub import constants, hf_hub_download
 
     HAS_ONNX = True
 except ImportError:
@@ -29,10 +30,14 @@ class ImageQuality:
         if self._session is not None:
             return
 
+        # The graph keeps its weights in a separate `musiq_model.onnx.data` file. In the default
+        # Hugging Face cache each file is a symlink into its own blob directory (on Linux), and
+        # onnxruntime refuses external data that resolves outside the model's directory ("External
+        # data path escapes model directory"), so both go into one plain directory instead.
+        local_dir = Path(constants.HF_HOME) / "fusion-vision-mcp" / self.model_id.replace("/", "--")
         try:
-            model_path = hf_hub_download(repo_id=self.model_id, filename="musiq_model.onnx")
-            # Ensure external data is downloaded; the graph references it by name.
-            hf_hub_download(repo_id=self.model_id, filename="musiq_model.onnx.data")
+            model_path = hf_hub_download(repo_id=self.model_id, filename="musiq_model.onnx", local_dir=local_dir)
+            hf_hub_download(repo_id=self.model_id, filename="musiq_model.onnx.data", local_dir=local_dir)
         except Exception as exc:
             raise RuntimeError(
                 f"Could not obtain the MUSIQ ONNX weights from {self.model_id!r}. "
