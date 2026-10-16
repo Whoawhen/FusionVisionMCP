@@ -59,9 +59,13 @@ def register(mcp: MCPServer) -> None:
         generalist images, where the previous detector (Grounding DINO) boxed
         something on 66%; for an absent COCO category, on none of 80 scenes. It
         found 89% of labelled objects in COCO scenes and 66% across generalist
-        images, screenshots and documents included. Its weakness is strays: only
-        a fifth to a third of its boxes land on a labelled instance, so read `scores`
-        and treat low-scoring extra boxes as candidates, not finds. If SAM 3 cannot
+        images, screenshots and documents included. Boxes come highest score first,
+        and the first box is the one to trust: it landed on a labelled instance 71-73%
+        of the time on sprint R's photos. The rest are candidates, not finds, whatever
+        their score: in crowded scenes it returns dozens (a pile of apples came back as
+        163 boxes for 8 labelled), many of them parts, duplicates or a second guess at
+        one object, so pooled over all boxes only about a quarter land on a labelled
+        instance. Use `count_objects` for "how many". If SAM 3 cannot
         be loaded (it is gated on Hugging Face), this falls back to Grounding DINO
         at 0.35, and `detector` says which ran.
 

@@ -324,6 +324,13 @@ than confirmed.
 `detect_objects` on photographs with SAM 3 (`sam3.py`, `facebook/sam3`, threshold `LOCATE_BOX_THRESHOLD` 0.125).
 On the held-out half it found 76.4% of labelled objects against 60.2%, and boxed a plausible-but-absent neighbour
 on 9.0% of probes against 65.7%; its boxes are less precise (about a third land on a labelled instance on COCO).
+**2026-10-16: that precision is mostly crowded scenes, and the first box is right 71-73% of the time.** VisionBench
+gate V (`detect_verify_gate.py`) tried dropping boxes CLIP rejects: precision 25.4 -> 28.7% on confirm but recall -3.4
+(CI -5.0 to -1.9), past the -3 limit, so not shipped. `detect_wrong_boxes.py` then sorted the wrong boxes by geometry:
+10% of queries hold 64% of them (a COCO apple pile returned 163 boxes for 8 labelled; phase 11 scenes where one lamp
+of many was boxed), SAM 3's score does not separate them (more wrong boxes than right ones score >= 0.4), and per
+query precision is 48-51%. The highest-scoring box, which comes first, is right 70.9 / 72.9% (tune / confirm), so the
+tool description tells callers to trust the first box and treat the rest as candidates.
 **2026-10-14: flat images too.** VisionBench gate F (`sam3_flat_gate.py` screen on 63 images, then
 `sam3_flat_confirm.py` on 88 fresh ones, rule fixed in `Future_Ideas/sam3_expansion_plan.md` before they existed):
 on the confirm set SAM 3 boxed the absent object on 11.4% against Florence-2's 100%, and found 53.8% of labelled
