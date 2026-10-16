@@ -65,6 +65,10 @@
       "description": "Ask a free-form question about an image (visual question answering), backed by Moondream2. Set check_consistency=true to re-ask a rephrased control question and flag the answer 'low' confidence when the two agree on a flat default ('None'/'Yes') or contradict each other; on a low-confidence answer it also routes to the measurement that answers the question (spatial_relations/count_objects/ocr) as cross_check when one applies."
     },
     {
+      "name": "classify_image",
+      "description": "Pick which of the caller's labels an image shows (species, landmark, art style, kind of image), with a probability for each, by CLIP zero-shot. Chooses only among the labels given."
+    },
+    {
       "name": "count_objects",
       "description": "Count how many instances of a named object an image contains, backed by Grounding DINO. Use this, not detect_objects, whenever the question is \"how many\". Adds a consensus second-opinion count and a separability flag by default; on a collapse, adds an actionable outline estimate (and an optional vqa_estimate)."
     },

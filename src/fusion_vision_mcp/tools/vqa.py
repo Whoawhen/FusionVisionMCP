@@ -1,4 +1,4 @@
-"""VQA tools: `query_image` and the `batch_analyze_images` fan-out."""
+"""VQA tools: `query_image`, `classify_image` (multiple choice) and the `batch_analyze_images` fan-out."""
 
 import logging
 import os
@@ -7,7 +7,7 @@ from typing import Annotated, Any
 from mcp.server.mcpserver import Context, MCPServer
 from pydantic import Field
 
-from fusion_vision_mcp.analysis import _dispatch, _vqa_consistency, _vqa_cross_check
+from fusion_vision_mcp.analysis import _dispatch, _vqa_consistency, _vqa_cross_check, classify_pages, clean_labels
 from fusion_vision_mcp.forensics import analyze_metadata_anomalies
 from fusion_vision_mcp.images import get_images
 from fusion_vision_mcp.inspection import Anomaly, Observation, analyze_inspection
@@ -172,6 +172,45 @@ def register(mcp: MCPServer) -> None:
                         entry["cross_check"] = cross
                 results.append(entry)
             return results
+
+    @mcp.tool()
+    def classify_image(
+        ctx: Context[AppContext],
+        src: ImagePath,
+        labels: Annotated[
+            list[str],
+            Field(
+                description=(
+                    "The candidate answers to choose between, as short names: species ('red fox', 'coyote'), "
+                    "landmarks, art styles, kinds of image, product types. 2 to 200; each is put in "
+                    "'a photo of {label}'. The pick is always one of them, so include a catch-all such as "
+                    "'something else' if none may fit."
+                )
+            ),
+        ],
+    ) -> list[dict[str, Any]]:
+        """Pick which of your labels an image shows, with a probability for each (CLIP zero-shot).
+
+        Use it whenever you can list the possible answers: which species, which landmark, which art
+        style, photo or screenshot or chart. On 200 fresh species, landmark and art-style images it
+        picked the right label 98.5% of the time against `query_image`'s 77.5% asked the same
+        multiple-choice question, at 0.25 s per image against 10 s (VisionBench gate Z2,
+        2026-10-16); on everyday COCO objects and image kinds the margin was smaller, 79.9% vs 74.1%
+        (gate Z). Those images were well-known Commons files that CLIP may have seen in training, so
+        expect lower on your own photos. Its probability is usable: right 197 of 198 times at 0.5 or
+        more in gate Z2, and 190 of 230 against 29 of 44 below 0.5 in gate Z.
+
+        It cannot answer an open question ("what is this?"): it only ranks the labels it is given,
+        and always returns one of them, even when none is in the image. Use `caption` or
+        `query_image` for that. Art styles were its weakest set (95%).
+
+        Returns one dict per page/image: `label` (the top pick), its `probability`, and `ranking`,
+        every label with its probability, highest first (they sum to 1).
+        """
+        app = ctx.request_context.lifespan_context
+        names = clean_labels(labels)
+        with get_images(src) as images:
+            return classify_pages(app, images, names)
 
     @mcp.tool()
     def batch_analyze_images(

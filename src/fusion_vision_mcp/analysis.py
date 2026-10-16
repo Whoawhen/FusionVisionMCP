@@ -20,6 +20,8 @@ from fusion_vision_mcp import geometry, layout, question
 from fusion_vision_mcp.constants import (
     BUSY_BACKGROUND_QUESTION,
     CAPTION_TEXT_WORDS,
+    CLASSIFY_MAX_LABELS,
+    CLASSIFY_TEMPLATE,
     COUNT_BOX_THRESHOLD,
     COUNT_RANGE_VETO,
     DETECT_BOX_THRESHOLD,
@@ -492,6 +494,33 @@ def possibly_more(counted: Sequence[Sequence[float]], candidates: Sequence[dict[
             "the time (it can still be too high). Measured at the default threshold"
         ),
     }
+
+
+def clean_labels(labels: Sequence[str]) -> list[str]:
+    """The caller's labels, stripped and de-duplicated in order; at least 2 and at most `CLASSIFY_MAX_LABELS`."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for label in labels:
+        text = label.strip()
+        if text and text.lower() not in seen:
+            seen.add(text.lower())
+            out.append(text)
+    if len(out) < 2:
+        raise ValueError("classify_image needs at least 2 distinct, non-empty labels to choose between")
+    if len(out) > CLASSIFY_MAX_LABELS:
+        raise ValueError(f"classify_image takes at most {CLASSIFY_MAX_LABELS} labels, got {len(out)}")
+    return out
+
+
+def classify_pages(app: AppContext, images: list[Image], labels: list[str]) -> list[dict[str, Any]]:
+    """CLIP's pick among `labels` for each page, with every label's probability, highest first."""
+    rows = app.aesthetic.zero_shot(images, [CLASSIFY_TEMPLATE.format(label) for label in labels])
+    results = []
+    for row in rows:
+        order = sorted(zip(labels, row, strict=True), key=lambda pair: -pair[1])
+        ranking = [{"label": label, "probability": round(p, 4)} for label, p in order]
+        results.append({"label": order[0][0], "probability": round(order[0][1], 4), "ranking": ranking})
+    return results
 
 
 def busy_background(app: AppContext, image: Image) -> dict[str, Any]:

@@ -7,7 +7,7 @@
 
 🚧 **Work in progress** — see [README_DETAILED.md](README_DETAILED.md) for current limits and measured results before relying on this for anything important.
 
-An MCP server that fuses local, CPU-capable vision models — Florence-2, Moondream2, SAM2, Grounding DINO, PP-OCRv6, EasyOCR, IQA, and CLIP/LAION — behind eleven tools: OCR, captioning, object detection/grounding, instance counting, visual question answering, spatial measurement (touch/gap/containment), and aesthetic scoring (including technical quality and artistic judgment via Ollama).
+An MCP server that fuses local, CPU-capable vision models — Florence-2, Moondream2, SAM2, Grounding DINO, PP-OCRv6, EasyOCR, IQA, and CLIP/LAION — behind twelve tools: OCR, captioning, object detection/grounding, instance counting, visual question answering, multiple-choice classification, spatial measurement (touch/gap/containment), and aesthetic scoring (including technical quality and artistic judgment via Ollama).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="FusionVisionMCP-Dark.jpg">
@@ -74,6 +74,7 @@ root-caused against the exact fixture that exposed it, not patched at the sympto
 | `detect_objects` | SAM 3 (Florence-2 / Grounding DINO if it can't load) | Locate a named object, returning scored bounding boxes, center points and labels. On photos it rarely boxes an object that isn't there. |
 | `dense_region_caption` | Florence-2 | Caption every salient region of an image at once, without naming objects first. |
 | `query_image` | Moondream2 | Ask a free-form question about an image (visual question answering). `check_consistency=true` routes a low-confidence answer to the measurement that actually answers it, when one applies. |
+| `classify_image` | CLIP | Pick which of your labels an image shows (species, landmark, art style, kind of image), with a probability for each. 98.5% vs `query_image`'s 77.5% on 200 fresh images, in 0.25 s. It only chooses among the labels given. |
 | `count_objects` | Grounding DINO | Count how many instances of a named object an image contains. Use this, not `detect_objects`, for "how many" questions. On a collapse, adds an actionable outline estimate. On photos, `possibly_more: {upper, extra_candidates, reliability}` flags a count that may be too low. |
 | `spatial_relations` | Grounding DINO + SAM2 | Measure contact, gaps, containment depth and shape between two named objects. |
 | `score_aesthetics` | CLIP + LAION | Rate how aesthetically pleasing an image looks on a 1-10 scale. `compare_with` switches to a calibrated like-with-like comparison against a reference image. |
