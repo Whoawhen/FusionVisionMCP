@@ -5,7 +5,7 @@ on:
   pull_request:
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # pinned 2026-10-16: ubuntu-latest moves to 26 on 2026-10-19; move deliberately
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -27,7 +27,7 @@ jobs:
     # same as today's torch-extras split, without downloading the 1.5GB Florence-2-large
     # weights on every push. It cannot catch a broken CMD flag, since CMD is never run
     # during a build; the Release workflow's manual docker-full job covers that instead.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # pinned 2026-10-16: ubuntu-latest moves to 26 on 2026-10-19; move deliberately
     steps:
       - name: Checkout
         uses: actions/checkout@v7

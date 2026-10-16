@@ -9,7 +9,7 @@ permissions:
   contents: write
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # pinned 2026-10-16: ubuntu-latest moves to 26 on 2026-10-19; move deliberately
     steps:
       - uses: actions/checkout@v7
       - name: Create package artifact (named explicitly -- pack's default uses the working dir's basename, not the package name)

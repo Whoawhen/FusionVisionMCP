@@ -25,7 +25,7 @@ jobs:
     # either way. GitHub Actions runs `run:` steps with `bash -eo pipefail`, so the
     # nonzero exit a bad flag produces (2, confirmed directly against --cache-model)
     # fails the step with no extra check needed.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # pinned 2026-10-16: ubuntu-latest moves to 26 on 2026-10-19; move deliberately
     steps:
       - name: Checkout
         uses: actions/checkout@v7
