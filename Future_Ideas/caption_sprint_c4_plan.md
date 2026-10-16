@@ -394,6 +394,15 @@ The rule picks **epoch 1**. Its gains by kind: everyday photos 67.4 → 78.3, ch
 illustrations 67.3 → 73.5, screenshots 67.9 → 71.7. AI-generated images lost (48.1 → 44.2); documents and game UI
 were flat. Confirm runs epoch 1 only.
 
+**Confirm (280, `results/c4p_score_confirm.json`): fails.** `lora+text` 61.5% against 60.9% (+0.6, CI -1.3 to
++2.6); at matched length 60.3% against 60.3% (+0.0); absent object named 2 against 1; median words 136 against 129.
+Rules 1 and 2 fail and rule 3 holds, so **the LoRA route stops here: C4-4s does not go ahead**, and the web-UI data
+idea stays parked. The +3.2 on tune was noise across 120 images; on 280 fresh ones it shrank to +0.6, and to zero
+once length is equal. By kind it's a wash: signage 60.7 → 66.1 and illustrations 50.8 → 56.9, against everyday
+photos 89.1 → 83.6, with the rest within ±2. What this tested is one recipe: 1,500 captions, mostly phone screens,
+rank 16 on the text model only. It doesn't rule out every caption fine-tune. But nothing in these numbers points at
+a variant worth a second run, and the plan's rule was a single shot.
+
 If all three hold, C4-4s goes ahead (clean data, then the full ship gates: default slot <= 15 s, CHAIR, holdout).
 If not, the LoRA route stops here. Speed isn't part of this verdict; it's measured separately by `overhead`. Nothing
 is tuned after confirm.
