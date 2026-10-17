@@ -4,7 +4,7 @@ import torch
 from PIL.Image import Image
 from transformers import AutoModelForCausalLM
 
-from .constants import DEFAULT_MOONDREAM_MODEL, DEFAULT_MOONDREAM_REVISION
+from .constants import DEFAULT_MOONDREAM_MODEL, DEFAULT_MOONDREAM_REVISION, THEME_PROMPT
 from .device import resolve_device
 from .repetition import cut_loop, loop_start
 
@@ -59,20 +59,31 @@ class Moondream:
                 res.append(answer)
         return res
 
-    def caption(self, images: list[Image], length: str = "long") -> list[str]:
+    def caption(self, images: list[Image], length: str = "long", theme: bool = False) -> list[str]:
         """Moondream2's own captioner; `length` is "short", "normal" or "long".
 
         Streamed, and stopped once the caption loops (`repetition.loop_start`): the long caption
         otherwise repeats a phrase until the 768-token cap on ~7% of images, which is also its slowest
         tail. The repeated text is cut off.
+
+        Each image is encoded once (`encode_image`: vision features plus the text model's prefilled
+        cache) and the caption runs on that encoding. With `theme`, THEME_PROMPT is asked on the same
+        encoding and its answer added as `Theme: ...`; reusing it makes the question ~2 s instead of
+        ~13 s, with identical output (VisionBench `caption_c4_1.py`, 20 of 20 under greedy decoding).
         """
         res = []
         for img in images:
             with img.convert("RGB") as rgb_img:
-                res.append(self._caption_until_loop(rgb_img, length))
+                encoded = self.model.encode_image(rgb_img)
+            text = self._caption_until_loop(encoded, length)
+            if theme:
+                answer = " ".join(self.model.query(encoded, THEME_PROMPT)["answer"].split()).rstrip(".")
+                if answer:
+                    text = f"{text.rstrip()} Theme: {answer}."
+            res.append(text)
         return res
 
-    def _caption_until_loop(self, image: Image, length: str) -> str:
+    def _caption_until_loop(self, image: Any, length: str) -> str:
         text = ""
         for n, token in enumerate(self.model.caption(image, length=length, stream=True)["caption"], 1):
             text += token

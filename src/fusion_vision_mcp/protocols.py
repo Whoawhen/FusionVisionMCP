@@ -103,8 +103,8 @@ class VqaProcessor(Protocol):
         """Answers a free-form question about each image."""
         ...
 
-    def caption(self, images: list[Image], length: str = "long") -> list[str]:
-        """Describes each image in prose ("short", "normal" or "long")."""
+    def caption(self, images: list[Image], length: str = "long", theme: bool = False) -> list[str]:
+        """Describes each image in prose ("short", "normal" or "long"); `theme` adds what it conveys."""
         ...
 
 

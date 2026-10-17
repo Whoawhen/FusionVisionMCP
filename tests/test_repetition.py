@@ -64,14 +64,31 @@ def test_short_text_is_never_cut() -> None:
 
 
 class _StreamingModel:
-    """Stands in for Moondream2: `caption(..., stream=True)` yields tokens and counts how many were taken."""
+    """Stands in for Moondream2: `caption(..., stream=True)` yields tokens and counts how many were taken.
 
-    def __init__(self, tokens: list[str]) -> None:
+    It also records what each call was given, so tests can check the image is encoded once and the
+    caption and theme question both run on that encoding."""
+
+    def __init__(self, tokens: list[str], theme: str = "Teamwork matters.") -> None:
         self.tokens = tokens
         self.taken = 0
+        self.theme = theme
+        self.encoded: list[object] = []
+        self.captioned: list[object] = []
+        self.queried: list[tuple[object, str]] = []
+
+    def encode_image(self, image: Any) -> object:
+        handle = object()
+        self.encoded.append(handle)
+        return handle
+
+    def query(self, image: Any, question: str) -> dict[str, Any]:
+        self.queried.append((image, question))
+        return {"answer": self.theme}
 
     def caption(self, image: Any, length: str, stream: bool = False) -> dict[str, Any]:
         assert stream
+        self.captioned.append(image)
 
         def gen() -> Any:
             for t in self.tokens:
@@ -103,3 +120,21 @@ def test_caption_without_a_loop_is_unchanged() -> None:
     md = _moondream([w + " " for w in PROSE.split()])
     assert md.caption([Image.new("RGB", (8, 8))]) == [PROSE]
     assert md.model.taken == len(PROSE.split())
+    assert md.model.queried == []  # no theme unless asked
+
+
+def test_caption_encodes_each_image_once_and_reuses_it_for_the_theme() -> None:
+    from fusion_vision_mcp.constants import THEME_PROMPT
+
+    md = _moondream([w + " " for w in PROSE.split()])
+    [caption] = md.caption([Image.new("RGB", (8, 8))], theme=True)
+    assert len(md.model.encoded) == 1
+    assert md.model.captioned == md.model.encoded
+    assert md.model.queried == [(md.model.encoded[0], THEME_PROMPT)]
+    assert caption == PROSE + " Theme: Teamwork matters."
+
+
+def test_an_empty_theme_answer_adds_nothing() -> None:
+    md = _moondream([w + " " for w in PROSE.split()])
+    md.model.theme = "  "
+    assert md.caption([Image.new("RGB", (8, 8))], theme=True) == [PROSE]

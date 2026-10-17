@@ -141,6 +141,12 @@ CAPTION_TEXT_WORDS: Final[int] = 40
 LOOP_NGRAM: Final[int] = 8
 LOOP_RUN: Final[int] = 16
 
+#: `caption(deep=true)` also asks Moondream2 this on the image encoding its caption already made, and
+#: adds `Theme: <answer>.` to the prose. Fixed before measuring (VisionBench `caption_theme.py`,
+#: 2026-10-10): +1.3 points of keyword recall on tune and on 280 held-out images (CI 0.6 to 2.0),
+#: 0 images worse. On a fresh encode it cost ~13 s; on the reused one ~2 s (`caption_c4_1.py`).
+THEME_PROMPT: Final[str] = "In one sentence, what idea, theme or message does this image convey?"
+
 #: Without a `target_subject`, `critique_composition` asks Moondream2 this and boxes the answer with
 #: Florence-2. Fixed before measuring (VisionBench `composition_critique.py`, 2026-10-11).
 MAIN_SUBJECT_QUESTION: Final[str] = (
