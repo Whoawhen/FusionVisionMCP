@@ -199,6 +199,21 @@ on time (63.6 s against the 45 s limit), and reuse removes ~11 s. Since reuse gi
 `caption_theme.py confirm` (fresh-encode answers, same distribution) for recall. The real `deep` path's seconds are
 timed separately, in one session.
 
+**C4-1 fails on CHAIR (2026-10-16; VisionBench `0812281`). `deep` is unchanged.** Results:
+
+- **Confirm recall** (`caption_theme.py confirm`): +1.3 points (CI 0.6 to 2.0), 0 images worse, absent object named
+  3 vs 3.
+- **Timing:** the real `deep` path on 20 tune images, in one session: 35.2 vs 31.9 s median (+2.7 s, under the 45 s
+  limit).
+- **CHAIR, the gate that failed:** theme answers on the 300 COCO images. CHAIR-i went from 17.1% to 17.8% (+0.7)
+  and **CHAIR-s from 30.3% to 32.7% (+2.4, limit +1.0)**. The one theme sentence named 17 more COCO objects, and
+  8 of them are not in the image, about half against the caption's 17%. Object recall rose 77.2 to 78.4%.
+
+The rule was fixed before the run, so the theme line does not ship, and the round 11 holdout was not run because it
+could not change the decision. The theme sentence adds a little recall but invents objects at about three times the
+caption's rate. `Moondream.caption` keeps encoding each image once (FusionVision `cfa0d31`: same output, tests
+pass). Its `theme` argument stays unused.
+
 Expected size: +1 to +3 points on `deep`, mostly AI images and charts. A small gain, but it costs no memory and
 no new model.
 
