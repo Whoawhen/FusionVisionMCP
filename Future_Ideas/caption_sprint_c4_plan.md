@@ -189,6 +189,16 @@ generated words.
    the same encoding. Tests: a unit test with a fake model checking `encode_image` is called once per image;
    a slow-marked test for the greedy equivalence on `tests/sample.jpg`.
 
+**Steps 1–2 done (2026-10-16, VisionBench `caption_c4_1.py measure`, `0316fb5`; pin `5d6c926`).** Medians on 20 tune
+images, greedy, 18 threads: encode 9.8 s, long caption on the encoding 18.3 s, **theme question on the same encoding
+2.0 s** (stop rule: 6 s) against 12.9 s with a fresh encode, type question 0.4 s. Equivalence: caption and theme
+answer identical on 20 of 20, with the theme asked after the caption as shipped. `type_q` is out: 5 of the 20 could
+be judged and 2 agreed (40%, floor 80%). That leaves `deep+text+theme`. Its tune recall was measured in C3
+(`caption_theme_tune.json`): +1.3, CI +0.4 to +2.5, 0 images worse, absent object named 1 vs 1. It failed then only
+on time (63.6 s against the 45 s limit), and reuse removes ~11 s. Since reuse gives identical output, confirm reuses
+`caption_theme.py confirm` (fresh-encode answers, same distribution) for recall. The real `deep` path's seconds are
+timed separately, in one session.
+
 Expected size: +1 to +3 points on `deep`, mostly AI images and charts. A small gain, but it costs no memory and
 no new model.
 
