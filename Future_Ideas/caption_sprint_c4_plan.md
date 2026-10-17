@@ -365,8 +365,9 @@ published too.** That splits C4-4 in two:
 - **2026-10-16, built and checked (VisionBench `benchmarks/c4p_lora.py`, environment `.venv-lora`: torch 2.14.1
   cu130, transformers 5.19 as the server, peft 0.21.2):**
   - DOCCI: 400 training-split images streamed from Google's archive (~200 MB of the 7.6 GB), median 112 words.
-  - Dedup (dHash, Hamming <= 4) against all 4,004 images under `benchmarks/`, holdout included: 2 DOCCI photos
-    dropped (likely chance matches). 1,575 rows: 1,496 train, 79 validation (5%, seeded).
+  - Dedup (dHash, Hamming <= 4) against all 4,004 images under main VisionBench's `benchmarks/`: 2 DOCCI photos
+    dropped (likely chance matches). Correction: the round 11 holdout lives only in the VisionBench-labels worktree,
+    so that pass didn't cover it. Checked separately afterwards: 0 of the 1,575 rows match any of its 241 files. 1,575 rows: 1,496 train, 79 validation (5%, seeded).
   - Switch check: with a random LoRA loaded but disabled, `<OD>`, dense regions, OCR regions and phrase grounding on
     8 `tests/` fixture cases, and the caption, are byte-identical to the base model; enabled, the caption changes.
   - LoRA: rank 16, alpha 32, on the text model's attention (encoder self-attention, decoder self- and
