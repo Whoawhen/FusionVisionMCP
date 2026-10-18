@@ -445,6 +445,50 @@ C4-3b ends here.** Run by Opus 5.5 (the handoff named Sonnet 5.5) on a quiet mac
 
 Run C4-3b before C4-3a's adapter runs: it targets the gap the scoreboard names, and its gate 1 is cheap.
 
+## C4-5: image-type line (Sonnet 5.5 runs; rules in [c4_5_image_type_handoff.md](c4_5_image_type_handoff.md))
+
+An `Image type: <label>.` line from CLIP zero-shot over a fixed list of 64 labels, ahead of the `Visible text` line.
+This retries the C3 type label (ruled out for false labels, 83.0% agreement) with a bigger list, the catch-all
+`something else`, and the decision on round 11's holdout. Script: VisionBench `benchmarks/caption_c4_5_type.py`
+(`ea6e6d5`, `7463028`: the count assertion was 63, the list is 64 and matches the handoff word for word; no rule
+changed). Results: `benchmarks/results/caption_c4_5_*.json(l)`.
+
+**Step 1, tune (2026-10-18): passes at threshold 0.3.** 120 images, 447 groups, cached captions + 80-word text line.
+0.2 and 0.3 tie on default +type recall (65.5%), so the tie goes to 0.3.
+
+| Threshold | Shown | Default (base 62.4%) | `deep` (base 71.4%) |
+| --- | --- | --- | --- |
+| 0.2 | 113 | +3.1 (CI 1.6 to 4.7), 14 better / 0 worse | +2.2 (1.1 to 3.6), 10 / 0 |
+| **0.3** | **107** | **+3.1 (1.6 to 4.7), 14 / 0** | **+2.2 (1.1 to 3.6), 10 / 0** |
+| 0.4 | 90 | +2.9 (1.5 to 4.5), 13 / 0 | +2.2 (1.1 to 3.6), 10 / 0 |
+| 0.5 | 73 | +2.7 (1.3 to 4.2), 12 / 0 | +2.0 (0.9 to 3.3), 9 / 0 |
+
+`absent_object_named` 0 -> 0 (default) and 1 -> 1 (`deep`) at every threshold. The line adds a median 4 words.
+Report-only: at 0.3 the label fits the image's labelled kind (label-to-kind map written into the script before the
+run) on **84.7%** of 98 shown images (9 AI-generated ones left out). The 15 disagreements: game UI called
+desktop software or mobile app screenshot (5), documents/app screenshots crossed (3), art and illustrations
+called form, banner, newspaper page, watercolor or children's illustration (6), a diagram called product packaging.
+This is the same ground the C3 version failed on (floor was 90%); the user's check (step 3) is the real test.
+
+**Step 2, CHAIR (2026-10-18): passes.** 300 COCO photos, threshold 0.3, line shown on 191 of them (so it names a type on
+most photos: `product photograph` 45, `form` 20, `close-up photograph` 20, `landscape photograph` 14, `scatter plot`
+11). Cached captions with and without the line:
+
+| | CHAIR-i | CHAIR-s | object recall | hallucinated / named |
+| --- | --- | --- | --- | --- |
+| default | 12.2 | 23.3 | 71.8 | 75 / 617 |
+| default + type | 12.4 (+0.2) | 23.7 (+0.4) | 71.8 | 77 / 619 |
+| `deep` | 17.1 | 30.3 | 77.2 | 120 / 703 |
+| `deep` + type | 17.3 (+0.2) | 31.0 (+0.7) | 77.2 | 122 / 705 |
+
+Limit +1.0 each; all four hold. What the CHAIR passing does not cover: `form` on 20 photos and `scatter plot` on 11 are
+wrong labels on ordinary photos, which CHAIR can't see; step 3 is where the labels are judged.
+
+**Step 3: waiting on the user.** 40 of the 107 shown tune images drawn (seed 20261018) into
+`benchmarks/results/caption_c4_5_review.json`; blind review page (image + label only) via
+`benchmarks\caption_c4_5_type.py review` on http://127.0.0.1:8774; `--tally` scores it. Passes at 32 of 40 right
+(partly = half). Step 4 (round 11 holdout, ~3 CPU hours on a quiet machine) waits for the result and the user's timing.
+
 ## Sprint C4-4: train a caption LoRA for Florence-2-large (decision point; Opus 5.5 to design)
 
 This is the "fine-tunes" step that the "good" section reserves for when progress stalls. **It needs the user's go-ahead.**
