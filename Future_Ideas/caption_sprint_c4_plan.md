@@ -390,6 +390,19 @@ prebuilt `win-cpu-x64` binaries are the fallback if the handler doesn't drive Ge
 4. If it wins on tune, decide with the user whether it replaces Moondream2 in `deep` (Moondream2 stays for
    `query_image` either way) before any confirm run.
 
+**Gate 1 result (2026-10-18, VisionBench `caption_c4_3b_gate1.py` at c83e6f4, results `caption_c4_3b_gate1.json(l)`):
+passes, by 0.12 s.** llama-cpp-python 0.3.36 `MTMDChatHandler` drove Gemma 3's vision directly (no fallback to the
+CLI binaries). On the first 20 tune images, greedy, 512 tokens, 18 threads: median Gemma caption + `ocr_pages`
+**44.88 s** (rule <= 45), 90th percentile 52.61 s, 9 of 20 over 45 s; Gemma alone 42.42 s, OCR 1.80 s. Captions are
+long: median 334.5 words, 512 output tokens (274 prompt tokens), 0.088 s per output token. **13 of 20 were cut off
+at 512 tokens**, so the median is set mostly by the cap; none looped. Load 1.5 s, warm-up 37.4 s (not counted). Peak
+resident 7.37 GB for the Gemma process; system available memory 13.6 GB before loading, 2.9 GB after the 20 images
+(other processes included). Moondream2's shipped `deep` in the same session, right after: 29.8 s caption, 31.7 s with
+OCR, 181.5 words, so Gemma is about 13 s slower and about 1.8x longer. OCR seconds came from a separate pass in
+FusionVisionMCP's `.venv` (the editable install pulled torch into `.venv-gguf`), as the handoff allowed. For gate 2:
+any `max_tokens` above 512 or a longer prompt moves Gemma over 45 s, since a cut-off caption already sits at ~43.6 s.
+Gate 2 on the tune split is about 120 x 45 s = 1.5 CPU hours for Gemma, plus the baseline if not cached.
+
 Run C4-3b before C4-3a's adapter runs: it targets the gap the scoreboard names, and its gate 1 is cheap.
 
 ## Sprint C4-4: train a caption LoRA for Florence-2-large (decision point; Opus 5.5 to design)
