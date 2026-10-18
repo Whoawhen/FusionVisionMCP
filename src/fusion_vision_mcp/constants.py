@@ -130,7 +130,11 @@ OCR_MIN_CONFIDENCE: Final[float] = 0.75
 #: `caption(read_text=true)` appends at most this many words of the `ocr` engine's text.
 #: Fixed before measuring (VisionBench `caption_text_grounding.py`, 2026-10-10); on 280
 #: held-out images it lifted the default caption's keyword recall 53.3% -> 60.9%.
-CAPTION_TEXT_WORDS: Final[int] = 40
+#: Raised 40 -> 80 on 2026-10-18 (C4-2b stage 1b, `caption_text_cap_r18.py`, rule fixed
+#: before the images existed): on 136 fresh text-heavy images key phrases 46.8% -> 57.5%
+#: (default) and 53.9% -> 63.6% (`deep`), no image worse, no absent object named; COCO
+#: CHAIR unchanged and round 11's line +6.6 points with no absent object added.
+CAPTION_TEXT_WORDS: Final[int] = 80
 
 #: `caption(deep=true)` stops Moondream2's long caption once it loops: when LOOP_RUN consecutive
 #: LOOP_NGRAM-word spans all repeat earlier text, the caption is cut where that run began. The

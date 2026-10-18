@@ -227,13 +227,109 @@ only (no other task changes). Measure on tune: median seconds, recall, length-ma
 check as C4-0a; beam search is partly what keeps Florence-2's long captions from looping). Whatever time it saves
 is the budget for c. Time the 20-image smoke first: if 1 beam saves under 1 s median, stop there.
 
-**b. Put titles first in the OCR line.** `visible_text_line` keeps reading order and cuts at 40 words, so a long
-document or busy screen can lose its title. With `ocr_pages(..., detail)` boxes, order lines by text height
-(tallest first) and keep reading order among similar heights. The 40-word cap stays, so captions don't get longer.
-- Go/no-go: the count from C4-0 b2. If it's under ~10, skip this step.
-- Pure ordering on the OCR boxes, so it carries over unchanged when PP-OCRv6 is replaced (no tuning on a
-  Chinese-developed model).
-- Applies to both slots. Unit tests in `tests/test_analysis_helpers.py` next to the existing `visible_text_line` tests.
+**b. The OCR line: a bigger word cap, then titles first** (rewritten 2026-10-17 from `docs/plans/Caption_Ideas.md`
+Track 1; Opus 5.5 fixed these rules, Sonnet 5.5 runs them). It applies to both slots, costs no time (`ocr_pages`
+already runs on every call and already returns the boxes), and works only on OCR output, so it carries over unchanged
+when PP-OCRv6 is replaced.
+
+*Why the cap comes first, from cached rows (no run).* On `caption_text_recheck.jsonl` (phase 11, 315 images,
+1,569 key phrases), **all 307 `cap_or_join` misses are the 40-word cap; none is the ` / ` joining** (the grader
+ignores punctuation). Raising the cap recovers 68 of them at 60 words (+4.3 points), 127 at 80 (+8.1), 197 at 120
+and all 307 with no cap. They sit on 141 images (screenshots 162 phrases, charts 52, documents 42, game UI 31),
+whose median OCR text is 141 words. Ordering by height at 40 words only changes *which* 40 words fit, so the cap is
+the lever and ordering is the second test. That count is on a scoreboard set, so it motivates the test but does
+not pick the variant. C4-0 b2's go/no-go holds: 38 of 120 tune images have more than 40 OCR words.
+
+*Stage 1, the cap (tune, cached captions and `caption_ocr_tune.jsonl`, no model run).* Variants, fixed now, both
+slots (`florence_detailed` and `moondream_long`), raster order as shipped:
+- `+text40` (shipped, the baseline), `+text60`, `+text80`. Nothing above 80: past that the text line is longer than
+  the median Florence-2 prose (157 words).
+- **Pick rule:** the largest cap that beats the next smaller one on tune keyword recall by >= 1.0 point *in both
+  slots*, with the 95% bootstrap CI against `+text40` above 0 and `absent_object_named` not higher. One constant
+  (`CAPTION_TEXT_WORDS`) serves both slots, so they get one cap. If 60 fails, stop: C4-2b doesn't ship.
+- **Length-matched recall does not apply here.** The added words are at the end, so trimming to the baseline's
+  length removes exactly them and the difference is 0 by construction. Report the median and 90th-percentile
+  words added instead.
+- Report-only, not used to pick: phase 11 key-phrase recall from the cached recheck rows at each cap.
+
+*Stage 2, titles first (only if a cap was picked).* One OCR-only pass with boxes over the 120 tune images (the `ocr`
+engine alone, ~1-3 s an image, no captioner). One variant at the picked cap, fixed now: lines whose box height is at
+least 1.5x the page's median line height go first, then every other line; reading order is kept within each group.
+Ships only if it beats raster order at the same cap by >= 1.0 point in both slots, CI above 0, `absent_object_named`
+not higher.
+
+*Then, for whatever is picked:* the COCO CHAIR run (`caption_hallucination.py` needs the text line appended at the
+picked cap; this adds words, so the rule applies even though the text is verbatim), then confirm (280) once, then the
+round 11 holdout, bundled with anything else from C4 per the rules above. Unit tests in
+`tests/test_analysis_helpers.py` next to the existing `visible_text_line` tests; `caption`'s docstring figures update
+from the holdout.
+
+**Stage 1 fails as written (2026-10-17; VisionBench `benchmarks/caption_text_cap.py`,
+`results/caption_text_cap_tune.json`). The cap stays 40; stage 2 was not run.** The +text40 rows rebuilt from cache
+matched the cached `+text` rows 120 of 120 in both slots. Tune keyword recall, both slots identical in the differences:
+
+| | default | `deep` | vs 40 (CI) | images better / worse | absent named |
+|---|---|---|---|---|---|
+| +text40 | 61.5% | 70.7% | | | 0 / 1 |
+| +text60 | 62.2% | 71.4% | +0.7 (0.0 to 1.6) | 3 / 0 | 0 / 1 |
+| +text80 | 62.4% | 71.6% | +0.9 (0.2 to 1.8) | 4 / 0 | 0 / 1 |
+
+60 gains 0.7 points against the 1.0 step, and its CI touches 0. Words added: median 0, 90th percentile 20 (60) and 40
+(80). Report-only, phase 11 key phrases (1,569): 59.2% → **63.5%** (60) → **67.3%** (80), against `ocr`'s 74.9%.
+
+Why the two disagree: the tune split's 447 keyword groups are mostly *not* text written in the image, so a longer
+verbatim line moves 3–4 of 120 images. The tune metric was the wrong instrument for a text-only change, and that
+was knowable before the run. It is recorded as a failure rather than re-scored, because swapping the metric after
+seeing it would be choosing the test to fit the result. A decision on the cap needs either a key-phrase set the
+phase 11 count did not come from (a fresh text-heavy round), or the user's call that verbatim text needs no
+recall gate beyond CHAIR and length.
+
+**Stage 1b: the cap on a fresh text-heavy set (user chose this, 2026-10-17).** VisionBench round 18
+(`worker_handoff/ROUND18_PLAN.md`): 150 images, 30 each of screenshots, documents, charts, game UI and signage, each
+with about 50+ words of text, transcribed with round 4's key-phrase rules by the Gemini worker (native vision, no
+tools), blind-checked by the user on a sample. Rules, fixed before the images exist:
+
+- **Run once:** the server's `caption` (default and `deep`) and `ocr(detail=true)` on every kept image, shipped code.
+  Each variant is the caption's prose (its `Visible text` line stripped) plus a line rebuilt from that `ocr` reply:
+  raster at 40, 60, 80 words, and titles-first (stage 2's rule above) at the picked cap. The rebuilt 40-word line
+  must equal the server's own on every image, or the run stops. About 2.5 CPU hours.
+- **Metric:** key-phrase recall (`run_visionbench.phrase_found`) on the whole caption, 5,000-sample image bootstrap.
+- **Pick the cap:** the largest cap that beats the next smaller one by >= 2.0 points in the default slot, with its
+  95% CI against 40 above 0, `deep`'s difference against 40 not below 0, and `absent_object_named` not higher in
+  either slot. If 60 fails, the cap stays 40.
+- **Titles first:** only at a picked cap; ships if it beats raster at that cap by >= 1.0 point in the default slot,
+  CI above 0, and is not lower in `deep`.
+- **Then:** COCO CHAIR with the text line at the chosen settings (CHAIR-i and CHAIR-s not more than +1.0), the
+  round 11 holdout once (key-phrase and keyword recall, reported), unit tests, and the docstring figures.
+
+**Stage 1b result (2026-10-18; VisionBench `benchmarks/results/caption_text_cap_r18.json`): the cap passes at 80;
+titles-first fails.** 136 images (30 per kind, game UI 16), 718 key phrases; the rebuilt 40-word line matched the
+server's on 272 of 272 captions. The run crashed once at image 26 on a RapidOCR bug (a 2048x11 zone crop rounds to
+a 0-high detector input), fixed in FusionVisionMCP `bef7be5` (such a crop reads as no text; only images that used to
+crash change) and resumed.
+
+| Key-phrase recall | 40 | 60 | 80 | 80 vs 40 (95% CI) | images better / worse |
+| --- | --- | --- | --- | --- | --- |
+| default | 46.8 | 52.9 | 57.5 | +10.7 (8.4 to 13.1) | 58 / 0 |
+| `deep` | 53.9 | 59.3 | 63.6 | +9.7 (7.6 to 12.0) | 55 / 0 |
+
+- 60 beats 40 by 6.1 and 80 beats 60 by 4.6 (both >= 2.0); `absent_object_named` 0 in every variant. OCR alone
+  finds 76.3% of the phrases, so 80 words still leaves about 19 points of read text out of the default caption.
+- The 80-word line adds a median 40 words to captions of text-heavy images (p90 41). Median seconds 14.3 / 40.3.
+- Per kind at 80 in `deep`: screenshots 55.5, charts 73.4, documents 50.8, game UI 80.0, signage 68.7.
+- **Titles first at 80: not shipped.** +0.4 (CI -1.4 to 2.2) default, +0.1 `deep`; the rule needed >= 1.0, CI above 0.
+- The user's spot-check of the labels: 105 of 105 phrases right on 20 images, no absent object present.
+- **Guards (2026-10-18, user's go; VisionBench `caption_text_cap_guards.py` `4514a2d`, rules in its docstring
+  committed before running).** A longer line only appends words, so both checks need only the `ocr` text.
+  - COCO CHAIR, 300 images, cached captions plus the line: identical at 40 and 80 in both slots (default CHAIR-i
+    12.3 / CHAIR-s 23.7, `deep` 17.1 / 30.3; no line 12.2 / 23.3 and 17.1 / 30.3). Weak: only 2 photos have over
+    40 words of text.
+  - Round 11 holdout, 235 images, the line alone: key phrases 48.2 -> 54.9% (+6.6, CI 4.4 to 9.2; 31 images
+    better), caption keywords 18.5 -> 21.0% (+2.5, CI 1.4 to 3.7); the 80-word line names the absent object on no
+    image where the 40-word one doesn't. The full caption run (~4 h) could not have changed the decision, so it was
+    not run.
+- **Shipped:** `CAPTION_TEXT_WORDS` 40 -> 80, with the `read_text` description, `caption` docstring, CLAUDE.md and
+  a unit test pinning the default.
 
 **c. Object list from `<DENSE_REGION_CAPTION>`** (only if a frees ≥ 4 s, or only in the `deep` slot). Dense
 regions score 74% box recall (phase 7), and small objects are a known miss (21% named in the crop pilot). Add
@@ -501,3 +597,4 @@ C4-0: ~2 CPU hours (two greedy tune runs; b and b2 reuse cached output) plus a w
 and scripts, local GPU hours per run (see C4-4, Compute), then the usual tune/confirm/holdout CPU runs.
 
 Suggested order, cheapest decisive check first: C4-0 (a, b, b2) → C4-1 → C4-3b gate 1 → C4-2a → the rest.
+Updated 2026-10-17 (C4-0 and C4-1 done): C4-2b stage 1 (cached, no model run) → C4-3b gate 1 → C4-2a → the rest.

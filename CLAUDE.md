@@ -164,13 +164,23 @@ the one remaining place Florence-2 reads text.
 
 **2026-10-10: the caption now carries the `ocr` engine's text (`read_text`, on by default).** The captioners
 paraphrase text and cannot read most of it, so `caption` runs `ocr_pages` and ends the caption with
-`Visible text: "..."` (verbatim, reading order, ` / ` between lines, 40 words at most; `CAPTION_TEXT_WORDS`). A
+`Visible text: "..."` (verbatim, reading order, ` / ` between lines, 80 words at most since 2026-10-18; `CAPTION_TEXT_WORDS`). A
 text-free image gets no line, so its caption is unchanged. On VisionBench's 280 held-out images (variants fixed
 before running, `caption_text_grounding.py`): default 53.3% -> 60.9% of key facts, `deep` 61.5% -> 66.3%, no image
 worse, and none of the absent objects named came from the text. The line is appended *after* any `verify_text`
 work, so `verify_text` checks only the prose's own quotes. Two things lost on the tune
 split and were not shipped: asking Moondream2 for the image type first (-9.2 points; its answers are a third the
 length of its long caption) and a language tag on the text (no recall gain, about 1 in 4 tags wrong).
+
+**2026-10-18: the line holds 80 words, not 40.** On phase 11 every key phrase the line dropped was cut by the cap,
+but the tune split could not decide it (its keyword groups are mostly not image text). VisionBench round 18 did: 136
+fresh text-heavy images (screenshots, documents, charts, game UI, signage; the Gemini worker's key phrases, 105 of 105
+right in the user's spot-check), rule fixed before they existed (`caption_text_cap_r18.py`). Key phrases 46.8 -> 57.5%
+at 80 words (+10.7, CI 8.4 to 13.1), `deep` 53.9 -> 63.6%, no image worse, no absent object named; 60 words gave
+about half that. The server's own line matched the rebuilt one on 272 of 272 captions. COCO CHAIR was unchanged (only
+2 of 300 photos have more than 40 words) and on round 11 the 80-word line added no absent object
+(`caption_text_cap_guards.py`). Putting titles and large lines first gained nothing (+0.4, CI -1.4 to 2.2). OCR alone
+finds 76% of round 18's phrases, so text is still left out of the caption on dense images.
 
 **2026-10-15: `caption(region=[x1, y1, x2, y2])` captions one part of the image.** The caller points; the tool
 crops (`images.crop_region`: the box widened 15% each side, at least 32 px, clipped), so the region gets the

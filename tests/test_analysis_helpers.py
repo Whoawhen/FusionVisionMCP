@@ -381,6 +381,11 @@ class TestVisibleTextLine:
         # The " / " separator counts toward the cut; a cut landing on it does not leave it dangling.
         assert visible_text_line("one two three\nfour five", max_words=4) == 'Visible text: "one two three".'
 
+    def test_default_cap_is_80_words(self) -> None:
+        """Raised from 40 on round 18's text-heavy images (C4-2b stage 1b)."""
+        line = visible_text_line(" ".join(f"w{i}" for i in range(100)))
+        assert line == 'Visible text: "' + " ".join(f"w{i}" for i in range(80)) + '".'
+
 
 class TestBusyBackground:
     """The yes/no is read from the start of Moondream2's answer; anything else is None."""
