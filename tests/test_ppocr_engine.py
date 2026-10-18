@@ -60,3 +60,12 @@ def test_detector_uses_the_photo_tuned_box_threshold() -> None:
     params = engine_params("en", "v6")
     assert params["Det.box_thresh"] == 0.4
     assert params["Rec.lang_type"] == "en" and params["Rec.ocr_version"] == "v6"
+
+
+def test_sliver_crop_reads_as_no_text() -> None:
+    """A 2048x11 zone rounds to a 0-high detector input; RapidOCR raised instead of reading nothing."""
+    from PIL import Image
+
+    from fusion_vision_mcp.ppocr_engine import PPOCREngine
+
+    assert PPOCREngine().readtext(Image.new("RGB", (2048, 11), "white")) == []

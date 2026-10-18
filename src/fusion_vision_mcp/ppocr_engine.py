@@ -41,8 +41,20 @@ class PPOCREngine:
         return "\n".join(region["text"] for region in self.readtext(image))
 
     def readtext(self, image: Image) -> list[dict[str, Any]]:
-        """Spans as `{text, confidence, box}`, box = [x1, y1, x2, y2] in image pixels."""
-        result = self._load()(np.array(image.convert("RGB")))
+        """Spans as `{text, confidence, box}`, box = [x1, y1, x2, y2] in image pixels.
+
+        RapidOCR rounds the detector's input to multiples of 32 and raises when a side
+        rounds to 0, which a sliver zone from `layout.reading_blocks` does (a 2048x11 top
+        strip of a round 18 screenshot crashed `caption`). Nothing that thin is legible,
+        so it reads as no text.
+        """
+        from rapidocr.utils.process_img import ResizeImgError
+
+        engine = self._load()
+        try:
+            result = engine(np.array(image.convert("RGB")))
+        except ResizeImgError:
+            return []
         return spans(result.boxes, result.txts, result.scores, self.min_confidence)
 
 
