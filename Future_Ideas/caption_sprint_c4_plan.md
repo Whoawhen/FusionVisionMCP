@@ -420,6 +420,29 @@ FusionVisionMCP's `.venv` (the editable install pulled torch into `.venv-gguf`),
 any `max_tokens` above 512 or a longer prompt moves Gemma over 45 s, since a cut-off caption already sits at ~43.6 s.
 Gate 2 on the tune split is about 120 x 45 s = 1.5 CPU hours for Gemma, plus the baseline if not cached.
 
+**Gate 2 result (2026-10-18, VisionBench `caption_c4_3b_gate2.py` `2694784`, rules from `c4_3b_gate2_handoff.md`,
+results `caption_c4_3b_gate2.json(l)`): fails at matched length. Gemma doesn't replace Moondream2 in `deep`, and
+C4-3b ends here.** Run by Opus 5.5 (the handoff named Sonnet 5.5) on a quiet machine, 17:06-18:27; a first start at
+13:10 ran under other load and its 3 rows were deleted before the restart.
+
+| 120 tune images, prose + 80-word text line | Gemma 3 4B | shipped `deep` | Difference (95% CI) |
+| --- | --- | --- | --- |
+| Keyword recall | 75.6% | 71.4% | +4.3 (0.7 to 8.1); 37 better, 22 worse |
+| At matched length | 69.1% | 71.4% | **-2.2 (-6.3 to 1.8)** |
+| Median prose words | 330.5 | 191 | |
+| Absent object named | 0 | 1 | |
+| Prose with a repeated 8-word span | 16 | 20 | |
+
+- Rule: recall CI above 0 passed; matched length (point above 0, CI low above -1.0) **failed**; absent, loops and
+  speed passed (median Gemma + OCR 42.2 s, p90 44.7 s). The raw gain is length: cut to the baseline's word count,
+  Gemma names fewer key facts.
+- 92 of 120 Gemma captions stopped at 512 tokens and lost their unfinished last sentence; `cut_loop` found no loop
+  in Gemma's and 14 in the baseline's.
+- Key phrases (report only, 90 images, 432 phrases): 71.3 vs 69.2%.
+- Memory (report only): Gemma resident 7.4 GB; with it loaded, 5.6 GB was available, and loading Florence-2 and
+  Moondream2 beside it fell under the 2 GB floor (probe stopped at 3.9 GB in). Shipping it beside the server's
+  models would not fit this machine's working memory as it stands.
+
 Run C4-3b before C4-3a's adapter runs: it targets the gap the scoreboard names, and its gate 1 is cheap.
 
 ## Sprint C4-4: train a caption LoRA for Florence-2-large (decision point; Opus 5.5 to design)
