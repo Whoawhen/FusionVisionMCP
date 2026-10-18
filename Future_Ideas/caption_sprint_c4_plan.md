@@ -227,6 +227,23 @@ only (no other task changes). Measure on tune: median seconds, recall, length-ma
 check as C4-0a; beam search is partly what keeps Florence-2's long captions from looping). Whatever time it saves
 is the budget for c. Time the 20-image smoke first: if 1 beam saves under 1 s median, stop there.
 
+**C4-2a result (2026-10-18; VisionBench `benchmarks/caption_c4_2a.py` `a1f8f4e`, rules from `c4_2a_handoff.md`,
+`results/caption_c4_2a.json`): fails on CHAIR-i. One beam does not ship, and C4-2c gets no budget from it.** The
+helper at 3 beams equalled `Florence2.caption` on 5 of 5 images, and its 3-beam captions equalled the cached
+`florence_detailed` rows 20 of 20, so step 2 used the cache. Both runs of each setting gave identical captions.
+- **Speed (smoke, 20 tune images, paired in one session): passes.** Median 10.14 s -> 6.37 s, saving **4.48 s**
+  (range -1.53 to 9.17; 19 of 20 faster). On the 300 COCO photos, 7.48 -> 4.08 s (seconds from different sessions).
+- **Tune (120, prose plus the 80-word text line): passes.** Keyword recall 62.4 -> 62.9% (+0.4, CI -1.8 to 2.5;
+  10 images better / 6 worse); matched length 62.6% (+0.2, CI -2.0 to 2.3); median prose words 122 -> 122.5;
+  `absent_object_named` 0 / 0; prose with a repeated 8-word span 0 / 0. Only 3 of 120 captions are identical.
+- **CHAIR (300 COCO): fails.** CHAIR-i 12.2 -> **13.6** (+1.4, limit +1.0); CHAIR-s 23.3 -> 24.3 (+1.0, holds);
+  object recall 71.8 -> 70.9; 84 hallucinated mentions vs 75, from 619 vs 617 named. The extras are spread
+  thin (dining table 10 -> 12, person 10 -> 11, sports ball 4 and keyboard 3 new to the top list), not one object.
+- Per the rule, C4-2a stops here; no 2-beam or other setting was tried.
+- Caveats, neither able to change the outcome: another session's pre-commit hook (its pytest loads models) ran
+  11:48-11:58 during the smoke's timing, so the smoke ran under some load; settings alternated per image, the
+  saving is 4.5x the 1.0 s bar, and the fail is CHAIR, not speed. Run by Opus 5.5, not the Sonnet 5.5 the handoff named.
+
 **b. The OCR line: a bigger word cap, then titles first** (rewritten 2026-10-17 from `docs/plans/Caption_Ideas.md`
 Track 1; Opus 5.5 fixed these rules, Sonnet 5.5 runs them). It applies to both slots, costs no time (`ocr_pages`
 already runs on every call and already returns the boxes), and works only on OCR output, so it carries over unchanged
