@@ -484,10 +484,13 @@ most photos: `product photograph` 45, `form` 20, `close-up photograph` 20, `land
 Limit +1.0 each; all four hold. What the CHAIR passing does not cover: `form` on 20 photos and `scatter plot` on 11 are
 wrong labels on ordinary photos, which CHAIR can't see; step 3 is where the labels are judged.
 
-**Step 3: waiting on the user.** 40 of the 107 shown tune images drawn (seed 20261018) into
-`benchmarks/results/caption_c4_5_review.json`; blind review page (image + label only) via
-`benchmarks\caption_c4_5_type.py review` on http://127.0.0.1:8774; `--tally` scores it. Passes at 32 of 40 right
-(partly = half). Step 4 (round 11 holdout, ~3 CPU hours on a quiet machine) waits for the result and the user's timing.
+**Step 3, the user's blind label check (2026-10-18): fails by half a point, 31.5 of 40 (needed 32).** 30 right, 3 partly,
+7 wrong, as the user marked them. Wrong: product photograph x2, children's illustration x2 (one on an AI-generated
+image), scanned document, website screenshot, fresco. Partly: portrait photograph x2, desktop software screenshot.
+The user called #10 (wrong), #11, #18 and #29 (partly) low confidence, arguable either way; the verdicts stand as
+marked, since re-scoring after seeing the total would be choosing the test to fit the result. For the record, the rule
+is a hard line and one of those four going the other way would have reached 32.0. Step 4 has not run; whether to run
+it anyway is the user's call. Tune labels agreed with kind 84.7%, the check scores 78.8%: both under the 90% C3 floor.
 
 ## Sprint C4-4: train a caption LoRA for Florence-2-large (decision point; Opus 5.5 to design)
 
