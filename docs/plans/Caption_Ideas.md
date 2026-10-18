@@ -1,6 +1,6 @@
 # Plan to Improve the Caption Tool / Function
 
-*Compiled: 2026-10-16*  
+*Compiled: 2026-10-16*
 *Context: Follows the scoreboard in `Future_Ideas/frontier_capability_gaps.md#L79-L103`, the diagnostics in `Future_Ideas/caption_sprint_c4_plan.md`, and VisionBench evaluations.*
 
 > **Status (2026-10-17):** reviewed against `Future_Ideas/caption_sprint_c4_plan.md`, which is where the work is

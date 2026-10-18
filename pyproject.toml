@@ -122,6 +122,7 @@ overrides = [
         "onnxruntime",
         "pypdfium2",
         "rapidocr",
+        "rapidocr.*",
         "transformers.*",
     ], ignore_missing_imports = true },
 ]
