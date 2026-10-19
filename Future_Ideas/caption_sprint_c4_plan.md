@@ -492,6 +492,29 @@ marked, since re-scoring after seeing the total would be choosing the test to fi
 is a hard line and one of those four going the other way would have reached 32.0. Step 4 has not run; whether to run
 it anyway is the user's call. Tune labels agreed with kind 84.7%, the check scores 78.8%: both under the 90% C3 floor.
 
+**C4-5b, the fresh label check (2026-10-18/19): neither list passes, so C4-5 ends and the image-type line is not
+shipped.** Design: [c4_5b_label_check_design.md](c4_5b_label_check_design.md) (rubric, v2 list, 85% score / 10% wrong /
+10% wrong on photos, all fixed before the images existed). Script VisionBench `caption_c4_5b.py` (`13d6fc6`, lists
+committed before any label was computed); labels and deck `38fdd5c`. 120 round 19 images (first N ok per kind), CLIP at
+0.3, one shuffled deck of 107 cards (54 shared by both lists), graded by the user blind; results in
+`benchmarks/results/caption_c4_5b_tally.json`.
+
+| | Cards | Right / partly / wrong | Score | Wrong | Wrong on photos |
+| --- | --- | --- | --- | --- | --- |
+| v1 (64 labels) | 93 | 63 / 4 / 26 | 69.9% | 28.0% | 10 of 22 (45%) |
+| v2 (photo labels silent) | 68 | 51 / 4 / 13 | 77.9% | 19.1% | 4 of 5 (80%) |
+
+All three rules fail for both lists. Paired v2 minus v1 over the 67 images both showed: +1.5 points, CI -6.0 to +9.0
+(no difference). Coverage: v1 shows a line on 93 of 120 images, v2 on 68 (photos 22 vs 5 of 36). By kind both lists do
+well on signage (100%), app screenshots (90%), charts (94%) and game UI (85-94%), and badly where the labels are
+subjective: v1 scores artwork 50%, illustrations 31%, AI-generated 25%, photos 55%; v2 56%, 56%, 67%, 20%. Silencing
+the photo labels removed most of the photo cards but not the wrong ones (4 of the 5 left were wrong), and v2's silent
+labels were the top label on 26 of 36 photos and 10 of 84 non-photos. `children's illustration` (8 cards in v1),
+`desktop software screenshot` (9, both lists) and `scanned document` (5) were the commonest labels. The deck had
+fewer cards than the design's 150-200 guess because both lists abstain often. No CHAIR run, no holdout step 4: the
+rules end the line here. Whether a narrower list (only the kinds that scored 85%+: signage, screenshots, charts, game
+UI) is worth a new design is the user's call; it would need its own fresh images, since these now informed it.
+
 ## Sprint C4-4: train a caption LoRA for Florence-2-large (decision point; Opus 5.5 to design)
 
 This is the "fine-tunes" step that the "good" section reserves for when progress stalls. **It needs the user's go-ahead.**
