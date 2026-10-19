@@ -529,6 +529,15 @@ Not shipped from round 19 directly: the five kinds were chosen after seeing it, 
 is unmeasured. Cost: a worker round (~2 h), one grading sitting, ~1.5 CPU hours of captions. The hint can't move the
 current scoreboard (phase 11 scores the default caption's text); only a hint-following metric would show it.
 
+## C4-7: the text-line clean-up (designed 2026-10-19; waits on round 20)
+
+Rules in [c4_7_text_line_design.md](c4_7_text_line_design.md): drop repeated and one-character OCR lines, cap at 160
+words (the user's choice, counted in words), and end a cut line with `(N more words not shown; ocr returns the full
+text)`. Exploration on round 18's cache: cleaning alone 57.5 -> 59.6% at 80 words; cleaned at 120, 66.7%. Lines the
+prose already contains stay in the line (it is the verified text). Decided on round 20, a fresh text-heavy worker round
+(`VisionBench/worker_handoff/ROUND20_PLAN.md`): default +3.0 points with CI above 0, `deep` not lower, absent objects not
+higher; then CHAIR, the round 11 check, tests and docs.
+
 ## Sprint C4-4: train a caption LoRA for Florence-2-large (decision point; Opus 5.5 to design)
 
 This is the "fine-tunes" step that the "good" section reserves for when progress stalls. **It needs the user's go-ahead.**
