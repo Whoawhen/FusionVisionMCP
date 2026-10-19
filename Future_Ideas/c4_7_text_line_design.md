@@ -42,6 +42,13 @@ an `absent_object`. Test set: the first 30 kept per kind in manifest order (fewe
 spot-checks 20 random images' key phrases before any tool runs on the set (as round 18's
 `round18_label_check_serve.py` did); if fewer than 90% of the checked phrases are right, stop and report.
 
+**Amended 2026-10-19, after labelling and before any tool ran on round 20.** The worker excluded 54 of 178 images
+for under 30 legible words, leaving 124 (app and web 29, documents 28, charts 22, game UI 16, signage 29). The
+variants, metric and rule are unchanged. If the user tops it up (round 20b, `ROUND20B_PLAN.md`), the new images come
+after round 20's in the manifest, so the test set is still the first 30 kept per kind. The 20-image spot check drawn
+from the 124 stands, and about 4 of the top-up images are added to it, drawn the same way. Without a top-up, the
+test runs on the 124.
+
 ## Run and metric
 
 - Run once, shipped code, as `caption_text_cap_r18.py run` does: `caption` (default and `deep`) and `ocr(detail=true)`
