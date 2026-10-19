@@ -515,6 +515,20 @@ fewer cards than the design's 150-200 guess because both lists abstain often. No
 rules end the line here. Whether a narrower list (only the kinds that scored 85%+: signage, screenshots, charts, game
 UI) is worth a new design is the user's call; it would need its own fresh images, since these now informed it.
 
+## C4-6: the narrow-type check (named 2026-10-19; design not yet written)
+
+The user wants to pursue the narrower list. On round 19, CLIP labelled the default caption's weak kinds well (game UI
+85%, signage 100%, charts 94%, documents 86%, app screenshots 90%; 7-12 cards each) and the others badly (photos 55%,
+artwork 50%, illustrations 31%, AI images 25%). The same five kinds are where `deep` beats the default. C4-6 tests
+both uses of one narrowed list (labels for those five kinds; everything else silent) on a fresh worker round:
+1. **Type line:** label accuracy on the five kinds, and how often a label fires wrongly on photos, artwork and
+   illustrations (the set leans on those, since that is the failure that sank v2).
+2. **`suggest_deep` hint:** when it fires, does `deep` name more key facts than the default on those images?
+
+Not shipped from round 19 directly: the five kinds were chosen after seeing it, and the false-fire rate on other kinds
+is unmeasured. Cost: a worker round (~2 h), one grading sitting, ~1.5 CPU hours of captions. The hint can't move the
+current scoreboard (phase 11 scores the default caption's text); only a hint-following metric would show it.
+
 ## Sprint C4-4: train a caption LoRA for Florence-2-large (decision point; Opus 5.5 to design)
 
 This is the "fine-tunes" step that the "good" section reserves for when progress stalls. **It needs the user's go-ahead.**
