@@ -1,5 +1,9 @@
 # C4-6: the narrow-type check (an `Image type:` line for five kinds, and a `suggest_deep` hint)
 
+> **Result (2026-10-20): FAILED at the label check; closed.** 75.9% score, 16.0% wrong, 9 wrong on other kinds
+> (needs 85% / 10% / 4); the caption run was skipped since it could change no decision. See the "C4-6 result" in
+> `caption_sprint_c4_plan.md`.
+
 **Designed by:** Opus 5.5, 2026-10-20, before round 21 exists. The list, threshold, rubric, metrics and rules below
 are fixed; whoever runs it doesn't change them. If one can't be followed, stop and report.
 **Runs:** the Gemini worker sources and labels round 21 (`VisionBench/worker_handoff/ROUND21_PLAN.md`); the reviewer

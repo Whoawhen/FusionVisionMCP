@@ -15,6 +15,8 @@
 > ordering, gained nothing (+0.4, CI −1.4 to 2.2). Phase 11 on 2026-10-19: key text phrases 59.2 → 67.3%, keywords
 > 61.1 → 62.4%. The next text-line step is C4-7 (cleaned 160-word line with a cut marker), waiting on round 20.
 >
+> **C4-6 (2026-10-20): failed the blind label check (75.9%, need 85%); the image-type idea is closed.**
+>
 > **C4-7 result (2026-10-20): shipped.** On round 20 (150 fresh text-heavy images, 30 per kind incl. 26 from the
 > round 20b top-up; the user's spot-check 144 of 144 phrases right) the cleaned 160-word line with a cut marker took
 > key phrases 48.1 → 60.0% (+11.9, CI 9.1 to 14.9) and `deep` 54.3 → 63.0% (+8.8, CI 6.4 to 11.2), no image worse,

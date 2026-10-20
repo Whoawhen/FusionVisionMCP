@@ -515,7 +515,20 @@ fewer cards than the design's 150-200 guess because both lists abstain often. No
 rules end the line here. Whether a narrower list (only the kinds that scored 85%+: signage, screenshots, charts, game
 UI) is worth a new design is the user's call; it would need its own fresh images, since these now informed it.
 
-## C4-6: the narrow-type check (named 2026-10-19; designed 2026-10-20, waits on round 21)
+## C4-6: the narrow-type check (named 2026-10-19; designed 2026-10-20; FAILED and closed 2026-10-20)
+
+**C4-6 result: the type line fails the label check; neither it nor the hint ships, and the image-type idea is closed.**
+Round 21: 194 test images (game UI came up 19 of 20), the user's keyword spot-check 74 of 75 groups right. The user's
+blind check of v3's 106 labels: 72 right, 17 partly, 17 wrong, score **75.9%** (need 85%), wrong **16.0%** (need
+<= 10%), wrong on the 95 other-kind images **9** (need <= 4). Even with every "partly" right it scores 84.0% with 16%
+wrong, so the partly calls can't change it. By kind: app screenshots 92.5%, documents 93.8%, signage 90.0% held up;
+charts 66.7% (maps and diagrams called `data table` or `line chart`), game UI 77.8% (games called desktop or mobile
+apps), and the silent kinds still drew labels (photos 4 wrong of 9 cards, AI images 4 of 6). The hint can ship only
+with the type line, so the ~3 h caption run was not done (it could change no decision); H1/H2 were never measured.
+Round 21's keyword groups were also more specific than round 4's (e.g. "birth certificate", "beer label"), so fewer
+could be hit by a one-word type, but the label check failed first. VisionBench `caption_c4_6.py`, results
+`caption_c4_6_deck.json` and the keyword check (`d5860e3`, `242f3f1`). Of the cheap, already-named caption ideas, none
+are left.
 
 Rules in [c4_6_narrow_type_design.md](c4_6_narrow_type_design.md): v2's list with only the five kinds' 33 labels
 printed, the hint tested alongside (user's call), decided on round 21 (`VisionBench/worker_handoff/ROUND21_PLAN.md`,
