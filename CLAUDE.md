@@ -476,6 +476,15 @@ depends on; sorting moved `possibly_more` 65.2 -> 64.1 and nothing else, and the
 12. Costs SAM 3's ~7 s on every photo count. The 0.3 was picked on sprint R's tune half by looking; changing it means
 a fresh set.
 
+**2026-10-20: on a generalist set the range is mostly a false alarm, not a crowd.** Phase 11 (2026-10-19) scored it
+right on only 60.0% of the 16.1% of counts where it showed. Its cached count rows explain why: of 747 exact counts, 675
+are single objects and only 13 are 4 or more, so at least 107 of the ~120 ranges shown were on 1-3 objects, where it
+appears because one model overcounted. Where Grounding DINO itself said 4+ (39 counts), the truth was under 4 in 38 (a
+planter as 5, a logo as 5, a pie chart as 4; many are JPEG screenshots and charts, which take the photo path). On the 13
+real crowds Grounding DINO was low 12 times and never high, gate K's pattern, too few to re-measure its 86%. The tool
+description now says its appearance does not mean a crowd. The exact non-crowd figure (about 55-60%) would need SAM 3
+re-run on phase 11's count images; it would not change the wording, so it was not run.
+
 **The honest negative result: the flower is not counted by anything here.** `tests/sample.jpg` — a paper flower
 with overlapping petals — returns 1 from *every* approach tried: Florence-2 grounding, Moondream's detect head,
 Grounding DINO (at every box threshold down to 0.10), the `count_lobes` outline measurement, SAM2 in

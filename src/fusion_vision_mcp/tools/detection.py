@@ -252,8 +252,13 @@ def register(mcp: MCPServer) -> None:
         them brackets the truth. It appears when either count is 4 or more. On 92
         fresh photos of 4-30 objects the true count lay inside it 85.9% of the time,
         against 65.2% for `possibly_more`'s range, and its typical width was 0.6 of
-        the count. Prefer it to `count` for a crowd. Running SAM 3 adds about 7 s to
-        every photo count. Absent if SAM 3 is unavailable.
+        the count. Prefer it to `count` for a crowd. Its appearing does not mean the
+        scene is a crowd: on a generalist set where 90% of counts were one object, it
+        showed on 16% of counts, nearly all of them 1-3 objects that one model
+        overcounted (often screenshots and charts), and held the truth only about
+        55-60% of the time. Use it when you expect many objects; when you expect one
+        or a few, read its appearance as a sign `count` may be too high. Running SAM 3
+        adds about 7 s to every photo count. Absent if SAM 3 is unavailable.
 
         Accuracy depends heavily on the scene. On synthetic shapes whose counts are
         exact by construction it is right on 9 of 10 cases (mean error 0.1) and
