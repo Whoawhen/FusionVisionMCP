@@ -515,7 +515,12 @@ fewer cards than the design's 150-200 guess because both lists abstain often. No
 rules end the line here. Whether a narrower list (only the kinds that scored 85%+: signage, screenshots, charts, game
 UI) is worth a new design is the user's call; it would need its own fresh images, since these now informed it.
 
-## C4-6: the narrow-type check (named 2026-10-19; design not yet written)
+## C4-6: the narrow-type check (named 2026-10-19; designed 2026-10-20, waits on round 21)
+
+Rules in [c4_6_narrow_type_design.md](c4_6_narrow_type_design.md): v2's list with only the five kinds' 33 labels
+printed, the hint tested alongside (user's call), decided on round 21 (`VisionBench/worker_handoff/ROUND21_PLAN.md`,
+195 fresh images, 95 of them other kinds). Since C4-7, `deep` gains about as much on every kind (held-out confirm:
++5.2 on the five, +3.8 elsewhere), so the hint must show its firing predicts a bigger gain (H2). The original stub:
 
 The user wants to pursue the narrower list. On round 19, CLIP labelled the default caption's weak kinds well (game UI
 85%, signage 100%, charts 94%, documents 86%, app screenshots 90%; 7-12 cards each) and the others badly (photos 55%,
