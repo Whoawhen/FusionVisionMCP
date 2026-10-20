@@ -110,7 +110,9 @@ def register(mcp: MCPServer) -> None:
                 description=(
                     "When true (the default), also read the image with the `ocr` engine and end the "
                     'caption with `Visible text: "..."`: the verbatim text in reading order, lines '
-                    "separated by ' / ', at most 80 words. The captioners cannot read app and game "
+                    "separated by ' / ', repeats and single characters dropped, at most 160 words; a "
+                    "longer text says how many words were left out (`ocr` returns them all). The "
+                    "captioners cannot read app and game "
                     "titles, document headings or labels; this gives them to the caption. An image "
                     "with no text gets no line, so its caption is unchanged. Adds about 1-2s per image. "
                     "Set false for the bare caption."
@@ -152,9 +154,11 @@ def register(mcp: MCPServer) -> None:
         game titles, document headings and labels the captioners cannot read;
         no image scored worse, and a text-free image gets no line at all. The
         quoted line is the reliable text; the prose before it is not. It holds
-        up to 80 words: on 136 text-heavy screenshots, documents, charts, game
-        UI and signs, 80 rather than 40 took key facts named from 46.8% to
-        57.5% (deep 53.9% to 63.6%), with no image worse.
+        up to 160 words, skips repeated and single-character lines, and when it
+        is cut says how many words it left out (call `ocr` for all of them): on
+        150 text-heavy screenshots, documents, charts, game UI and signs that
+        took key facts named from 48.1% to 60.0% against the earlier 80-word
+        line (deep 54.3% to 63.0%), with no image worse.
 
         Reach for a different tool when the question is narrower: `query_image`
         to ask something specific about the image, `dense_region_caption` to get

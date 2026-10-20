@@ -134,7 +134,11 @@ OCR_MIN_CONFIDENCE: Final[float] = 0.75
 #: before the images existed): on 136 fresh text-heavy images key phrases 46.8% -> 57.5%
 #: (default) and 53.9% -> 63.6% (`deep`), no image worse, no absent object named; COCO
 #: CHAIR unchanged and round 11's line +6.6 points with no absent object added.
-CAPTION_TEXT_WORDS: Final[int] = 80
+#: Raised 80 -> 160 on 2026-10-20 (C4-7, `caption_text_line_r20.py`, rule fixed before the
+#: images existed), together with the clean-up and cut marker in `visible_text_line`: on 150
+#: fresh text-heavy images key phrases 48.1% -> 60.0% (default, CI +9.1 to +14.9) and
+#: 54.3% -> 63.0% (`deep`), no image worse, no absent object added; COCO CHAIR unchanged.
+CAPTION_TEXT_WORDS: Final[int] = 160
 
 #: `caption(deep=true)` stops Moondream2's long caption once it loops: when LOOP_RUN consecutive
 #: LOOP_NGRAM-word spans all repeat earlier text, the caption is cut where that run began. The

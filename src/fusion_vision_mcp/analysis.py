@@ -737,16 +737,34 @@ def ocr_pages(app: AppContext, images: Sequence[Image]) -> list[dict[str, Any]]:
     return pages
 
 
+def _text_line_key(line: str) -> str:
+    return re.sub(r"\W+", " ", line.lower()).strip()
+
+
 def visible_text_line(text: str, max_words: int = CAPTION_TEXT_WORDS) -> str:
     """The `ocr` engine's text as one caption sentence, or "" for a text-free page.
 
-    Lines keep their reading order, joined with " / " and cut at `max_words` words, and
-    are quoted so a caller can tell verbatim text from the captioner's own words.
+    Lines keep their reading order, joined with " / " and cut at `max_words` words (each
+    separator counts as one), and are quoted so a caller can tell verbatim text from the
+    captioner's own words. A line is dropped if, lower-cased with punctuation as spaces, it
+    is under 2 characters or repeats an earlier line. A cut line says how many words it left
+    out, since `ocr` has them all.
     """
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    lines, seen = [], set()
+    for line in text.splitlines():
+        key = _text_line_key(line)
+        if len(key.replace(" ", "")) < 2 or key in seen:
+            continue
+        seen.add(key)
+        lines.append(line.strip())
     if not lines:
         return ""
-    return 'Visible text: "' + " ".join(" / ".join(lines).split()[:max_words]).rstrip(" /") + '".'
+    words = " / ".join(lines).split()
+    shown = " ".join(words[:max_words]).rstrip(" /")
+    cut = sum(word != "/" for word in words[max_words:])
+    if cut:
+        return f'Visible text: "{shown}…" ({cut} more words not shown; ocr returns the full text).'
+    return f'Visible text: "{shown}".'
 
 
 def _dispatch(app: AppContext, operation: str, images: list[Image], *, question: str, object_name: str) -> Any:

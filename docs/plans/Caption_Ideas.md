@@ -14,6 +14,14 @@
 > **Status (2026-10-19):** Track 1 stage 1 shipped as the 80-word line (C4-2b, 2026-10-18); stage 2, title-first
 > ordering, gained nothing (+0.4, CI −1.4 to 2.2). Phase 11 on 2026-10-19: key text phrases 59.2 → 67.3%, keywords
 > 61.1 → 62.4%. The next text-line step is C4-7 (cleaned 160-word line with a cut marker), waiting on round 20.
+>
+> **C4-7 result (2026-10-20): shipped.** On round 20 (150 fresh text-heavy images, 30 per kind incl. 26 from the
+> round 20b top-up; the user's spot-check 144 of 144 phrases right) the cleaned 160-word line with a cut marker took
+> key phrases 48.1 → 60.0% (+11.9, CI 9.1 to 14.9) and `deep` 54.3 → 63.0% (+8.8, CI 6.4 to 11.2), no image worse,
+> absent objects named unchanged (0 / 1). Report-only: clean at 80 +2.4, raw 160 +10.8, clean uncapped +19.3 (67.4%).
+> COCO CHAIR exactly unchanged in both slots; round 11 no new absent object (its key phrases 54.9 → 65.0%). Results
+> in VisionBench `benchmarks/results/caption_text_line_r20*.json`; phase 11's scoreboard figure moves at the next
+> caption rerun.
 
 ---
 

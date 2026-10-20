@@ -164,7 +164,8 @@ the one remaining place Florence-2 reads text.
 
 **2026-10-10: the caption now carries the `ocr` engine's text (`read_text`, on by default).** The captioners
 paraphrase text and cannot read most of it, so `caption` runs `ocr_pages` and ends the caption with
-`Visible text: "..."` (verbatim, reading order, ` / ` between lines, 80 words at most since 2026-10-18; `CAPTION_TEXT_WORDS`). A
+`Visible text: "..."` (verbatim, reading order, ` / ` between lines, 160 words at most since 2026-10-20, with
+repeated and single-character lines dropped and a cut marked; `CAPTION_TEXT_WORDS`). A
 text-free image gets no line, so its caption is unchanged. On VisionBench's 280 held-out images (variants fixed
 before running, `caption_text_grounding.py`): default 53.3% -> 60.9% of key facts, `deep` 61.5% -> 66.3%, no image
 worse, and none of the absent objects named came from the text. The line is appended *after* any `verify_text`
@@ -181,6 +182,18 @@ about half that. The server's own line matched the rebuilt one on 272 of 272 cap
 2 of 300 photos have more than 40 words) and on round 11 the 80-word line added no absent object
 (`caption_text_cap_guards.py`). Putting titles and large lines first gained nothing (+0.4, CI -1.4 to 2.2). OCR alone
 finds 76% of round 18's phrases, so text is still left out of the caption on dense images.
+
+**2026-10-20: the line is cleaned, holds 160 words, and says when it is cut (C4-7).** `visible_text_line` drops a line
+that, lower-cased with punctuation as spaces, is under 2 characters or repeats an earlier one, caps at 160 words, and
+a cut line ends `…" (N more words not shown; ocr returns the full text).` Lines the prose already contains are
+*kept*: the quoted line is the verified text and the prose is not. Decided on VisionBench round 20 (150 fresh
+text-heavy images, 30 per kind; 144 of 144 key phrases right in the user's spot-check), rule fixed before the
+images existed (`Future_Ideas/c4_7_text_line_design.md`, `caption_text_line_r20.py`): key phrases 48.1 -> 60.0%
+(+11.9, CI 9.1 to 14.9), `deep` 54.3 -> 63.0% (+8.8, CI 6.4 to 11.2), no image worse, absent objects named
+unchanged; the marker shows on 56 of 150. Most of it is the length (raw 160 words: +10.8; cleaning at 80: +2.4).
+COCO CHAIR exactly unchanged in both slots and round 11 gained no absent object (`caption_text_line_r20_guards.py`).
+The server's line equals the measured candidate on 150 of 150 round 20 pages and 535 of 535 cached guard texts.
+Uncapped, the cleaned line would reach 67.4% (lines up to ~400 words), so dense pages still lose text.
 
 **2026-10-15: `caption(region=[x1, y1, x2, y2])` captions one part of the image.** The caller points; the tool
 crops (`images.crop_region`: the box widened 15% each side, at least 32 px, clipped), so the region gets the

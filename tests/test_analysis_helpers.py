@@ -376,15 +376,36 @@ class TestVisibleTextLine:
             == 'Visible text: "OpenTTD 14.1 / New Game / Load Game".'
         )
 
-    def test_cut_at_max_words(self) -> None:
-        assert visible_text_line("one two three\nfour five", max_words=5) == 'Visible text: "one two three / four".'
-        # The " / " separator counts toward the cut; a cut landing on it does not leave it dangling.
-        assert visible_text_line("one two three\nfour five", max_words=4) == 'Visible text: "one two three".'
+    def test_cut_at_max_words_says_how_many_words_were_left_out(self) -> None:
+        assert (
+            visible_text_line("one two three\nfour five", max_words=5)
+            == 'Visible text: "one two three / four…" (1 more words not shown; ocr returns the full text).'
+        )
+        # The " / " separator counts toward the cut but not in the words left out, and a cut landing on it does
+        # not leave it dangling.
+        assert (
+            visible_text_line("one two three\nfour five", max_words=4)
+            == 'Visible text: "one two three…" (2 more words not shown; ocr returns the full text).'
+        )
 
-    def test_default_cap_is_80_words(self) -> None:
-        """Raised from 40 on round 18's text-heavy images (C4-2b stage 1b)."""
-        line = visible_text_line(" ".join(f"w{i}" for i in range(100)))
-        assert line == 'Visible text: "' + " ".join(f"w{i}" for i in range(80)) + '".'
+    def test_uncut_line_has_no_marker(self) -> None:
+        assert visible_text_line("one two\nthree", max_words=4) == 'Visible text: "one two / three".'
+
+    def test_repeated_and_single_character_lines_are_dropped(self) -> None:
+        """C4-7: a repeat is judged lower-cased with punctuation as spaces; the first copy is kept as read."""
+        text = "Save Game\nX\n|\n  \nSAVE GAME!\nLoad Game\n-- 7 --\nOK\nLoad  game"
+        assert visible_text_line(text) == 'Visible text: "Save Game / Load Game / OK".'
+
+    def test_only_dropped_lines_gets_no_line(self) -> None:
+        assert visible_text_line("X\n|\n•") == ""
+
+    def test_default_cap_is_160_words(self) -> None:
+        """Raised from 40 to 80 on round 18 (C4-2b stage 1b), then to 160 with the marker on round 20 (C4-7)."""
+        line = visible_text_line(" ".join(f"w{i}" for i in range(200)))
+        assert line == (
+            'Visible text: "' + " ".join(f"w{i}" for i in range(160)) + '…" '
+            "(40 more words not shown; ocr returns the full text)."
+        )
 
 
 class TestBusyBackground:
