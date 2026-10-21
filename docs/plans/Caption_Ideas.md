@@ -13,7 +13,8 @@
 >
 > **Status (2026-10-19):** Track 1 stage 1 shipped as the 80-word line (C4-2b, 2026-10-18); stage 2, title-first
 > ordering, gained nothing (+0.4, CI −1.4 to 2.2). Phase 11 on 2026-10-19: key text phrases 59.2 → 67.3%, keywords
-> 61.1 → 62.4%. The next text-line step is C4-7 (cleaned 160-word line with a cut marker), waiting on round 20.
+> 61.1 → 62.4%. C4-7 (cleaned 160-word line with a cut marker) shipped 2026-10-20; phase 11 on 2026-10-21: keywords 63.1%,
+> key text phrases 75.2%.
 >
 > **C4-6 (2026-10-20): failed the blind label check (75.9%, need 85%); the image-type idea is closed.**
 >
@@ -31,9 +32,9 @@
 
 | Metric / Slot | Current Score | Frontier Ceiling | Gap | Latency (Budget) | Key Bottleneck Identified in Data |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`caption` (default)**<br>`Florence-2-large` + `read_text` | **60.9%** (280 confirm)<br>**62.4%** (400 Phase 11, 2026-10-19; 61.1% at 40 words) | ~75% (**L**) | **🔻 −13 pts** | 13.1 s (≤ 15 s;<br>**1.9 s left**) | Photos (79%) & artwork (76%) are at par. Weak on **AI images (48%)**, **illustrations (51%)**, **game UI (54%)**, **charts (57%)**, **documents (61%)**, **app/web (64%)**. |
+| **`caption` (default)**<br>`Florence-2-large` + `read_text` | **60.9%** (280 confirm)<br>**63.1%** (400 Phase 11, 2026-10-21, 160-word line; 62.4% at 80, 61.1% at 40) | ~75% (**L**) | **🔻 −12 pts** | 13.1 s (≤ 15 s;<br>**1.9 s left**) | Photos (79%) & artwork (76%) are at par. Weak on **AI images (48%)**, **illustrations (51%)**, **game UI (54%)**, **charts (57%)**, **documents (61%)**, **app/web (64%)**. |
 | **`caption(deep=true)`**<br>`Moondream2` long + `read_text` | **66.3%** (280 confirm) | ~75% (**L**) | **🔻 −9 pts** | 35.8 s (≤ 45 s;<br>**~9 s left**) | `C4-0d` loop stopper fixed the ~7% runaway tail (57.3 s → 40.7 s). Remaining misses are image genre/type (27/111), object/HUD detail (34/111), and concept/theme (13/111). |
-| **`caption` Key Text Phrases**<br>(`caption_text_recheck.py`) | **67.3%** in `caption` (80 words, phase 11 2026-10-19; 59.2% at 40)<br>vs **74.9%** in `ocr` | ~60–75% (**E**) | **≈ / 🔻 −1 to −16 pts** | Included in above | **48% of all text misses (307 of 640 phrases) were already read verbatim by `ocr_pages` during the `caption` call**, but discarded by `visible_text_line`'s raster order + 40-word cap (`screenshots`: 88.8% in `ocr` → 53.2% in `caption`; `charts`: 87.2% → 68.4%; `documents`: 64.7% → 52.6%). |
+| **`caption` Key Text Phrases**<br>(`caption_text_recheck.py`) | **75.2%** in `caption` (160 words, phase 11 2026-10-21; 67.3% at 80, 59.2% at 40)<br>vs **74.9%** in `ocr` | ~60–75% (**E**) | **≈ / 🔻 −1 to −16 pts** | Included in above | **48% of all text misses (307 of 640 phrases) were already read verbatim by `ocr_pages` during the `caption` call**, but discarded by `visible_text_line`'s raster order + 40-word cap (`screenshots`: 88.8% in `ocr` → 53.2% in `caption`; `charts`: 87.2% → 68.4%; `documents`: 64.7% → 52.6%). |
 | **`caption(region=...)`** | **80.3%** vs 67.8% whole-image | — | **✅ Shipped** | Same | Shipped 2026-10-15 (Gate R, +12.5 pts on 528 region questions). |
 
 ### What Is Already Settled (Will Not Be Repeated)
