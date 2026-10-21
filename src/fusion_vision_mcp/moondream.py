@@ -1,3 +1,5 @@
+import sys
+from collections.abc import Callable
 from typing import Any
 
 import torch
@@ -10,6 +12,61 @@ from .repetition import cut_loop, loop_start
 
 #: Tokens between loop checks while streaming a caption; a check rescans the text so far.
 _LOOP_CHECK_EVERY = 16
+
+
+class _SlicedCache:
+    """Stands in for one block's `KVCache` during a single-token decode step: writes the new key and
+    value as the real cache does, then returns only the filled `:n` prefix instead of all 2,048 slots."""
+
+    def __init__(self, cache: Any, n: int) -> None:
+        self.cache, self.n = cache, n
+
+    def update(self, pos_ids: torch.Tensor, k: torch.Tensor, v: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        kout, vout = self.cache.update(pos_ids, k, v)
+        return kout[:, :, : self.n, :], vout[:, :, : self.n, :]
+
+
+def sliced_decode_attn(attn: Callable[..., torch.Tensor]) -> Callable[..., torch.Tensor]:
+    """Wrap the pinned Moondream2's `text.attn` so a one-token decode step attends over the filled cache only.
+
+    Upstream hands SDPA the whole 2,048-slot cache and a boolean mask that is true on `0..pos` and false after
+    it, on every generated token in all 24 layers. Slicing keys, values and the mask to `:pos+1` attends over
+    the same keys without reading the empty slots. Any step whose mask is not false past `pos` (prefill, or a
+    caller's own mask) runs unchanged.
+
+    The mask is kept on purpose: dropping it moves CPU SDPA to another kernel whose bf16 rounding changed
+    every one of 20 greedy captions (VisionBench `caption_1c_a.py`, 2026-10-21); with it, they match.
+    """
+
+    def wrapped(
+        x: torch.Tensor,
+        w: Any,
+        freqs_cis: torch.Tensor,
+        kv_cache: Any,
+        attn_mask: torch.Tensor,
+        n_heads: int,
+        n_kv_heads: int,
+        position_ids: torch.Tensor,
+        lora: dict | None,
+    ) -> torch.Tensor:
+        if kv_cache is not None and x.shape[1] == 1 and attn_mask is not None and position_ids.numel() == 1:
+            n = int(position_ids[0]) + 1
+            if not bool(attn_mask[..., n:].any()):
+                kv_cache, attn_mask = _SlicedCache(kv_cache, n), attn_mask[..., :n]
+        return attn(x, w, freqs_cis, kv_cache, attn_mask, n_heads, n_kv_heads, position_ids, lora)
+
+    wrapped.__wrapped__ = attn  # type: ignore[attr-defined]
+    return wrapped
+
+
+def _slice_decode_kv(model: Any) -> None:
+    """Install `sliced_decode_attn` in the loaded remote code's `text` module, once.
+
+    Only for the pinned revision: the patch depends on that code's `attn` signature and decode mask.
+    """
+    text = sys.modules.get(type(model).__module__.rsplit(".", 1)[0] + ".text")
+    if text is not None and not hasattr(text.attn, "__wrapped__"):
+        text.attn = sliced_decode_attn(text.attn)
 
 
 class Moondream:
@@ -50,6 +107,8 @@ class Moondream:
             # and names "eager" as the supported alternative. Verified against 4.57.6.
             attn_implementation="eager",
         ).to(self.device)  # type: ignore[arg-type]
+        if revision == DEFAULT_MOONDREAM_REVISION:
+            _slice_decode_kv(self.model)
 
     def query(self, images: list[Image], question: str) -> list[str]:
         res = []

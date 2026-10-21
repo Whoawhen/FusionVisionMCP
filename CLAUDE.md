@@ -213,6 +213,14 @@ unstopped call: median 57.3 -> 40.7 s, 9 loops -> 0. Greedy decoding was tried f
 and is *not* shipped: a tie on recall and speed, but it failed the loop guard fixed before the run. Seconds measured
 in different sessions are not comparable here: the same captioner measured 39.3 s one day and 32.1 s the next.
 
+**2026-10-21: Moondream2's decode step reads only the filled KV cache (plan step 1C-a).** The pinned code hands
+SDPA all 2,048 cache slots and a boolean mask on every generated token; `moondream.sliced_decode_attn` (installed
+into the remote `text` module, pinned revision only) slices keys, values *and the mask* to `:pos+1`. VisionBench
+`caption_1c_a.py`, 20 tune images, greedy, arms alternated: **20 of 20 captions token-identical**, median caption
+14.8 -> 10.3 s, 0.077 -> 0.055 s per token. **Keep the mask.** Dropping it as well (the plan's first form) was faster
+(-7.2 s) but changed all 20 captions: CPU SDPA then takes another kernel with different bf16 rounding, 5 of the 20
+diverging where the top two tokens were 0.5-2.5 logits apart. The unpatched path repeats exactly, so it is the kernel.
+
 ## `classify_image` is CLIP zero-shot over the caller's labels (2026-10-16)
 
 `classify_image(src, labels)` puts each label in `CLASSIFY_TEMPLATE` ("a photo of {}") and ranks them with
