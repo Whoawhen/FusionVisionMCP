@@ -138,8 +138,12 @@ The roughly 24 "vocabulary rigidity" misses are mismatches between the captioner
 | `critique_composition` subject box (Florence-2 boxes Moondream's named subject; DRC fallback) | `composition_box2`'s 120 fresh photos against the user-checked labels | IoU >= 0.5 hit rate >= -1.0 point (84.4% now) |
 | `dense_region_caption` | phase 7 box recall | >= -1.0 point (74% now) |
 | `detect_objects` flat fallback (only when SAM 3 cannot load) | gate F's 88 confirm images, Florence-2 arm | recall >= -1.0 point; absent object boxed not higher |
-| `caption(verify_text)` text regions (`<OCR_WITH_REGION>`) | the test suite's banner check plus 20 phase 14 rendered pages | banner exact; character accuracy >= -0.5 point |
+| `caption(verify_text)` text regions (`<OCR_WITH_REGION>`) | the banner (`FusionVisionMCP-Dark.jpg`) plus 20 phase 14 rendered pages (`florence_tasks_ab.py`'s seeded sample) | banner exact; lines found verbatim >= -0.5 point (amended before the run from "character accuracy": lines found is the measure `florence_tasks_ab.py` already defines) |
 | everything | the full test suite (`tests/test_server.py` loads the real models) | passes |
+
+**Result (2026-10-21, VisionBench `florence_bf16_global.py`): every consumer passed.** Count fixtures 8/8 controls and 0/10 exact positives in both precisions (see below); phase 11 flat counts 46.6% -> 46.6% (3 of 103 changed); consensus region-label count changed on 4 of 121, `separable` on 0. Subject box 84.4 -> 85.4% (1 fixed, 0 broken). Dense box recall 74.1 -> 74.1%. Flat detection recall 40.5 -> 40.5%, absent boxed 100 -> 100%, 8.5 -> 7.6 s/image. OCR with regions: banner exact in both; lines found 58.4 -> 58.3%.
+
+**Found on the way, not part of 1A-g: flat-image counts run one high.** Every count fixture routes to Florence-2 (flat), whose grounding head returns a box around the whole group besides the instances (`[1,0,510,510]` on eight separated petals); the envelope filter that removes it exists only on the Grounding DINO path. The live server confirms it (9 for 8, 3 for 2), so `count_objects`' "9 of 10 on synthetic shapes" predates flat routing and no longer holds. A fix (the same envelope filter on the Florence-2 count path) needs its own gate: the fixtures with all 8 controls, and phase 11's 103 flat counts.
 
 Then a phase 11 express run of the affected tools (`--tools caption,count_objects,critique_composition,dense_region_caption --reuse <base>`) gives the scoreboard rows, reported under both scorers.
 

@@ -25,9 +25,11 @@ class Florence2:
 
     def __init__(self, model_id: str, device: str | None = None) -> None:
         self.device = resolve_device(device)
-        # Matches moondream/grounding_dino/sam2/aesthetic: half precision anywhere
-        # that is not CPU. Previously this was fp32 on CUDA too, costing 2x memory.
-        self.torch_dtype = torch.float32 if self.device == "cpu" else torch.float16
+        # Half precision everywhere: fp16 off CPU (fp32 on CUDA used to cost 2x memory), bf16 on CPU since
+        # 2026-10-21. VisionBench `caption_1a.py` (caption: -2.7 s median, tune +0.7, COCO CHAIR 12.1 / 22.3%)
+        # and `florence_bf16_global.py` (counts, subject box, dense regions, flat detection, OCR with regions,
+        # each within its rule of fp32) cleared it for every consumer.
+        self.torch_dtype = torch.bfloat16 if self.device == "cpu" else torch.float16
 
         self.model = Florence2ForConditionalGeneration.from_pretrained(
             model_id, dtype=self.torch_dtype, trust_remote_code=True, attn_implementation="sdpa"

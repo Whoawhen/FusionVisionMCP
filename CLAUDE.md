@@ -221,6 +221,14 @@ into the remote `text` module, pinned revision only) slices keys, values *and th
 (-7.2 s) but changed all 20 captions: CPU SDPA then takes another kernel with different bf16 rounding, 5 of the 20
 diverging where the top two tokens were 0.5-2.5 logits apart. The unpatched path repeats exactly, so it is the kernel.
 
+**2026-10-21: Florence-2 runs in bfloat16 on CPU, for every consumer (plan steps 1A and 1A-g).** Caption
+(`caption_1a.py`): median 9.4 -> 6.6 s paired, tune keywords 62.9 -> 63.5%, COCO CHAIR-i 12.2 -> 12.1%, CHAIR-s
+23.3 -> 22.3%; the captions are different text of the same quality (158 of 300 COCO unchanged). Every other consumer
+replayed its own measurement fp32 vs bf16 (`florence_bf16_global.py`): flat-image counts 46.6 -> 46.6% and all 8
+fixture controls, `critique_composition`'s subject box 84.4 -> 85.4%, dense box recall 74.1 -> 74.1%, flat detection
+recall 40.5 -> 40.5%, `<OCR_WITH_REGION>` lines 58.4 -> 58.3% with the banner exact. The transformers-5 parity
+figures above were fp32; anything re-measured against them now has to be re-measured in bf16.
+
 ## `classify_image` is CLIP zero-shot over the caller's labels (2026-10-16)
 
 `classify_image(src, labels)` puts each label in `CLASSIFY_TEMPLATE` ("a photo of {}") and ranks them with
