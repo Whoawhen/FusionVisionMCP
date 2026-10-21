@@ -268,3 +268,57 @@ class TestLocate:
         app = _StubApp()
         result = execute_detection(app, [_photo()], "mug", backend_preference="auto", locate=True)[0]
         assert result["detector"] == "grounding_dino"
+
+
+class TestFlorenceGroupBox:
+    """Florence-2 returns a box around the whole arrangement besides the instances; counting drops it."""
+
+    # Two separated instances plus the box enclosing both: the shape seen on two touching petals (3 for 2).
+    GROUP = [[10, 10, 60, 30], [10, 10, 30, 30], [40, 10, 60, 30]]
+
+    def test_counting_drops_the_group_box(self) -> None:
+        app = _StubApp(florence2=_RecordingFlorence2(self.GROUP))
+        result = execute_detection(app, [_clip_art()], "petal", backend_preference="florence2", drop_group_box=True)[0]
+        assert result["count"] == 2
+        assert result["bboxes"] == self.GROUP[1:]
+        assert len(result["points"]) == len(result["labels"]) == 2
+        assert result["group_boxes_dropped"] == 1
+
+    def test_locating_keeps_every_box(self) -> None:
+        app = _StubApp(florence2=_RecordingFlorence2(self.GROUP))
+        result = execute_detection(app, [_clip_art()], "petal", backend_preference="florence2")[0]
+        assert result["count"] == 3
+        assert result["group_boxes_dropped"] is None
+
+    def test_two_boxes_are_never_a_group(self) -> None:
+        app = _StubApp(florence2=_RecordingFlorence2([[0, 0, 50, 50], [10, 10, 20, 20]]))
+        result = execute_detection(app, [_clip_art()], "ring", backend_preference="florence2", drop_group_box=True)[0]
+        assert result["count"] == 2
+
+
+def test_count_objects_tool_asks_for_the_group_box_filter(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict = {}
+
+    def recording_policy(app, images, object_name, **kwargs):
+        seen.update(kwargs)
+        return [
+            {
+                "count": 2,
+                "bboxes": [[0, 0, 5, 5], [6, 6, 9, 9]],
+                "points": [],
+                "labels": [],
+                "scores": None,
+                "detector": "florence2",
+            }
+        ]
+
+    monkeypatch.setattr(detection_tools, "execute_detection", recording_policy)
+    server = _CapturingServer()
+    detection_tools.register(server)  # type: ignore[arg-type]
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "flat.png"
+        _clip_art().save(path)
+        server.tools["count_objects"](
+            _FakeContext(_StubApp()), str(path), "petal", verify_silhouette=False, consensus=False
+        )
+    assert seen["drop_group_box"] is True

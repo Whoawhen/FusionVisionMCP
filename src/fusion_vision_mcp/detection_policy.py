@@ -36,6 +36,7 @@ def execute_detection(
     adaptive_threshold: bool = True,
     locate: bool = False,
     candidates_floor: float | None = None,
+    drop_group_box: bool = False,
 ) -> list[dict[str, Any]]:
     """Shared detection execution.
 
@@ -45,6 +46,13 @@ def execute_detection(
 
     If `backend_preference` is `"auto"`, the backend is chosen dynamically via
     `choose_count_backend`, and `_routing` metadata is attached to the results.
+
+    `drop_group_box` (counting) removes, on the Florence-2 path, a box drawn around the whole arrangement
+    rather than one instance (`geometry.envelope_indices`, the rule Grounding DINO's path already applies).
+    Florence-2 returns one beside the instances, so flat-image counts ran one high (eight petals counted 9).
+    VisionBench `flat_count_envelope.py` (2026-10-21): fixture positives exact 0 -> 5 of 10 with all 8
+    controls held; phase 11 flat counts 46.6 -> 54.4% exact; fresh round 13 flat counts 47.6 -> 50.8%,
+    mean error 1.08 -> 0.84. It cannot tell nested shapes (concentric circles) from a group box.
     """
     image = images[0]
     exclude_full_frame = query_policy.is_generic_query(object_name)
@@ -76,18 +84,7 @@ def execute_detection(
         # on the query policy, fixing the bug where explicit clip_art=True
         # blindly dropped legitimate full-frame matches (like a close-up of wood).
         detected = app.florence2.detect_objects(images, object_name, exclude_full_frame=exclude_full_frame)
-        results = [
-            {
-                "count": len(d.get("bboxes", [])),
-                "bboxes": d.get("bboxes", []),
-                "points": d.get("points", []),
-                "labels": d.get("labels", []),
-                "scores": None,
-                "group_boxes_dropped": None,
-                "detector": "florence2",
-            }
-            for d in detected
-        ]
+        results = [_florence_result(d, drop_group_box) for d in detected]
     else:
         results = _photo_detect(app, images, object_name, threshold, adaptive_threshold, locate, candidates_floor)
         if exclude_full_frame:
@@ -105,6 +102,28 @@ def execute_detection(
             r["_routing"] = {**routing_metadata, "backend": r.get("detector", routing_metadata["backend"])}
 
     return results
+
+
+def _florence_result(detected: dict[str, Any], drop_group_box: bool) -> dict[str, Any]:
+    """Florence-2 grounding output in the shared shape, its group box dropped when counting."""
+    bboxes, points, labels = detected.get("bboxes", []), detected.get("points", []), detected.get("labels", [])
+    dropped: int | None = None
+    if drop_group_box:
+        from fusion_vision_mcp.geometry import envelope_indices  # numpy/scipy: kept off the import path
+
+        envelopes = envelope_indices(bboxes)
+        keep = [i for i in range(len(bboxes)) if i not in envelopes]
+        bboxes, points, labels = [bboxes[i] for i in keep], [points[i] for i in keep], [labels[i] for i in keep]
+        dropped = len(envelopes)
+    return {
+        "count": len(bboxes),
+        "bboxes": bboxes,
+        "points": points,
+        "labels": labels,
+        "scores": None,
+        "group_boxes_dropped": dropped,
+        "detector": "florence2",
+    }
 
 
 def _flat_locate(app: AppContext, images: list[Image.Image], object_name: str) -> list[dict[str, Any]] | None:

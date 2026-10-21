@@ -214,8 +214,8 @@ def register(mcp: MCPServer) -> None:
                     "6 instead of 2 trees, and a spurious 4th house past the true 3). Florence-2 got "
                     "both exactly right on the same scene. Try it when the image is clip art / flat "
                     "vector style and the default count looks wrong; `scores` are unavailable on "
-                    "this path (Florence-2's grounding head carries no per-box confidence) and "
-                    "`group_boxes_dropped` is not applicable."
+                    "this path (Florence-2's grounding head carries no per-box confidence); a box "
+                    "around the whole group is dropped as on the default path."
                 )
             ),
         ] = False,
@@ -260,9 +260,13 @@ def register(mcp: MCPServer) -> None:
         or a few, read its appearance as a sign `count` may be too high. Running SAM 3
         adds about 7 s to every photo count. Absent if SAM 3 is unavailable.
 
-        Accuracy depends heavily on the scene. On synthetic shapes whose counts are
-        exact by construction it is right on 9 of 10 cases (mean error 0.1) and
-        holds all 8 single-object controls. On real photographs it is reliable for
+        Accuracy depends heavily on the scene. Flat images (synthetic shapes, clip art,
+        vector charts, lossless UI captures) are counted by Florence-2: on shapes whose
+        counts are exact by construction it is right on 5 of 10 cases and holds all 8
+        single-object controls -- separated shapes count right, but touching or
+        overlapping ones (a ring of 8 touching discs, a grid of 30) merge into one box.
+        On 187 fresh flat-image counts it was exact 50.8% of the time, and nested shapes
+        (concentric circles) can be undercounted. On real photographs it is reliable for
         a few instances and weak for many: it was exact on 61.8% of 427 held-out
         photo counts (383 of them 3 or fewer), and crowded scenes remain far less
         reliable. Treat a count above a handful on a real photo as a rough estimate,
@@ -272,9 +276,10 @@ def register(mcp: MCPServer) -> None:
 
         Crowded real scenes (see above) are the biggest one.
 
-        Heavy overlap undercounts. Eight identical shapes in a ring count as 8 when
-        separated or touching, but 6 once they overlap by roughly two-thirds of their
-        width. A count below what you expect means "could not separate them", not a
+        Heavy overlap undercounts. With Grounding DINO (the photo path), eight identical
+        shapes in a ring count as 8 when separated or touching, but 6 once they overlap
+        by roughly two-thirds of their width; on a flat image even touching shapes can
+        merge into one. A count below what you expect means "could not separate them", not a
         real tally -- and it will undercount rather than overcount.
 
         Some evidence is simply not in the picture. On a photo of a paper flower whose
@@ -341,6 +346,7 @@ def register(mcp: MCPServer) -> None:
                 threshold=threshold,
                 adaptive_threshold=adaptive_threshold,
                 candidates_floor=COUNT_RANGE_FLOOR,
+                drop_group_box=True,
             )
 
             for image, result in zip(images, results, strict=True):

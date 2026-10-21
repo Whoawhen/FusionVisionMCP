@@ -696,3 +696,80 @@ def box_iou(a: Sequence[float], b: Sequence[float]) -> float:
     intersection = box_intersection_area(a, b)
     union = box_area(a) + box_area(b) - intersection
     return intersection / union if union > 0 else 0.0
+
+
+#: Share of the other detections whose centres a box must swallow to count as an
+#: envelope around the group rather than a member of it. Measured: asked for `petal`
+#: against eight shapes, the model returns the eight plus one box spanning the whole
+#: arrangement -- at 68% of the frame when they are separated, 38% when touching, and
+#: carrying the *highest* score both times, so score cannot be used to spot it.
+#: Dropping it turns a 9 into the correct 8 in both arrangements.
+_ENVELOPE_CONTAINMENT: Final[float] = 0.6
+
+#: Below this many detections there is no "group" for a box to enclose, and a genuine
+#: pair of nested objects would be discarded instead. Three is the floor worth applying:
+#: at three boxes the containment rule below requires one box to swallow *both* others,
+#: which is a strong signal, while at two it would only require swallowing one and would
+#: discard a genuinely nested object. Measured: two touching instances come back as
+#: 2 instances plus 1 envelope, so a floor of 4 left every two-instance count one too high.
+_MIN_BOXES_FOR_ENVELOPE: Final[int] = 3
+
+#: Above this mean pairwise IoU, the boxes a candidate "contains" are not separate
+#: instances -- they are noisy, overlapping re-detections of the *same* object at
+#: different scales, and the candidate must not be dropped as a group envelope.
+#:
+#: Found investigating a partially-occluded object (a rectangle ~60% hidden behind
+#: another shape) that a confidence cut of 0.15 dropped to zero detections even though
+#: the correct box scored 0.66, well above threshold. The drop was not a threshold
+#: problem: at the default threshold, the correct box "contained" two looser duplicate
+#: boxes of the same rectangle and was misclassified as an envelope around a group.
+#: Real group members (separate petals, discs) barely overlap each other -- mean
+#: pairwise IoU near 0 on every ring/row/grid fixture in `benchmarks/fixtures.py`.
+#: The occlusion case's duplicate members overlapped each other at IoU 0.805. 0.5 sits
+#: clear of both: verified to reproduce every existing benchmark fixture's envelope
+#: decision unchanged (all 9 positive/negative group-box cases), while recovering the
+#: occluded rectangle from 0 detections to 2, one of which is the correct 0.66 box.
+_MAX_MEMBER_MUTUAL_IOU: Final[float] = 0.5
+
+
+def envelope_indices(bboxes: Sequence[Sequence[float]]) -> set[int]:
+    """Indices of boxes that enclose a group of separate instances rather than belong to one.
+
+    Asked to find a repeated part, the model reliably returns the instances *and*
+    one box drawn around the whole arrangement. That box is not a duplicate of any
+    single detection, so non-maximum suppression keeps it, and it tends to score
+    highest, so a confidence cut removes the real instances first. What identifies
+    it is that it swallows the others' centres.
+
+    That containment test alone also fires on a single partially-occluded object:
+    the correct tight box can "contain" several looser, lower-confidence duplicate
+    detections of that *same* object at different scales, which look identical to a
+    group by centre-containment even though there is no group. What distinguishes
+    the two is whether the contained boxes overlap each other: real group members
+    (separate petals, discs) barely overlap; duplicate re-detections of one object
+    overlap heavily. Only boxes whose "members" have low mutual overlap are dropped.
+    """
+    if len(bboxes) < _MIN_BOXES_FOR_ENVELOPE:
+        return set()
+
+    centres = [((x1 + x2) / 2, (y1 + y2) / 2) for x1, y1, x2, y2 in bboxes]
+    envelopes = set()
+    for index, (x1, y1, x2, y2) in enumerate(bboxes):
+        contained = [
+            other for other, (cx, cy) in enumerate(centres) if other != index and x1 <= cx <= x2 and y1 <= cy <= y2
+        ]
+        if len(contained) < _ENVELOPE_CONTAINMENT * (len(bboxes) - 1):
+            continue
+
+        member_boxes = [bboxes[i] for i in contained]
+        pairs = [
+            box_iou(member_boxes[a], member_boxes[b])
+            for a in range(len(member_boxes))
+            for b in range(a + 1, len(member_boxes))
+        ]
+        mean_member_iou = sum(pairs) / len(pairs) if pairs else 0.0
+        if mean_member_iou > _MAX_MEMBER_MUTUAL_IOU:
+            continue
+
+        envelopes.add(index)
+    return envelopes

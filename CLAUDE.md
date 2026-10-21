@@ -501,6 +501,17 @@ real crowds Grounding DINO was low 12 times and never high, gate K's pattern, to
 description now says its appearance does not mean a crowd. The exact non-crowd figure (about 55-60%) would need SAM 3
 re-run on phase 11's count images; it would not change the wording, so it was not run.
 
+**2026-10-21: flat-image counts drop Florence-2's group box too.** Flat images (synthetic shapes included) count on
+Florence-2's grounding head, which returns a box around the whole arrangement besides the instances, and only the
+Grounding DINO path dropped it: eight separated petals counted 9 on the live server, and the "9 of 10 fixtures" in the
+tool description dated from before flat routing (the fixtures were 0 of 10 exact). `count_objects` now passes
+`drop_group_box=True`, applying the same rule (`geometry.envelope_indices`, moved there from `grounding_dino` so the
+torch-free path can use it). VisionBench `flat_count_envelope.py`: fixtures 0 -> 5 of 10 exact with all 8 controls
+held; phase 11 flat counts 46.6 -> 54.4% exact (MAE 1.04 -> 0.75); confirmed on round 13's 187 fresh flat counts,
+47.6 -> 50.8% (MAE 1.08 -> 0.84). Dropping exact duplicates first (Florence-2 has no NMS; a banner went to 0 on
+phase 11) tied on round 13 and was not shipped. Still wrong: touching or overlapping shapes merge into one Florence-2
+box (rings of 8 touching discs count 1), and nested shapes (concentric circles) lose the outer ones.
+
 **The honest negative result: the flower is not counted by anything here.** `tests/sample.jpg` — a paper flower
 with overlapping petals — returns 1 from *every* approach tried: Florence-2 grounding, Moondream's detect head,
 Grounding DINO (at every box threshold down to 0.10), the `count_lobes` outline measurement, SAM2 in
