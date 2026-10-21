@@ -115,7 +115,7 @@ The roughly 24 "vocabulary rigidity" misses are mismatches between the captioner
 
 1. **S — scorer revision (next; no model run).** See below. It goes first because it only re-scores cached replies, and every gate after it (1A-g's caption rows, 1B, 1C-b, 2A, 2B) then reports under both scorers from the start rather than being re-scored later.
 2. **1A-g — Florence-2 bf16 globally.**
-3. **1B** — bf16 at 2 beams (`caption` only, beams as a `caption` parameter), on the bf16 model.
+3. **1B** — bf16 at 2 beams (`caption` only, beams as a `caption` parameter), on the bf16 model. **Stopped at smoke (2026-10-21, VisionBench `caption_1b.py`):** median saving 0.88 s (range 0.33 to 3.13) against the 1.5 s rule, 3 beams 7.48 s vs 2 beams 6.64 s paired on 20 tune images; 18 of 20 captions changed. In bf16 the extra beam costs little, so a caption-changing step would buy under a second. Not tuned or CHAIR-tested; closed.
 4. 1C-b `max_crops`, then 2A, 2B, 3B, Track 4 as in 0.11.
 
 #### Step S: keyword-scorer word forms (the user's call, 2026-10-21)
