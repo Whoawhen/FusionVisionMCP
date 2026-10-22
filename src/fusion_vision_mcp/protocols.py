@@ -112,6 +112,14 @@ class VqaProcessor(Protocol):
         ...
 
 
+class Captioner(Protocol):
+    """Represents a protocol for a long image captioner (`caption(deep=true)`)."""
+
+    def caption(self, images: list[Image]) -> list[str]:
+        """One detailed prose caption per image."""
+        ...
+
+
 class InstanceDetector(Protocol):
     """Represents a protocol for open-vocabulary detection that tallies instances."""
 
@@ -200,3 +208,6 @@ class AppContext:
     # SAM 3, `detect_objects`' photo detector. None in tests and hand-built contexts, where
     # `detect_objects` falls back to Grounding DINO (`counter`) as it does when SAM 3 can't load.
     locator: InstanceDetector | None = None
+    # LFM2.5-VL-3B, `caption(deep=true)`'s captioner. None in tests and hand-built contexts, where `deep` falls back
+    # to Moondream2's long caption (`vqa`), the captioner before 2026-10-22.
+    deep_captioner: Captioner | None = None

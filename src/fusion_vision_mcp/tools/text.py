@@ -97,13 +97,14 @@ def register(mcp: MCPServer) -> None:
             bool,
             Field(
                 description=(
-                    "When true, caption with Moondream2's long captioner instead of Florence-2: "
-                    "3-4x slower (~22s vs ~7s per image for the caption itself on CPU, ~27s on a "
-                    "page with 30+ words of text, which keeps a finer tiling; 2026-10-22) and about "
-                    "60% longer, and it "
-                    "covers more of what is there. Worth it on charts, documents, signage, game UI "
-                    "and screenshots, where the default misses most; little gain on everyday photos "
-                    "and artwork. The return shape is unchanged, and `verify_text` still applies."
+                    "When true, caption with LFM2.5-VL-3B's detailed description instead of "
+                    "Florence-2: about 5x slower (~35s vs ~7s per image for the caption itself on CPU, "
+                    "2026-10-22) and about 75% longer, and it covers clearly more of what is there "
+                    "(key facts 74.8% vs 64.5% on 280 held-out images), on most kinds of image (signs "
+                    "about level). Worth "
+                    "it whenever the default caption is too thin or the image is a screenshot, chart, "
+                    "document, game UI or illustration. The return shape is unchanged, and "
+                    "`verify_text` still applies."
                 )
             ),
         ] = False,
@@ -144,11 +145,14 @@ def register(mcp: MCPServer) -> None:
 
         Set `deep=true` for a closer look when the default caption is too thin
         to answer what you need, or up front for a chart, document, sign,
-        screenshot or game UI. On 280 held-out mixed images the deep caption
-        named 61.5% of the labelled key facts against the default's 53.3%
-        (charts 67 vs 52, signage 71 vs 54, game UI 59 vs 44), and invented an
-        absent object no more often (about 1%). Much of that gain comes from
-        it simply saying more, so it is slower, not sharper per word.
+        screenshot or game UI. Since 2026-10-22 it is LFM2.5-VL-3B (Liquid AI):
+        on 280 held-out mixed images, with the text line, it named 74.8% of the
+        labelled key facts against 64.5% for the default caption and 69.0% for
+        the earlier deep captioner (Moondream2), and it beat Moondream2 at
+        equal length too (+8.0 points), so it is sharper per word, not just
+        longer. It invents absent objects about as often as Moondream2 did
+        (COCO: 16.5% of the objects it names vs 17.1%); the default caption is
+        more cautious (12.1%).
 
         By default the caption ends with `Visible text: "..."`, the `ocr`
         engine's verbatim reading of any text in the image (`read_text`). On
@@ -202,9 +206,14 @@ def register(mcp: MCPServer) -> None:
         app = ctx.request_context.lifespan_context
         with get_images(src) as pages:
             images = [crop_region(page, region) for page in pages] if region is not None else pages
-            # `deep` reads the text first too: a text-heavy page keeps 12 crops (see DEEP_CROPS).
-            page_texts = [page["text"] for page in ocr_pages(app, images)] if read_text or deep else [""] * len(images)
-            if deep:
+            # Moondream2's `deep` (the fallback) reads the text first: a text-heavy page keeps 12 crops (DEEP_CROPS).
+            moondream_deep = deep and app.deep_captioner is None
+            page_texts = (
+                [page["text"] for page in ocr_pages(app, images)] if read_text or moondream_deep else [""] * len(images)
+            )
+            if deep and app.deep_captioner is not None:
+                captions = app.deep_captioner.caption(images)
+            elif deep:
                 crops = [deep_crops(t) for t in page_texts]
                 captions = app.vqa.caption(images, length="long", max_crops=crops)
             else:

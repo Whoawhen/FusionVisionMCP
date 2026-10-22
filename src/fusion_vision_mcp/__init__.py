@@ -47,6 +47,7 @@ if TYPE_CHECKING:
     from fusion_vision_mcp.florence2 import Florence2
     from fusion_vision_mcp.grounding_dino import GroundingDino
     from fusion_vision_mcp.image_quality import ImageQuality
+    from fusion_vision_mcp.lfm import LfmCaptioner
     from fusion_vision_mcp.moondream import Moondream
     from fusion_vision_mcp.ppocr_engine import PPOCREngine
     from fusion_vision_mcp.reasoner import VisionReasoner
@@ -57,6 +58,7 @@ if TYPE_CHECKING:
 from fusion_vision_mcp.protocols import (
     AestheticScorer,
     AppContext,
+    Captioner,
     CropEmbedder,
     InstanceDetector,
     Processor,
@@ -107,6 +109,11 @@ async def app_lifespan(
         from fusion_vision_mcp.moondream import Moondream
 
         return Moondream(moondream_model_id, moondream_revision, device)
+
+    def _make_lfm() -> "LfmCaptioner":
+        from fusion_vision_mcp.lfm import LfmCaptioner
+
+        return LfmCaptioner(device=device)
 
     def _make_sam2() -> "Sam2":
         from fusion_vision_mcp.sam2 import Sam2
@@ -219,6 +226,9 @@ async def app_lifespan(
     # Only detect_objects (and batch "detect") loads SAM 3, on photographs.
     locator = cast(InstanceDetector, IdleProxy(IdleReleased(_make_sam3, idle_timeout, "SAM 3")))
 
+    # Only caption(deep=true) loads it (~6.4 GB in bf16).
+    deep_captioner = cast(Captioner, IdleProxy(IdleReleased(_make_lfm, idle_timeout, "LFM2.5-VL")))
+
     yield AppContext(
         florence2,
         vqa,
@@ -231,6 +241,7 @@ async def app_lifespan(
         reasoner,
         defect_embedder,
         locator,
+        deep_captioner,
     )
 
 

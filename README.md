@@ -7,7 +7,7 @@
 
 🚧 **Work in progress** — see [README_DETAILED.md](README_DETAILED.md) for current limits and measured results before relying on this for anything important.
 
-An MCP server that fuses local, CPU-capable vision models — Florence-2, Moondream2, SAM2, Grounding DINO, PP-OCRv6, EasyOCR, IQA, and CLIP/LAION — behind twelve tools: OCR, captioning, object detection/grounding, instance counting, visual question answering, multiple-choice classification, spatial measurement (touch/gap/containment), and aesthetic scoring (including technical quality and artistic judgment via Ollama).
+An MCP server that fuses local, CPU-capable vision models — Florence-2, Moondream2, LFM2.5-VL, SAM2, Grounding DINO, PP-OCRv6, EasyOCR, IQA, and CLIP/LAION — behind twelve tools: OCR, captioning, object detection/grounding, instance counting, visual question answering, multiple-choice classification, spatial measurement (touch/gap/containment), and aesthetic scoring (including technical quality and artistic judgment via Ollama).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="FusionVisionMCP-Dark.jpg">
@@ -70,7 +70,7 @@ root-caused against the exact fixture that exposed it, not patched at the sympto
 | Tool | Model(s) | Description |
 |---|---|---|
 | `ocr` | PP-OCRv6 English | Transcribe any text in an image or PDF — printed, stylized or low-contrast alike — with a per-span confidence score. Multi-column pages are split by geometry and read in reading order. Text-free images return nothing. |
-| `caption` | Florence-2 | Describe what an image shows as one detailed prose caption of the whole scene. `verify_text=true` also corrects close text misses against a verbatim OCR pass; `deep=true` uses Moondream2's longer caption (slower, covers more on charts, documents, signage and game UI). By default (`read_text`) the caption ends with `Visible text: "..."`, the `ocr` engine's verbatim reading of any text in the image. `region=[x1, y1, x2, y2]` captions just that part at full resolution, for small text or HUD detail (named the answer 80% of the time vs 68% for the whole image). |
+| `caption` | Florence-2; LFM2.5-VL-3B (`deep`) | Describe what an image shows as one detailed prose caption of the whole scene. `verify_text=true` also corrects close text misses against a verbatim OCR pass; `deep=true` uses LFM2.5-VL-3B's detailed description (~35 s; key facts 74.8% vs 64.5% for the default on 280 held-out images). By default (`read_text`) the caption ends with `Visible text: "..."`, the `ocr` engine's verbatim reading of any text in the image. `region=[x1, y1, x2, y2]` captions just that part at full resolution, for small text or HUD detail (named the answer 80% of the time vs 68% for the whole image). |
 | `detect_objects` | SAM 3 (Florence-2 / Grounding DINO if it can't load) | Locate a named object, returning scored bounding boxes, center points and labels. On photos it rarely boxes an object that isn't there. |
 | `dense_region_caption` | Florence-2 | Caption every salient region of an image at once, without naming objects first. |
 | `query_image` | Moondream2 | Ask a free-form question about an image (visual question answering). `check_consistency=true` routes a low-confidence answer to the measurement that actually answers it, when one applies. |
@@ -216,10 +216,11 @@ a session that only captions never loads the segmentation or aesthetic models at
 
 ## Architecture
 
-Five models, each loaded on-demand and released on its own idle timer:
+The main models, each loaded on demand and released on its own idle timer:
 
 - **Florence-2** (Microsoft) — captioning, OCR, object detection/grounding, dense region captioning
 - **Moondream2** (Vikhyat) — visual question answering
+- **LFM2.5-VL-3B** (Liquid AI) — `caption(deep=true)`'s detailed description (weights under the LFM Open License v1.0)
 - **SAM2** (Meta) — segmentation masks, the basis for `spatial_relations`
 - **Grounding DINO** (IDEA-Research) — open-vocabulary detection backing `count_objects`
 - **CLIP + LAION aesthetic head** — aesthetic quality scoring

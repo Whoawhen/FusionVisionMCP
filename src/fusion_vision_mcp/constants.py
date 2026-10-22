@@ -149,7 +149,19 @@ CAPTION_TEXT_WORDS: Final[int] = 160
 LOOP_NGRAM: Final[int] = 8
 LOOP_RUN: Final[int] = 16
 
-#: `caption(deep=true)` tiles the image into at most DEEP_CROPS_TEXT local crops when the page's `ocr` text
+#: `caption(deep=true)` is LiquidAI's LFM2.5-VL-3B since 2026-10-22 (caption plan Track 4, VisionBench
+#: `caption_track4.py`, rules fixed before each run). Against Moondream2's long caption on 280 confirm images:
+#: keyword recall 69.0 -> 74.8% (+5.7, CI 3.4 to 8.0; matched length +8.0, CI 5.8 to 10.3), median 34.7 s, COCO
+#: CHAIR-i 17.1 -> 16.5%, CHAIR-s 30.3 -> 31.0%. Measured exactly as below: this revision, bf16, the image processor's
+#: max_tiles 4 (10 by default: 46.8 s on tune, over the 45 s cap, for no more recall), this prompt, the model card's
+#: decoding. Changing any of them means re-running the gate.
+DEFAULT_DEEP_CAPTION_MODEL: Final[str] = "LiquidAI/LFM2.5-VL-3B"
+DEFAULT_DEEP_CAPTION_REVISION: Final[str] = "35a118d938ce6d123ac2d371649f24a8efb69058"
+DEEP_CAPTION_MAX_TILES: Final[int] = 4
+DEEP_CAPTION_PROMPT: Final[str] = "Describe this image in detail."
+DEEP_CAPTION_MAX_NEW_TOKENS: Final[int] = 768
+
+#: `caption(deep=true)` on Moondream2 (the fallback when no deep captioner is configured) tiles the image into at most DEEP_CROPS_TEXT local crops when the page's `ocr` text
 #: has DEEP_TEXT_WORDS words or more, and DEEP_CROPS below that (Moondream2's own setting is 12; plan step
 #: 1C-b, VisionBench `caption_1c_b.py`, 2026-10-21, both arms greedy). 6 crops: tune keyword recall 71.8 ->
 #: 72.3%, COCO CHAIR-i 18.5 -> 18.2%, about 5 s faster. On 140 confirm images with 30+ OCR words it tied

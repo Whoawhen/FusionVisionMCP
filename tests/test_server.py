@@ -93,7 +93,7 @@ async def test_caption(mcp_client_session: ClientSession) -> None:
 
 
 @pytest.mark.anyio
-async def test_caption_deep_uses_moondream(mcp_client_session: ClientSession) -> None:
+async def test_caption_deep_uses_the_long_captioner(mcp_client_session: ClientSession) -> None:
     default = await mcp_client_session.call_tool("caption", arguments={"src": SAMPLE_IMAGE_FILEPATH})
     deep = await mcp_client_session.call_tool("caption", arguments={"src": SAMPLE_IMAGE_FILEPATH, "deep": True})
     default_text = "\n".join(cast(TextContent, c).text for c in default.content)

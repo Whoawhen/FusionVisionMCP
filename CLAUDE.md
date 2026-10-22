@@ -229,7 +229,23 @@ fixture controls, `critique_composition`'s subject box 84.4 -> 85.4%, dense box 
 recall 40.5 -> 40.5%, `<OCR_WITH_REGION>` lines 58.4 -> 58.3% with the banner exact. The transformers-5 parity
 figures above were fp32; anything re-measured against them now has to be re-measured in bf16.
 
-**2026-10-22: `deep` tiles text-light pages into 6 crops, not 12 (plan step 1C-b).** `caption(deep=true)` now reads
+**2026-10-22 (later): `deep` is LFM2.5-VL-3B now, not Moondream2 (caption plan Track 4).** `lfm.LfmCaptioner`
+(`AppContext.deep_captioner`, lazy and idle-released, ~6.4 GB bf16) runs Liquid AI's LFM2.5-VL-3B at revision
+`35a118d`, bf16, prompt "Describe this image in detail.", the card's decoding, and `max_tiles` 4. VisionBench
+`caption_track4.py`, rules fixed before each run: four non-Chinese candidates screened (Gemma 4 E2B and Granite Vision
+4.1 failed time or memory, LFM2.5-VL-1.6B too terse even with a fuller prompt); at the card's 10 tiles the 3B took
+46.8 s on tune, over the 45 s cap, so a 4-tile variant was fixed before running and went through confirm and CHAIR.
+Confirm (280 images) vs Moondream2's long caption: keyword recall 69.0 -> 74.8% (+5.7, CI 3.4 to 8.0), matched length
++8.0 (CI 5.8 to 10.3), median 34.7 s (p90 49.8 s), absent objects 3 vs 3; ahead on eight of nine kinds (signage -1.8).
+COCO CHAIR-i 17.1 -> 16.5%, CHAIR-s 30.3 -> 31.0%. The wrapper reproduced the gate's captions on 8 of 8 confirm images
+(VisionBench `lfm_wrapper_parity.py`, same seeds). **Not the default captioner:** even cut to Florence-2's length its
+CHAIR is 14.1% / 25.0% against Florence-2's 12.1% / 22.3%, and it is 5x slower. Moondream2 stays for `query_image`
+and `critique_composition`; whether LFM can take those over (which would also drop Moondream's ~7.5 GB fp32, its
+remote-code pin and `pyvips`) is untested. Weights are under the LFM Open License v1.0 (commercial use only below
+$10M annual revenue), downloaded on first use, not redistributed.
+
+**2026-10-22: `deep` tiles text-light pages into 6 crops, not 12 (plan step 1C-b).** (Applies to the Moondream2
+fallback only since Track 4 shipped.) `caption(deep=true)` now reads
 the page's text first and sets Moondream2's `max_crops` per image for the encode only (`analysis.deep_crops`,
 restored afterwards so `query_image` keeps 12): 12 when the `ocr` text has 30+ words, 6 below. VisionBench
 `caption_1c_b.py`, both arms greedy: tune recall 71.8 -> 72.3%, COCO CHAIR-i 18.5 -> 18.2%, ~5 s faster. On 140

@@ -201,19 +201,28 @@ specific, and `ocr` to transcribe text rather than describe it. Returns one capt
   list of the close misses it fixed, and a `caption_corrected` copy with the verbatim OCR text substituted in.
   Defaults to `false`, which keeps the original `list[str]` return shape; `true` returns one
   `{caption, text_regions, corrections, caption_corrected}` dict per page.
-- **deep**: When `true`, caption with Moondream2's long captioner (already loaded for `query_image`) instead
-  of Florence-2. About 3-4x slower and ~60% longer: measured 2026-10-21 on CPU, the caption itself takes ~27 s
-  (Moondream2 encode plus long caption) against ~7 s for Florence-2 in bf16, plus the shared text reading for the
-  `Visible text` line. (It was ~3x, ~33 s vs ~11 s, before Florence-2 moved to bf16 and Moondream2's decode to a
-  sliced KV cache the same day.) Since 2026-10-22 a page whose text reading has fewer than 30 words is tiled into
-  at most 6 crops instead of Moondream2's 12, about 5 s faster (~22 s); text-heavy pages keep 12 (plan step 1C-b:
-  6 crops tied on recall, but documents dipped on both test sets). On VisionBench's 280
-  held-out generalist images it named 61.5% of labelled key facts against 53.3% (charts 67 vs 52, signage
-  71 vs 54, game UI 59 vs 44, documents 71 vs 58; everyday photos and artwork barely move), naming a
-  labelled absent object in ~1% of captions either way. Cut to the default's length it is no better
-  (55.2%, CI includes zero), so the gain is coverage from saying more, not sharper wording. A fine-tuned
-  Florence-2 (PromptGen v2.0) was also tested and rejected: +2.9 points, all of it length, for a second
-  1.5 GB model.
+- **deep**: When `true`, caption with **LFM2.5-VL-3B** (Liquid AI; LFM2.5 language model with a SigLIP2 vision
+  encoder) instead of Florence-2. Since 2026-10-22; Moondream2's long caption held the slot before. About 5x slower
+  and ~75% longer: the caption itself takes a median ~35 s on CPU (p90 ~50 s) against ~7 s for Florence-2, plus the
+  shared text reading for the `Visible text` line. The model is loaded only by `deep` (~6.4 GB in bf16, released
+  on the idle timer like the rest). It runs at revision `35a118d`, bf16, the prompt "Describe this image in
+  detail.", the model card's decoding (temperature 0.1, min_p 0.15, repetition penalty 1.05) and at most 4 image
+  tiles of 512 px plus a thumbnail (the default 10 tiles gave no more recall and took 46.8 s, over the 45 s cap).
+  Chosen by VisionBench caption plan Track 4 (`caption_track4.py`, rules fixed before each run): of four
+  non-Chinese candidates, Gemma 4 E2B (11.2 GB, 48.8 s) and Granite Vision 4.1 (8.4 GB) failed the memory or time
+  screen and LFM2.5-VL-1.6B was too terse. On the 280 held-out generalist images, with the text line, it named
+  **74.8%** of labelled key facts against 69.0% for Moondream2 (+5.7, CI 3.4 to 8.0) and 64.5% for the default
+  caption; cut to equal length it still led Moondream2 by +8.0 (CI 5.8 to 10.3), so it is sharper per word, not
+  just longer. It led on eight of nine image kinds (illustrations +12.3, screenshots +9.9, game UI +5.7; signage
+  -1.8) and named a labelled absent object no more often (3 vs 3). On 300 COCO photos it names an absent object
+  category about as often as Moondream2 (CHAIR-i 16.5% vs 17.1%, CHAIR-s 31.0% vs 30.3%); the default caption is
+  more cautious (12.1% / 22.3%), and cut to the default's length LFM is still above it (14.1% / 25.0%), which is
+  why it is not the default captioner. Its weights are under Liquid AI's LFM Open License v1.0, not Apache: free for
+  personal, research and commercial use, except commercial use by an organisation with $10M or more in annual
+  revenue; downloaded from Hugging Face on first use, not redistributed here.
+  Moondream2 stays for `query_image` and `critique_composition`; without the LFM captioner (a hand-built context)
+  `deep` falls back to Moondream2's long caption, at 6 crops on pages under 30 OCR words and 12 above (plan
+  step 1C-b).
 - **region**: `[x1, y1, x2, y2]` in the image's pixels: caption only that part, so it gets the captioner's whole
   input resolution (Florence-2 shrinks every image to 768 px). The box is widened by 15% on each side, to at
   least 32 px, and clipped to the image; the caption then describes the region, not the image. Measured
