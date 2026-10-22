@@ -229,6 +229,15 @@ fixture controls, `critique_composition`'s subject box 84.4 -> 85.4%, dense box 
 recall 40.5 -> 40.5%, `<OCR_WITH_REGION>` lines 58.4 -> 58.3% with the banner exact. The transformers-5 parity
 figures above were fp32; anything re-measured against them now has to be re-measured in bf16.
 
+**2026-10-22: `deep` tiles text-light pages into 6 crops, not 12 (plan step 1C-b).** `caption(deep=true)` now reads
+the page's text first and sets Moondream2's `max_crops` per image for the encode only (`analysis.deep_crops`,
+restored afterwards so `query_image` keeps 12): 12 when the `ocr` text has 30+ words, 6 below. VisionBench
+`caption_1c_b.py`, both arms greedy: tune recall 71.8 -> 72.3%, COCO CHAIR-i 18.5 -> 18.2%, ~5 s faster. On 140
+text-heavy confirm images 6 crops tied (+0.2, CI -1.8 to +2.3) and the rule fixed before that run picked 6 for every
+call, but documents dipped on both sets (tune 72.5 -> 67.5%, confirm 79.3 -> 77.2%), so the user kept 12 there. The
+first, sampled tune run failed its loop guard (13 -> 15 looping captions); the greedy re-test's paired sign test
+did not (p = 0.12, then 0.25).
+
 ## `classify_image` is CLIP zero-shot over the caller's labels (2026-10-16)
 
 `classify_image(src, labels)` puts each label in `CLASSIFY_TEMPLATE` ("a photo of {}") and ranks them with

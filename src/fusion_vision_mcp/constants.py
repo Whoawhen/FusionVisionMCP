@@ -149,6 +149,17 @@ CAPTION_TEXT_WORDS: Final[int] = 160
 LOOP_NGRAM: Final[int] = 8
 LOOP_RUN: Final[int] = 16
 
+#: `caption(deep=true)` tiles the image into at most DEEP_CROPS_TEXT local crops when the page's `ocr` text
+#: has DEEP_TEXT_WORDS words or more, and DEEP_CROPS below that (Moondream2's own setting is 12; plan step
+#: 1C-b, VisionBench `caption_1c_b.py`, 2026-10-21, both arms greedy). 6 crops: tune keyword recall 71.8 ->
+#: 72.3%, COCO CHAIR-i 18.5 -> 18.2%, about 5 s faster. On 140 confirm images with 30+ OCR words it tied
+#: (70.4 -> 70.6%, CI -1.8 to +2.3), but documents dipped on both sets (tune 72.5 -> 67.5%, confirm 79.3 ->
+#: 77.2%), so text-heavy pages keep 12. The rule fixed before that run picked 6 for every call; the user
+#: chose to keep 12 on text-heavy pages.
+DEEP_CROPS: Final[int] = 6
+DEEP_CROPS_TEXT: Final[int] = 12
+DEEP_TEXT_WORDS: Final[int] = 30
+
 #: `caption(deep=true)` also asks Moondream2 this on the image encoding its caption already made, and
 #: adds `Theme: <answer>.` to the prose. Fixed before measuring (VisionBench `caption_theme.py`,
 #: 2026-10-10): +1.3 points of keyword recall on tune and on 280 held-out images (CI 0.6 to 2.0),

@@ -103,8 +103,12 @@ class VqaProcessor(Protocol):
         """Answers a free-form question about each image."""
         ...
 
-    def caption(self, images: list[Image], length: str = "long", theme: bool = False) -> list[str]:
-        """Describes each image in prose ("short", "normal" or "long"); `theme` adds what it conveys."""
+    def caption(
+        self, images: list[Image], length: str = "long", theme: bool = False, max_crops: list[int] | None = None
+    ) -> list[str]:
+        """Describes each image in prose ("short", "normal" or "long"); `theme` adds what it conveys.
+
+        `max_crops`, one per image, caps the local crops the image is tiled into (the model's default if None)."""
         ...
 
 

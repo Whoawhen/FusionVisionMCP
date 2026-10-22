@@ -202,10 +202,12 @@ specific, and `ocr` to transcribe text rather than describe it. Returns one capt
   Defaults to `false`, which keeps the original `list[str]` return shape; `true` returns one
   `{caption, text_regions, corrections, caption_corrected}` dict per page.
 - **deep**: When `true`, caption with Moondream2's long captioner (already loaded for `query_image`) instead
-  of Florence-2. About 4x slower and ~60% longer: measured 2026-10-21 on CPU, the caption itself takes ~27 s
+  of Florence-2. About 3-4x slower and ~60% longer: measured 2026-10-21 on CPU, the caption itself takes ~27 s
   (Moondream2 encode plus long caption) against ~7 s for Florence-2 in bf16, plus the shared text reading for the
   `Visible text` line. (It was ~3x, ~33 s vs ~11 s, before Florence-2 moved to bf16 and Moondream2's decode to a
-  sliced KV cache the same day.) On VisionBench's 280
+  sliced KV cache the same day.) Since 2026-10-22 a page whose text reading has fewer than 30 words is tiled into
+  at most 6 crops instead of Moondream2's 12, about 5 s faster (~22 s); text-heavy pages keep 12 (plan step 1C-b:
+  6 crops tied on recall, but documents dipped on both test sets). On VisionBench's 280
   held-out generalist images it named 61.5% of labelled key facts against 53.3% (charts 67 vs 52, signage
   71 vs 54, game UI 59 vs 44, documents 71 vs 58; everyday photos and artwork barely move), naming a
   labelled absent object in ~1% of captions either way. Cut to the default's length it is no better

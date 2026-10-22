@@ -119,7 +119,9 @@ class Moondream:
                 res.append(answer)
         return res
 
-    def caption(self, images: list[Image], length: str = "long", theme: bool = False) -> list[str]:
+    def caption(
+        self, images: list[Image], length: str = "long", theme: bool = False, max_crops: list[int] | None = None
+    ) -> list[str]:
         """Moondream2's own captioner; `length` is "short", "normal" or "long".
 
         Streamed, and stopped once the caption loops (`repetition.loop_start`): the long caption
@@ -130,11 +132,14 @@ class Moondream:
         cache) and the caption runs on that encoding. With `theme`, THEME_PROMPT is asked on the same
         encoding and its answer added as `Theme: ...`; reusing it makes the question ~2 s instead of
         ~13 s, with identical output (VisionBench `caption_c4_1.py`, 20 of 20 under greedy decoding).
+
+        `max_crops` (one per image) caps the local crops for that image's encoding only; the model's own
+        setting is restored afterwards, so `query` keeps it.
         """
         res = []
-        for img in images:
+        for i, img in enumerate(images):
             with img.convert("RGB") as rgb_img:
-                encoded = self.model.encode_image(rgb_img)
+                encoded = self._encode(rgb_img, None if max_crops is None else max_crops[i])
             text = self._caption_until_loop(encoded, length)
             if theme:
                 answer = " ".join(self.model.query(encoded, THEME_PROMPT)["answer"].split()).rstrip(".")
@@ -142,6 +147,18 @@ class Moondream:
                     text = f"{text.rstrip()} Theme: {answer}."
             res.append(text)
         return res
+
+    def _encode(self, image: Image, max_crops: int | None) -> Any:
+        if max_crops is None:
+            return self.model.encode_image(image)
+        vision = self.model.model.config.vision
+        default = vision.max_crops
+        # A frozen dataclass, read when the image is tiled (VisionBench `caption_1c_b.py` switches it the same way).
+        object.__setattr__(vision, "max_crops", max_crops)
+        try:
+            return self.model.encode_image(image)
+        finally:
+            object.__setattr__(vision, "max_crops", default)
 
     def _caption_until_loop(self, image: Any, length: str) -> str:
         text = ""

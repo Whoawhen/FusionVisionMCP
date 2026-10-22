@@ -10,7 +10,7 @@ from typing import Annotated, Any
 from mcp.server.mcpserver import Context, MCPServer
 from pydantic import Field
 
-from fusion_vision_mcp.analysis import ocr_pages, visible_text_line
+from fusion_vision_mcp.analysis import deep_crops, ocr_pages, visible_text_line
 from fusion_vision_mcp.constants import CaptionLevel
 from fusion_vision_mcp.images import crop_region, get_images
 from fusion_vision_mcp.ocr_fusion import fuse_caption_ocr
@@ -98,8 +98,9 @@ def register(mcp: MCPServer) -> None:
             Field(
                 description=(
                     "When true, caption with Moondream2's long captioner instead of Florence-2: "
-                    "about 4x slower (~27s vs ~7s per image for the caption itself on CPU, "
-                    "2026-10-21) and about 60% longer, and it "
+                    "3-4x slower (~22s vs ~7s per image for the caption itself on CPU, ~27s on a "
+                    "page with 30+ words of text, which keeps a finer tiling; 2026-10-22) and about "
+                    "60% longer, and it "
                     "covers more of what is there. Worth it on charts, documents, signage, game UI "
                     "and screenshots, where the default misses most; little gain on everyday photos "
                     "and artwork. The return shape is unchanged, and `verify_text` still applies."
@@ -201,11 +202,14 @@ def register(mcp: MCPServer) -> None:
         app = ctx.request_context.lifespan_context
         with get_images(src) as pages:
             images = [crop_region(page, region) for page in pages] if region is not None else pages
+            # `deep` reads the text first too: a text-heavy page keeps 12 crops (see DEEP_CROPS).
+            page_texts = [page["text"] for page in ocr_pages(app, images)] if read_text or deep else [""] * len(images)
             if deep:
-                captions = app.vqa.caption(images, length="long")
+                crops = [deep_crops(t) for t in page_texts]
+                captions = app.vqa.caption(images, length="long", max_crops=crops)
             else:
                 captions = app.florence2.caption(images, CaptionLevel.MORE_DETAILED)
-            texts = [page["text"] for page in ocr_pages(app, images)] if read_text else [""] * len(captions)
+            texts = page_texts if read_text else [""] * len(captions)
             # A captioner can emit U+FFFD for a split multi-byte character; mend it from the page's text.
             captions = [repair_replacement_chars(c, t) for c, t in zip(captions, texts, strict=True)]
             # Appended after any verify step, so `verify_text` checks only the prose's own

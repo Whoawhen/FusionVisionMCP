@@ -26,6 +26,9 @@ from fusion_vision_mcp.constants import (
     COUNT_RANGE_VETO,
     CROWD_RANGE_SAM3_FLOOR,
     CROWD_RANGE_SHOW,
+    DEEP_CROPS,
+    DEEP_CROPS_TEXT,
+    DEEP_TEXT_WORDS,
     DETECT_BOX_THRESHOLD,
     MAIN_SUBJECT_QUESTION,
     CaptionLevel,
@@ -739,6 +742,11 @@ def ocr_pages(app: AppContext, images: Sequence[Image]) -> list[dict[str, Any]]:
 
 def _text_line_key(line: str) -> str:
     return re.sub(r"\W+", " ", line.lower()).strip()
+
+
+def deep_crops(text: str) -> int:
+    """Moondream2's crop cap for `caption(deep=true)` on a page whose `ocr` text is `text` (see DEEP_CROPS)."""
+    return DEEP_CROPS_TEXT if len(text.split()) >= DEEP_TEXT_WORDS else DEEP_CROPS
 
 
 def visible_text_line(text: str, max_words: int = CAPTION_TEXT_WORDS) -> str:
