@@ -135,6 +135,8 @@ Gates, in order:
 
 A pass is reported; shipping is the user's decision.
 
+**2B result (2026-10-22): stopped at the tune screen; no arm advanced.** 120 tune images, Step S scorer, shipped caption 65.3%. `drc`: 66.7% (+1.3, CI +0.4 to +2.5, passes) but over its length control 65.5% only +1.1 (CI 0.0 to +2.3; needs > 0); fired on 39% of images, median 0 labels added, ~2.6 s. `od`: 65.8% (+0.4, CI 0.0 to +1.1) and +0.2 over its control (CI 0.0 to +0.7); fired on 68%. No absent object named by any arm. Most of `drc`'s gain was app screenshots (69.8 -> 73.6) and a few photos and illustrations; about half of it the length control matched, so it could not be told apart from adding any plausible words. Confirm, the precision check and CHAIR were not run. Per 0.10 the expected size was +0.5 to +2, and +1 is what it gave; the rule asked for more certainty than 120 images can give at that size.
+
 **3B shipped as hygiene (2026-10-21, no gate, as 0.6 says):** `textmatch.repair_replacement_chars` mends a caption token containing U+FFFD when exactly one OCR word of the page fits it (one character per mark), else drops the mark; `caption` applies it to the prose with the OCR text it already reads.
 
 #### Step S: keyword-scorer word forms (the user's call, 2026-10-21)
