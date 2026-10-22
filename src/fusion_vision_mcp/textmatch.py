@@ -190,3 +190,39 @@ def correct_text(caption: str, text_regions: list[dict[str, object]]) -> tuple[l
 
 
 __all__ = ["Correction", "correct_text", "extract_candidates", "should_correct"]
+
+
+#: The Unicode replacement character. A captioner emits it when its tokenizer splits a multi-byte character
+#: (Moondream2 wrote "créditos" as "cr�ditos" on a game menu).
+REPLACEMENT_CHAR = "�"
+_TOKEN = re.compile(r"\S+")
+_EDGE = re.compile(r"^(\W*)(.*?)(\W*)$", re.DOTALL)
+_OCR_WORD = re.compile(r"\w+")
+
+
+def repair_replacement_chars(caption: str, ocr_text: str = "") -> str:
+    """Mend or drop U+FFFD in caption prose, using the page's OCR text when it can.
+
+    Only tokens that contain U+FFFD are touched. Each U+FFFD stands for one character: if exactly one distinct
+    OCR word (compared case-insensitively) fits the token with those characters filled in, the token takes that
+    word, keeping its own surrounding punctuation; otherwise the U+FFFD characters are dropped. The plan measured
+    U+FFFD in 3 of about 6,800 cached captions, so this is hygiene, not a recall lever.
+    """
+    if REPLACEMENT_CHAR not in caption:
+        return caption
+    words = {w.lower(): w for w in _OCR_WORD.findall(ocr_text)}
+
+    def mend(match: re.Match[str]) -> str:
+        token = match.group(0)
+        if REPLACEMENT_CHAR not in token:
+            return token
+        lead, core, trail = cast("re.Match[str]", _EDGE.match(token)).groups()
+        pattern = re.compile(
+            "".join(r"\w" if ch == REPLACEMENT_CHAR else re.escape(ch) for ch in core.lower()), re.IGNORECASE
+        )
+        fits = {low for low in words if pattern.fullmatch(low)}
+        if len(fits) == 1:
+            return f"{lead}{words[fits.pop()]}{trail}"
+        return token.replace(REPLACEMENT_CHAR, "")
+
+    return _TOKEN.sub(mend, caption)

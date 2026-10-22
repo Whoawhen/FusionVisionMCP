@@ -64,7 +64,8 @@ def _slice_decode_kv(model: Any) -> None:
 
     Only for the pinned revision: the patch depends on that code's `attn` signature and decode mask.
     """
-    text = sys.modules.get(type(model).__module__.rsplit(".", 1)[0] + ".text")
+    # The remote code is loaded at runtime, so its module is only known as a ModuleType.
+    text: Any = sys.modules.get(type(model).__module__.rsplit(".", 1)[0] + ".text")
     if text is not None and not hasattr(text.attn, "__wrapped__"):
         text.attn = sliced_decode_attn(text.attn)
 

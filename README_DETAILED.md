@@ -202,7 +202,10 @@ specific, and `ocr` to transcribe text rather than describe it. Returns one capt
   Defaults to `false`, which keeps the original `list[str]` return shape; `true` returns one
   `{caption, text_regions, corrections, caption_corrected}` dict per page.
 - **deep**: When `true`, caption with Moondream2's long captioner (already loaded for `query_image`) instead
-  of Florence-2. About 3x slower (~33s vs ~11s per image on CPU) and ~60% longer. On VisionBench's 280
+  of Florence-2. About 4x slower and ~60% longer: measured 2026-10-21 on CPU, the caption itself takes ~27 s
+  (Moondream2 encode plus long caption) against ~7 s for Florence-2 in bf16, plus the shared text reading for the
+  `Visible text` line. (It was ~3x, ~33 s vs ~11 s, before Florence-2 moved to bf16 and Moondream2's decode to a
+  sliced KV cache the same day.) On VisionBench's 280
   held-out generalist images it named 61.5% of labelled key facts against 53.3% (charts 67 vs 52, signage
   71 vs 54, game UI 59 vs 44, documents 71 vs 58; everyday photos and artwork barely move), naming a
   labelled absent object in ~1% of captions either way. Cut to the default's length it is no better
@@ -426,6 +429,15 @@ the other half (427 counts, rules committed before the run) exact counts went **
 14.1 to 22.2). The controls held under both the "petal" prompts and literal names ("pink circle", "ball", "rod"),
 and fixture positives went 8/10 -> 7/10. Other Grounding DINO callers (spatial relations, structured analysis's
 part crops) keep 0.15. Pass `threshold=0.15` to count as before.
+
+**2026-10-21: the fixtures are flat images, and flat images count on Florence-2.** Since routing by pixel
+statistics arrived, these synthetic shapes go to Florence-2's grounding head, not Grounding DINO, so the tables
+above describe Grounding DINO when forced and not what `count_objects` does with them. Florence-2 also draws a box
+around the whole group, and until 2026-10-21 nothing dropped it there: eight separated petals counted 9 and every
+positive was wrong (0/10). The same group-box filter now applies on that path (VisionBench
+`flat_count_envelope.py`): positives **5/10**, controls 8/8; on 187 fresh flat-image counts exact went 47.6% ->
+50.8% (mean error 1.08 -> 0.84). Florence-2 still merges touching or overlapping shapes into one box (rings of 8
+touching discs and the 30-disc grid count 1), and it cannot tell nested shapes (concentric circles) from a group.
 
 #### Limits
 

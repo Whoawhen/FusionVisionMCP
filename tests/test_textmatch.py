@@ -122,3 +122,27 @@ class TestShouldCorrect:
         corrections, corrected = correct_text('a field titled "Nejsem Plátce DPH"', regions)
         assert corrections == []
         assert "Nejsem Plátce DPH" in corrected
+
+
+class TestRepairReplacementChars:
+    """U+FFFD in caption prose (a tokenizer splitting a multi-byte character) is mended from OCR or dropped."""
+
+    def test_unique_ocr_word_fills_it(self) -> None:
+        from fusion_vision_mcp.textmatch import repair_replacement_chars
+
+        caption = "The menu lists cr�ditos, salir and save."
+        assert repair_replacement_chars(caption, "NUEVO\nCréditos\nSalir") == "The menu lists Créditos, salir and save."
+
+    def test_without_a_unique_match_the_character_is_dropped(self) -> None:
+        from fusion_vision_mcp.textmatch import repair_replacement_chars
+
+        assert repair_replacement_chars("a caf� sign", "") == "a caf sign"
+        # Two OCR words fit "b?d": ambiguous, so no guess.
+        assert repair_replacement_chars("a b�d", "bad bed") == "a bd"
+
+    def test_one_character_per_mark_and_other_tokens_untouched(self) -> None:
+        from fusion_vision_mcp.textmatch import repair_replacement_chars
+
+        # "cr?ditos" cannot become "creeditos": one mark, one character.
+        assert repair_replacement_chars("cr�ditos here", "creeditos here") == "crditos here"
+        assert repair_replacement_chars("plain caption", "anything") == "plain caption"

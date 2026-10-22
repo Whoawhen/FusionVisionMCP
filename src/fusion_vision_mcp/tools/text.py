@@ -16,6 +16,7 @@ from fusion_vision_mcp.images import crop_region, get_images
 from fusion_vision_mcp.ocr_fusion import fuse_caption_ocr
 from fusion_vision_mcp.params import CustomPrompt, ImagePath
 from fusion_vision_mcp.protocols import AppContext
+from fusion_vision_mcp.textmatch import repair_replacement_chars
 
 
 def register(mcp: MCPServer) -> None:
@@ -97,7 +98,8 @@ def register(mcp: MCPServer) -> None:
             Field(
                 description=(
                     "When true, caption with Moondream2's long captioner instead of Florence-2: "
-                    "about 3x slower (~33s vs ~11s per image on CPU) and about 60% longer, and it "
+                    "about 4x slower (~27s vs ~7s per image for the caption itself on CPU, "
+                    "2026-10-21) and about 60% longer, and it "
                     "covers more of what is there. Worth it on charts, documents, signage, game UI "
                     "and screenshots, where the default misses most; little gain on everyday photos "
                     "and artwork. The return shape is unchanged, and `verify_text` still applies."
@@ -203,13 +205,12 @@ def register(mcp: MCPServer) -> None:
                 captions = app.vqa.caption(images, length="long")
             else:
                 captions = app.florence2.caption(images, CaptionLevel.MORE_DETAILED)
+            texts = [page["text"] for page in ocr_pages(app, images)] if read_text else [""] * len(captions)
+            # A captioner can emit U+FFFD for a split multi-byte character; mend it from the page's text.
+            captions = [repair_replacement_chars(c, t) for c, t in zip(captions, texts, strict=True)]
             # Appended after any verify step, so `verify_text` checks only the prose's own
             # quotes, never the verbatim line.
-            lines = (
-                [visible_text_line(page["text"]) for page in ocr_pages(app, images)]
-                if read_text
-                else [""] * len(captions)
-            )
+            lines = [visible_text_line(t) for t in texts] if read_text else [""] * len(captions)
 
             def with_text(caption_text: str, line: str) -> str:
                 return f"{caption_text.rstrip()} {line}" if line else caption_text

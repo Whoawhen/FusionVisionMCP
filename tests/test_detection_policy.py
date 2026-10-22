@@ -7,6 +7,7 @@ against recording stubs.
 
 import tempfile
 from pathlib import Path
+from typing import ClassVar
 
 import numpy as np
 import pytest
@@ -274,7 +275,7 @@ class TestFlorenceGroupBox:
     """Florence-2 returns a box around the whole arrangement besides the instances; counting drops it."""
 
     # Two separated instances plus the box enclosing both: the shape seen on two touching petals (3 for 2).
-    GROUP = [[10, 10, 60, 30], [10, 10, 30, 30], [40, 10, 60, 30]]
+    GROUP: ClassVar[list[list[int]]] = [[10, 10, 60, 30], [10, 10, 30, 30], [40, 10, 60, 30]]
 
     def test_counting_drops_the_group_box(self) -> None:
         app = _StubApp(florence2=_RecordingFlorence2(self.GROUP))
