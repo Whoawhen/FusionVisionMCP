@@ -139,3 +139,15 @@ so ONNX single image is the fastest CPU runtime measured, and 10.6 s + ~2.4 s OC
 3. **Moondream2 replacement:** VQA failed on false-premise text questions; a premise-check variant could be gated.
 4. Still open: text-aware prompt precision check (worker + you), GGUF `deep` re-test (its timing was GPU too), Gemma 4
    E2B (only if LFM fails), Cline rules refresh, OCR-TextVQA plan.
+
+## User decisions, 2026-10-23 morning
+1. **ONNX single image: go.** `lfm_onnx.py tune1` (120 tune, raw within -1.0 of llama-server, median <= 12 s), then
+   `confirm` (280 + `coco_chair2`, the default-slot gate) if it holds. Rules committed before running.
+2. **`deep` wording: held back, corrected.** The "its gain is length" finding is against the *LFM* default only. Against
+   the shipped default (Florence-2) `deep` is +10.0 raw and **+8.1 at matched length** (CI 5.8-10.5) on confirm, so the
+   current description ("covers clearly more of what is there") stays true. The rewording ships in the same commit as
+   the default switch, if that happens, e.g.: "against the default caption it adds detail rather than accuracy per
+   word: +3.5 key facts (74.8 vs 71.3%), -1.3 at equal length; longer (142 vs 94 words) and ~3x slower".
+3. **Premise-check VQA: go.** `vqa_premise.py screen` on phase 11 (arms plain / premise / ocr_text, ONNX single
+   image, CPU). Phase 11 is a screen here (the variants answer its failures); a pass needs a fresh VQA set with
+   false-premise questions (a worker round) before anything ships.
