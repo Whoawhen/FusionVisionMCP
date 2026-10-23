@@ -113,7 +113,7 @@ class VqaProcessor(Protocol):
 
 
 class Captioner(Protocol):
-    """Represents a protocol for a long image captioner (`caption(deep=true)`)."""
+    """Represents a protocol for a prose captioner (`caption`'s default, and `caption(deep=true)`)."""
 
     def caption(self, images: list[Image]) -> list[str]:
         """One detailed prose caption per image."""
@@ -211,3 +211,6 @@ class AppContext:
     # LFM2.5-VL-3B, `caption(deep=true)`'s captioner. None in tests and hand-built contexts, where `deep` falls back
     # to Moondream2's long caption (`vqa`), the captioner before 2026-10-22.
     deep_captioner: Captioner | None = None
+    # LFM2.5-VL-3B on ONNX Runtime, `caption`'s default captioner since 2026-10-23. None with
+    # `--caption-model florence2`, in tests and in hand-built contexts, where the default caption is Florence-2's.
+    captioner: Captioner | None = None

@@ -166,6 +166,23 @@ Describe what an image shows, as one detailed prose caption of the whole scene. 
 `dense_region_caption` instead for a separate caption and box per region, `query_image` to ask something
 specific, and `ocr` to transcribe text rather than describe it. Returns one caption per page for a PDF.
 
+**Since 2026-10-23 the caption is LFM2.5-VL-3B on ONNX Runtime, not Florence-2.** `lfm_onnx.LfmOnnxCaptioner` runs
+Liquid AI's ONNX export (`LiquidAI/LFM2.5-VL-3B-ONNX` at `020f931`: fp32 vision encoder and embeddings, q8 decoder)
+on CPU with one image of at most 256 tokens (no tiles), the prompt "Describe only what is clearly visible in this
+image.", the model card's decoding (temperature 0.1, min_p 0.15, repetition penalty 1.05) seeded with 0, so a caption
+repeats. The export has no generation loop; the wrapper is one (image tokens spliced into the prompt, the decoder on
+its own conv and KV state). Chosen by VisionBench (`caption_default_lfm.py`, `caption_default_prompt.py`,
+`lfm_onnx.py`, rules fixed before each run): on the 280 held-out images, with the text line, **71.0%** of labelled
+key facts against **64.8%** for Florence-2-large bf16 (+6.2, CI 4.0 to 8.5; +9.1 at equal length), ahead or level on
+all nine image kinds (charts +12.8, documents +11.5, signage +10.7, everyday photos level); on 300 fresh COCO photos
+it names absent object categories less often (CHAIR-i 12.4% vs 13.3%, CHAIR-s 23.0% vs 27.7%). The cost is time and
+memory: a median 11.4 s for the caption on CPU (Florence-2: 6.6 s), 14.1 s with the text line, ~8.3 GB at peak and a
+~6.3 GB download on first use. The cautious prompt is what keeps it below Florence-2's hallucination rate ("Describe
+this image in detail." named 78% of key facts on tune but absent objects at 16.7%), and fuller "clearly visible"
+prompts did not beat it on the held-out images. The server's wrapper reproduced the gate's captions on 8 of 8 images.
+`--caption-model florence2` keeps Florence-2's caption, and a server that cannot load the ONNX model (no network for
+the first download) falls back to it. The weights are under the LFM Open License v1.0 (see `deep`).
+
 > **Don't trust text a caption quotes back.** A caption that mentions a name, brand or label is *describing*
 > it, not transcribing it, and Florence-2 misspells text here that it reads correctly elsewhere. Tested live
 > on this repository's own banner image: `caption` rendered the logo "FusionVisionMCP" as **"FusionVisionMP"**
@@ -202,9 +219,13 @@ specific, and `ocr` to transcribe text rather than describe it. Returns one capt
   Defaults to `false`, which keeps the original `list[str]` return shape; `true` returns one
   `{caption, text_regions, corrections, caption_corrected}` dict per page.
 - **deep**: When `true`, caption with **LFM2.5-VL-3B** (Liquid AI; LFM2.5 language model with a SigLIP2 vision
-  encoder) instead of Florence-2. Since 2026-10-22; Moondream2's long caption held the slot before. About 5x slower
-  and ~75% longer: the caption itself takes a median ~35 s on CPU (p90 ~50 s) against ~7 s for Florence-2, plus the
-  shared text reading for the `Visible text` line. The model is loaded only by `deep` (~6.4 GB in bf16, released
+  encoder) in bf16 with up to 4 tiles and a fuller prompt. Since 2026-10-22; Moondream2's long caption held the slot
+  before. **Against today's default (the same model on ONNX) it adds detail, not accuracy per word:** 74.8% vs 71.0%
+  of key facts on the 280 held-out images, but -1.3 at equal length (CI -3.5 to 0.8), 142 vs 94 words, and behind on
+  documents (80.5 vs 83.2%). About 3x slower: the caption itself takes a median ~35 s on CPU (p90 ~50 s) against
+  ~11 s for the default, plus the shared text reading for the `Visible text` line. (A rule fixed before the default
+  was confirmed would have retired `deep` had it gained under 2.0 points raw; it gained 3.5, CI 1.6 to 5.4.) The
+  figures below compare it with Florence-2, the default when it shipped. The model is loaded only by `deep` (~6.4 GB in bf16, released
   on the idle timer like the rest). It runs at revision `35a118d`, bf16, the prompt "Describe this image in
   detail.", the model card's decoding (temperature 0.1, min_p 0.15, repetition penalty 1.05) and at most 4 image
   tiles of 512 px plus a thumbnail (the default 10 tiles gave no more recall and took 46.8 s, over the 45 s cap).
@@ -224,11 +245,11 @@ specific, and `ocr` to transcribe text rather than describe it. Returns one capt
   `deep` falls back to Moondream2's long caption, at 6 crops on pages under 30 OCR words and 12 above (plan
   step 1C-b).
 - **region**: `[x1, y1, x2, y2]` in the image's pixels: caption only that part, so it gets the captioner's whole
-  input resolution (Florence-2 shrinks every image to 768 px). The box is widened by 15% on each side, to at
+  input resolution (the default caption sees about 512 px; Florence-2 shrank every image to 768 px). The box is widened by 15% on each side, to at
   least 32 px, and clipped to the image; the caption then describes the region, not the image. Measured
   2026-10-15 (VisionBench gate R): for 528 questions, a worker drew where it would look without seeing the
   answer, and the region's caption named the answer 80.3% of the time against 67.8% for the whole image
-  (+12.5, CI 8.3 to 16.9). Not offered on `ocr` (the same crops cut words at the edge: 71.6 → 54.5%) or
+  (+12.5, CI 8.3 to 16.9), measured with Florence-2 as the captioner. Not offered on `ocr` (the same crops cut words at the edge: 71.6 → 54.5%) or
   `query_image` (no measurable change).
 
 ### detect_objects ➕

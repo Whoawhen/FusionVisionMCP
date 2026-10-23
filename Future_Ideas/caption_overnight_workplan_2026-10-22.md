@@ -151,3 +151,26 @@ so ONNX single image is the fastest CPU runtime measured, and 10.6 s + ~2.4 s OC
 3. **Premise-check VQA: go.** `vqa_premise.py screen` on phase 11 (arms plain / premise / ocr_text, ONNX single
    image, CPU). Phase 11 is a screen here (the variants answer its failures); a pass needs a fresh VQA set with
    false-premise questions (a worker round) before anything ships.
+
+## Day results, 2026-10-23 (VisionBench `9d9e078`)
+
+**ONNX single image (CPU) passes the default-slot gate.** Tune: 72.0% vs llama-server's 72.9 (-0.9, within -1.0),
+11.0 s. Confirm (280) vs Florence-2 bf16: **71.0 vs 64.8% (+6.2, CI 4.0-8.5), matched +9.1 (CI 6.7-11.4)**; fresh COCO
+CHAIR **12.4 / 23.0 vs 13.3 / 27.7**; median caption 11.4 s, **caption + OCR 14.1 s** (gate 15; Florence-2's caption is
+6.6 s); peak process memory 8.3 GB; 0 errors. Ahead or level on all nine kinds (charts +12.8, documents +11.5, signage
++10.7; everyday photos level). Watch: the confirm set's absent-object probe was named 6 times vs Florence-2's 1
+(llama-server 2); not a gate, CHAIR on COCO is the hallucination gate and it passed.
+**The user approved shipping it (2026-10-23); shipped with wrapper parity 8 of 8 (`lfm_onnx_wrapper_parity.py`).**
+
+**Premise-check VQA screen (phase 11, ONNX single image):**
+| arm | overall | no_text | text | yes_no | count | passes |
+|---|---|---|---|---|---|---|
+| Moondream2 | 78.8 | 88.7 | 58.1 | 97.6 | 70.1 | |
+| plain | 81.7 | 75.5 | 62.5 | 97.6 | 79.9 | no (no_text -13.2) |
+| premise | 80.7 | 100 | 59.5 | 94.7 | 76.2 | yes |
+| **ocr_text** (picked) | **82.4** | **100** | 61.6 | 97.6 | 79.9 | yes |
+
+Median answer 4.6 s vs Moondream2's 10.6 s (different sessions). The text regex routed all 53 no_text questions and
+193 of 341 text ones. The OCR context did not help real text questions (61.6 vs plain 62.5), and one image without
+tiles reads text worse than llama-server's run did (text 62.5 vs 73.6), so tiles for text questions are the next lever.
+Phase 11 is a screen here: shipping needs a fresh VQA set with false-premise questions (worker round).

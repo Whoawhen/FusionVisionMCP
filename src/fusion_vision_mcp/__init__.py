@@ -22,6 +22,7 @@ from mcp.server.mcpserver import MCPServer
 
 from fusion_vision_mcp import defect_probe
 from fusion_vision_mcp.constants import (
+    CAPTION_MODELS,
     DEFAULT_AESTHETIC_MODEL,
     DEFAULT_FLORENCE2_MODEL,
     DEFAULT_GROUNDING_DINO_MODEL,
@@ -48,6 +49,7 @@ if TYPE_CHECKING:
     from fusion_vision_mcp.grounding_dino import GroundingDino
     from fusion_vision_mcp.image_quality import ImageQuality
     from fusion_vision_mcp.lfm import LfmCaptioner
+    from fusion_vision_mcp.lfm_onnx import LfmOnnxCaptioner
     from fusion_vision_mcp.moondream import Moondream
     from fusion_vision_mcp.ppocr_engine import PPOCREngine
     from fusion_vision_mcp.reasoner import VisionReasoner
@@ -81,6 +83,7 @@ async def app_lifespan(
     ocr_languages: tuple[str, ...] = ("en",),
     idle_timeout: float = 0,
     device: str | None = None,
+    caption_model: str = CAPTION_MODELS[0],
 ) -> AsyncIterator[AppContext]:
     """Context manager for the FastMCP app lifespan.
 
@@ -114,6 +117,11 @@ async def app_lifespan(
         from fusion_vision_mcp.lfm import LfmCaptioner
 
         return LfmCaptioner(device=device)
+
+    def _make_lfm_onnx() -> "LfmOnnxCaptioner":
+        from fusion_vision_mcp.lfm_onnx import LfmOnnxCaptioner
+
+        return LfmOnnxCaptioner()
 
     def _make_sam2() -> "Sam2":
         from fusion_vision_mcp.sam2 import Sam2
@@ -229,6 +237,13 @@ async def app_lifespan(
     # Only caption(deep=true) loads it (~6.4 GB in bf16).
     deep_captioner = cast(Captioner, IdleProxy(IdleReleased(_make_lfm, idle_timeout, "LFM2.5-VL")))
 
+    # `caption`'s default (~8 GB at peak, CPU). `--caption-model florence2` keeps Florence-2's caption instead.
+    captioner = (
+        cast(Captioner, IdleProxy(IdleReleased(_make_lfm_onnx, idle_timeout, "LFM2.5-VL ONNX")))
+        if caption_model == "lfm-onnx"
+        else None
+    )
+
     yield AppContext(
         florence2,
         vqa,
@@ -242,6 +257,7 @@ async def app_lifespan(
         defect_embedder,
         locator,
         deep_captioner,
+        captioner,
     )
 
 
@@ -258,6 +274,7 @@ def server(
     ocr_languages: tuple[str, ...] = ("en",),
     idle_timeout: float = 0,
     device: str | None = None,
+    caption_model: str = CAPTION_MODELS[0],
 ) -> MCPServer:
     """Creates a new FastMCP server instance with the specified name and model ID."""
     mcp = MCPServer(
@@ -275,6 +292,7 @@ def server(
             ocr_languages=ocr_languages,
             idle_timeout=idle_timeout,
             device=device,
+            caption_model=caption_model,
         ),
     )
 
@@ -287,6 +305,7 @@ def server(
 
 
 __all__: Final = [
+    "CAPTION_MODELS",
     "DEFAULT_AESTHETIC_MODEL",
     "DEFAULT_GROUNDING_DINO_MODEL",
     "DEFAULT_MOONDREAM_MODEL",

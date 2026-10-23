@@ -5,6 +5,7 @@ here exposes `register(mcp)`; `tools.register_all` calls them in the order the t
 should appear to a client.
 """
 
+import logging
 from typing import Annotated, Any
 
 from mcp.server.mcpserver import Context, MCPServer
@@ -17,6 +18,8 @@ from fusion_vision_mcp.ocr_fusion import fuse_caption_ocr
 from fusion_vision_mcp.params import CustomPrompt, ImagePath
 from fusion_vision_mcp.protocols import AppContext
 from fusion_vision_mcp.textmatch import repair_replacement_chars
+
+logger = logging.getLogger(__name__)
 
 
 def register(mcp: MCPServer) -> None:
@@ -97,14 +100,14 @@ def register(mcp: MCPServer) -> None:
             bool,
             Field(
                 description=(
-                    "When true, caption with LFM2.5-VL-3B's detailed description instead of "
-                    "Florence-2: about 5x slower (~35s vs ~7s per image for the caption itself on CPU, "
-                    "2026-10-22) and about 75% longer, and it covers clearly more of what is there "
-                    "(key facts 74.8% vs 64.5% on 280 held-out images), on most kinds of image (signs "
-                    "about level). Worth "
-                    "it whenever the default caption is too thin or the image is a screenshot, chart, "
-                    "document, game UI or illustration. The return shape is unchanged, and "
-                    "`verify_text` still applies."
+                    "When true, ask the same model (LFM2.5-VL-3B) for a longer, fuller description, in "
+                    "bf16 with up to 4 tiles: about 3x slower (~35s vs ~11s per image for the caption itself "
+                    "on CPU) and about 50% longer (142 vs 94 words). It adds detail rather than accuracy per "
+                    "word: key facts 74.8% vs 71.0% for the default on 280 held-out images, but no better "
+                    "when both are cut to the same length (-1.3), and it names absent objects more often "
+                    "(COCO: 16.5% of the objects it names, against about 11-12% for the default). Use it when the default caption is too thin for what you need; "
+                    "for one detail, `region` or `query_image` is cheaper. The return shape is unchanged, "
+                    "and `verify_text` still applies."
                 )
             ),
         ] = False,
@@ -128,12 +131,12 @@ def register(mcp: MCPServer) -> None:
             Field(
                 description=(
                     "Optional [x1, y1, x2, y2] in the image's pixels: caption only that part, so it gets the "
-                    "captioner's whole input resolution (Florence-2 shrinks every image to 768 px, so small text "
+                    "captioner's whole input resolution (the default caption sees about 512 px, so small text "
                     "and HUD detail on a large screenshot are a few pixels). The box is widened by 15% on each "
                     "side, to at least 32 px, and clipped to the image. Pointed at the part a question is about, "
                     "the caption named the answer 80% of the time against 68% for the whole image (528 "
-                    "questions). The caption then describes the region, not the image; applies to every page of "
-                    "a PDF."
+                    "questions, measured with Florence-2 as the captioner). The caption then describes the "
+                    "region, not the image; applies to every page of a PDF."
                 )
             ),
         ] = None,
@@ -143,16 +146,24 @@ def register(mcp: MCPServer) -> None:
         The default choice for "what is this a picture of". Returns a single
         paragraph covering the scene as a whole, with no coordinates.
 
-        Set `deep=true` for a closer look when the default caption is too thin
-        to answer what you need, or up front for a chart, document, sign,
-        screenshot or game UI. Since 2026-10-22 it is LFM2.5-VL-3B (Liquid AI):
-        on 280 held-out mixed images, with the text line, it named 74.8% of the
-        labelled key facts against 64.5% for the default caption and 69.0% for
-        the earlier deep captioner (Moondream2), and it beat Moondream2 at
-        equal length too (+8.0 points), so it is sharper per word, not just
-        longer. It invents absent objects about as often as Moondream2 did
-        (COCO: 16.5% of the objects it names vs 17.1%); the default caption is
-        more cautious (12.1%).
+        Since 2026-10-23 the caption comes from LFM2.5-VL-3B (Liquid AI) on
+        ONNX Runtime, asked to describe only what is clearly visible. On 280
+        held-out mixed images (photos, art, screenshots, documents, charts,
+        game UI, signs, illustrations, AI images), with the text line, it named
+        71.0% of the labelled key facts against 64.8% for Florence-2-large, the
+        captioner before it (+9.1 at equal length), ahead or level on every
+        kind, and it names absent objects less often (COCO: 12.4% of the
+        objects it names vs 13.3%). It is slower: about 11 s for the caption on
+        CPU against Florence-2's ~7 s, ~14 s with the text line. A server
+        started with `--caption-model florence2` uses Florence-2 instead, as
+        does any server that cannot load the ONNX model.
+
+        Set `deep=true` when the default caption is too thin for what you need:
+        the same model, longer and fuller (142 vs 94 words), at ~35 s. It names
+        more key facts (74.8% vs 71.0%) because it says more, not because it is
+        sharper per word (-1.3 at equal length), and it names absent objects
+        more often (COCO: 16.5% of the objects it names, against about
+        11-12% for the default).
 
         By default the caption ends with `Visible text: "..."`, the `ocr`
         engine's verbatim reading of any text in the image (`read_text`). On
@@ -173,9 +184,9 @@ def register(mcp: MCPServer) -> None:
         text rather than describe it. Returns one caption per page for a PDF.
 
         Do not trust any text the prose quotes back. A caption that mentions a name,
-        brand or label is describing it, not transcribing it, and Florence-2
-        misspells text here that it reads correctly under `ocr` -- it rendered a
-        logo reading "FusionVisionMCP" as "FusionVisionMP" mid-caption while `ocr`
+        brand or label is describing it, not transcribing it, and captioners
+        misspell text that `ocr` reads correctly -- Florence-2 rendered a logo
+        reading "FusionVisionMCP" as "FusionVisionMP" mid-caption while `ocr`
         read the same image exactly. When a specific piece of text matters,
         confirm it with `ocr`, which handles stylized and cursive text as well as
         printed text, rather than quoting this.
@@ -216,6 +227,13 @@ def register(mcp: MCPServer) -> None:
             elif deep:
                 crops = [deep_crops(t) for t in page_texts]
                 captions = app.vqa.caption(images, length="long", max_crops=crops)
+            elif app.captioner is not None:
+                try:
+                    captions = app.captioner.caption(images)
+                except (OSError, ImportError) as exc:
+                    # No network for the first download, or no onnxruntime: the caption before 2026-10-23.
+                    logger.warning(f"LFM2.5-VL ONNX unavailable ({exc}); caption falls back to Florence-2")
+                    captions = app.florence2.caption(images, CaptionLevel.MORE_DETAILED)
             else:
                 captions = app.florence2.caption(images, CaptionLevel.MORE_DETAILED)
             texts = page_texts if read_text else [""] * len(captions)

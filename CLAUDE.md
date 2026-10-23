@@ -244,6 +244,29 @@ and `critique_composition`; whether LFM can take those over (which would also dr
 remote-code pin and `pyvips`) is untested. Weights are under the LFM Open License v1.0 (commercial use only below
 $10M annual revenue), downloaded on first use, not redistributed.
 
+**2026-10-23: the default caption is LFM2.5-VL-3B on ONNX Runtime, not Florence-2.** `lfm_onnx.LfmOnnxCaptioner`
+(`AppContext.captioner`, lazy and idle-released; `--caption-model florence2` or a failed load falls back to Florence-2)
+runs Liquid AI's transformers.js export at `020f931` on CPU: fp32 vision encoder and embeddings, q8 decoder, one image
+of at most 256 tokens, "Describe only what is clearly visible in this image.", the card's decoding seeded with
+`CAPTION_SEED`. The export has no generation loop, so the wrapper is one. VisionBench, rules fixed before each run:
+`caption_default_lfm.py` (Q8 GGUF on llama-server: screen, then confirm on 280 + a fresh COCO set `coco_chair2`),
+`caption_default_prompt.py` (fuller prompts won tune and tied on confirm), `lfm_onnx.py` (the shipped runtime):
+confirm 64.8 -> **71.0%** vs Florence-2-large bf16 (+6.2, CI 4.0 to 8.5; matched +9.1), CHAIR-i 13.3 -> 12.4%, CHAIR-s
+27.7 -> 23.0%, median caption 11.4 s / with the text line 14.1 s against the 15 s gate, ~8.3 GB. The wrapper reproduced
+the gate's captions on 8 of 8 (`lfm_onnx_wrapper_parity.py`). Four tiles took 20 s; the base prompt ("Describe this
+image in detail.") named more but failed CHAIR (16.7 / 31.7%). Florence-2 still backs `verify_text`, dense captions,
+flat-image detection and counting, the composition subject box and `process`.
+
+**llama-server ran on the GPU without being asked.** The winget llama.cpp build ships Vulkan and defaults to
+`--n-gpu-layers auto`: every llama-server timing in the runs above was the RTX 5060 (2.4 s), not CPU (25.6 s). Recall
+was unaffected (CPU vs GPU +0.0 on tune). Any llama.cpp run here sets `LLAMA_ARG_N_GPU_LAYERS=0`,
+`LLAMA_ARG_DEVICE=none` and `LLAMA_ARG_MMPROJ_OFFLOAD=0` and checks `-v` for "offloaded 0/31 layers"
+(`llama_cpu_retime.py`).
+
+**`deep` against the new default adds detail, not accuracy per word:** 74.8 vs 71.0% raw but -1.3 at equal length,
+142 vs 94 words. It stayed under a rule fixed before the default's confirm (retire if it gained < 2.0 raw; it gained
+3.5, CI 1.6 to 5.4). Against Florence-2 it had been +8.1 at equal length, so its description changed with the default.
+
 **2026-10-22: `deep` tiles text-light pages into 6 crops, not 12 (plan step 1C-b).** (Applies to the Moondream2
 fallback only since Track 4 shipped.) `caption(deep=true)` now reads
 the page's text first and sets Moondream2's `max_crops` per image for the encode only (`analysis.deep_crops`,

@@ -4,6 +4,7 @@ from typing import Final, Literal
 import rich_click as click
 
 from . import (
+    CAPTION_MODELS,
     DEFAULT_AESTHETIC_MODEL,
     DEFAULT_FLORENCE2_MODEL,
     DEFAULT_GROUNDING_DINO_MODEL,
@@ -55,6 +56,16 @@ def resolve_memory_mode(memory_mode: str) -> float:
     default=DEFAULT_FLORENCE2_MODEL,
     show_default=True,
     help="Specifies the Florence-2 model to be used for caption/OCR/detection/grounding.",
+)
+@click.option(
+    "--caption-model",
+    type=click.Choice(CAPTION_MODELS),
+    default=CAPTION_MODELS[0],
+    show_default=True,
+    help=(
+        "Captioner behind `caption`'s default: 'lfm-onnx' (LFM2.5-VL-3B on ONNX Runtime, ~11 s, ~6.3 GB download, "
+        "names more of an image) or 'florence2' (the --model Florence-2, ~7 s)."
+    ),
 )
 @click.option(
     "--moondream-model",
@@ -142,6 +153,7 @@ def resolve_memory_mode(memory_mode: str) -> float:
 @click.version_option()
 def main(
     model: str,
+    caption_model: str,
     moondream_model: str,
     moondream_revision: str,
     sam2_model: str,
@@ -174,6 +186,7 @@ def main(
         ocr_languages=ocr_languages,
         idle_timeout=idle_minutes * 60,
         device=device,
+        caption_model=caption_model,
     )
 
     logger.info(f"Starting server with {model} + {moondream_model}@{moondream_revision} (Press CTRL+D to quit)")

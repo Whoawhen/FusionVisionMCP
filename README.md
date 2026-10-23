@@ -56,7 +56,7 @@ root-caused against the exact fixture that exposed it, not patched at the sympto
 | Capability | How it's provided |
 |---|---|
 | OCR & document text | PaddleOCR PP-OCRv6 English via RapidOCR (ONNX, CPU) — printed, stylized and low-contrast text through one tool, with a per-span confidence score. EasyOCR covers non-English languages and the generated-gibberish check |
-| Captioning | Florence-2, whole-scene or per-region |
+| Captioning | LFM2.5-VL-3B (whole scene), Florence-2 (per region) |
 | Object detection / grounding | SAM 3 on photos and flat images (it can say "not here") — scored boxes and center points for a named object |
 | Instance counting | Grounding DINO — parallel object queries, not a sequential emission, so overlapping-but-separate instances don't collapse into one |
 | Visual question answering | Moondream2 — free-form questions about image content |
@@ -70,7 +70,7 @@ root-caused against the exact fixture that exposed it, not patched at the sympto
 | Tool | Model(s) | Description |
 |---|---|---|
 | `ocr` | PP-OCRv6 English | Transcribe any text in an image or PDF — printed, stylized or low-contrast alike — with a per-span confidence score. Multi-column pages are split by geometry and read in reading order. Text-free images return nothing. |
-| `caption` | Florence-2; LFM2.5-VL-3B (`deep`) | Describe what an image shows as one detailed prose caption of the whole scene. `verify_text=true` also corrects close text misses against a verbatim OCR pass; `deep=true` uses LFM2.5-VL-3B's detailed description (~35 s; key facts 74.8% vs 64.5% for the default on 280 held-out images). By default (`read_text`) the caption ends with `Visible text: "..."`, the `ocr` engine's verbatim reading of any text in the image. `region=[x1, y1, x2, y2]` captions just that part at full resolution, for small text or HUD detail (named the answer 80% of the time vs 68% for the whole image). |
+| `caption` | LFM2.5-VL-3B (ONNX; `deep` in bf16) | Describe what an image shows as one detailed prose caption of the whole scene: key facts 71.0% vs 64.8% for Florence-2, its captioner before 2026-10-23, on 280 held-out images, at ~11 s vs ~7 s (`--caption-model florence2` keeps Florence-2). `verify_text=true` also corrects close text misses against a verbatim OCR pass; `deep=true` gives a longer, fuller description (~35 s; 74.8%, by saying more rather than more sharply). By default (`read_text`) the caption ends with `Visible text: "..."`, the `ocr` engine's verbatim reading of any text in the image. `region=[x1, y1, x2, y2]` captions just that part at full resolution, for small text or HUD detail (named the answer 80% of the time vs 68% for the whole image). |
 | `detect_objects` | SAM 3 (Florence-2 / Grounding DINO if it can't load) | Locate a named object, returning scored bounding boxes, center points and labels. On photos it rarely boxes an object that isn't there. |
 | `dense_region_caption` | Florence-2 | Caption every salient region of an image at once, without naming objects first. |
 | `query_image` | Moondream2 | Ask a free-form question about an image (visual question answering). `check_consistency=true` routes a low-confidence answer to the measurement that actually answers it, when one applies. |
@@ -218,9 +218,9 @@ a session that only captions never loads the segmentation or aesthetic models at
 
 The main models, each loaded on demand and released on its own idle timer:
 
-- **Florence-2** (Microsoft) — captioning, OCR, object detection/grounding, dense region captioning
+- **Florence-2** (Microsoft) — OCR with regions, object detection/grounding, dense region captioning (and `caption` with `--caption-model florence2`)
 - **Moondream2** (Vikhyat) — visual question answering
-- **LFM2.5-VL-3B** (Liquid AI) — `caption(deep=true)`'s detailed description (weights under the LFM Open License v1.0)
+- **LFM2.5-VL-3B** (Liquid AI) — `caption`: ONNX Runtime for the default caption, bf16 for `deep=true` (weights under the LFM Open License v1.0)
 - **SAM2** (Meta) — segmentation masks, the basis for `spatial_relations`
 - **Grounding DINO** (IDEA-Research) — open-vocabulary detection backing `count_objects`
 - **CLIP + LAION aesthetic head** — aesthetic quality scoring

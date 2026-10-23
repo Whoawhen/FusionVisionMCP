@@ -161,6 +161,29 @@ DEEP_CAPTION_MAX_TILES: Final[int] = 4
 DEEP_CAPTION_PROMPT: Final[str] = "Describe this image in detail."
 DEEP_CAPTION_MAX_NEW_TOKENS: Final[int] = 768
 
+#: The default `caption` since 2026-10-23: LFM2.5-VL-3B on ONNX Runtime (Liquid AI's transformers.js export at this
+#: revision: fp32 vision encoder and token embeddings, q8 decoder), one image of at most 256 tokens (no tiles),
+#: CAPTION_PROMPT, the card's decoding with CAPTION_SEED. VisionBench `lfm_onnx.py` (rules fixed before each run): on
+#: 280 held-out images 64.8% -> 71.0% of key facts against Florence-2-large bf16 (+6.2, CI 4.0 to 8.5; matched length
+#: +9.1), fresh COCO CHAIR-i 13.3 -> 12.4%, CHAIR-s 27.7 -> 23.0%, median caption 11.4 s and caption + `ocr` 14.1 s on
+#: CPU (Florence-2: 6.6 s), peak ~8.3 GB. Four tiles took 20 s; the prompt round's fuller prompts did not beat this one
+#: on confirm. Changing any setting means re-running the gate. Florence-2 stays loaded for every other consumer.
+DEFAULT_CAPTION_ONNX_MODEL: Final[str] = "LiquidAI/LFM2.5-VL-3B-ONNX"
+DEFAULT_CAPTION_ONNX_REVISION: Final[str] = "020f9311343b8f3c6d9789b4dd300e749ec52cd1"
+CAPTION_ONNX_FILES: Final[dict[str, str]] = {
+    "vision": "onnx/vision_encoder.onnx",
+    "embed": "onnx/embed_tokens.onnx",
+    "decoder": "onnx/decoder_model_merged_q8.onnx",
+}
+CAPTION_PROMPT: Final[str] = "Describe only what is clearly visible in this image."
+CAPTION_MAX_NEW_TOKENS: Final[int] = 768
+#: Sampled, as measured; seeded so a caption repeats on the same image.
+CAPTION_SEED: Final[int] = 0
+#: As the gate ran (`-t 18` on a 24-thread CPU); capped at the machine's count.
+CAPTION_ONNX_THREADS: Final[int] = 18
+#: `--caption-model` choices.
+CAPTION_MODELS: Final[tuple[str, ...]] = ("lfm-onnx", "florence2")
+
 #: `caption(deep=true)` on Moondream2 (the fallback when no deep captioner is configured) tiles the image into at most DEEP_CROPS_TEXT local crops when the page's `ocr` text
 #: has DEEP_TEXT_WORDS words or more, and DEEP_CROPS below that (Moondream2's own setting is 12; plan step
 #: 1C-b, VisionBench `caption_1c_b.py`, 2026-10-21, both arms greedy). 6 crops: tune keyword recall 71.8 ->
