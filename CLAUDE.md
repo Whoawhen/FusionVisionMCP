@@ -167,7 +167,7 @@ the one remaining place Florence-2 reads text.
 
 **2026-10-10: the caption now carries the `ocr` engine's text (`read_text`, on by default).** The captioners
 paraphrase text and cannot read most of it, so `caption` runs `ocr_pages` and ends the caption with
-`Visible text: "..."` (verbatim, reading order, ` / ` between lines, 160 words at most since 2026-10-20, with
+`Visible text: "..."` (verbatim, reading order, ` / ` between lines, 400 words at most since 2026-10-24 (160 from 2026-10-20), with
 repeated and single-character lines dropped and a cut marked; `CAPTION_TEXT_WORDS`). A
 text-free image gets no line, so its caption is unchanged. On VisionBench's 280 held-out images (variants fixed
 before running, `caption_text_grounding.py`): default 53.3% -> 60.9% of key facts, `deep` 61.5% -> 66.3%, no image
@@ -185,6 +185,14 @@ about half that. The server's own line matched the rebuilt one on 272 of 272 cap
 2 of 300 photos have more than 40 words) and on round 11 the 80-word line added no absent object
 (`caption_text_cap_guards.py`). Putting titles and large lines first gained nothing (+0.4, CI -1.4 to 2.2). OCR alone
 finds 76% of round 18's phrases, so text is still left out of the caption on dense images.
+
+**2026-10-24: the line holds 400 words.** Re-measured with the LFM ONNX default's prose (VisionBench
+`caption_text_cap_lfm.py`, caps and rule fixed before the run; round 20 reused, as no fresh text-heavy set exists): key
+phrases 62.5% at 160 -> 65.7 (240) -> 67.2 (320, +4.7, CI 3.1 to 6.7) -> 68.5% uncapped (+6.0, CI 4.0 to 8.5), all
+qualifying (round 20's absent objects and COCO CHAIR unchanged). The rule recommended uncapped (320 reached 78% of its
+gain, under the 80% bar); the user chose 400 (67.8%, +5.3; computed after the run), because uncapped lines reached
+1,021 words on round 20 and 1,985 on round 21. The median line is ~117 words on text-heavy pages and 10 on a general mix;
+400 cuts 7% of text-heavy pages. `query_image`'s OCR context (`VQA_OCR_WORDS`) stays 160, as gated.
 
 **2026-10-20: the line is cleaned, holds 160 words, and says when it is cut (C4-7).** `visible_text_line` drops a line
 that, lower-cased with punctuation as spaces, is under 2 characters or repeats an earlier one, caps at 160 words, and

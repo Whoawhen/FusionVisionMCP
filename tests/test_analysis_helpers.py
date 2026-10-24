@@ -399,12 +399,13 @@ class TestVisibleTextLine:
     def test_only_dropped_lines_gets_no_line(self) -> None:
         assert visible_text_line("X\n|\n•") == ""
 
-    def test_default_cap_is_160_words(self) -> None:
-        """Raised from 40 to 80 on round 18 (C4-2b stage 1b), then to 160 with the marker on round 20 (C4-7)."""
-        line = visible_text_line(" ".join(f"w{i}" for i in range(200)))
+    def test_default_cap_is_400_words(self) -> None:
+        """Raised from 40 to 80 on round 18 (C4-2b stage 1b), to 160 with the marker on round 20 (C4-7), then to 400
+        with LFM prose (2026-10-24, `caption_text_cap_lfm.py`)."""
+        line = visible_text_line(" ".join(f"w{i}" for i in range(450)))
         assert line == (
-            'Visible text: "' + " ".join(f"w{i}" for i in range(160)) + '…" '
-            "(40 more words not shown; ocr returns the full text)."
+            'Visible text: "' + " ".join(f"w{i}" for i in range(400)) + '…" '
+            "(50 more words not shown; ocr returns the full text)."
         )
 
 

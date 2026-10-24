@@ -138,7 +138,11 @@ OCR_MIN_CONFIDENCE: Final[float] = 0.75
 #: images existed), together with the clean-up and cut marker in `visible_text_line`: on 150
 #: fresh text-heavy images key phrases 48.1% -> 60.0% (default, CI +9.1 to +14.9) and
 #: 54.3% -> 63.0% (`deep`), no image worse, no absent object added; COCO CHAIR unchanged.
-CAPTION_TEXT_WORDS: Final[int] = 160
+#: Raised 160 -> 400 on 2026-10-24 (`caption_text_cap_lfm.py`, rule fixed before the run, the user chose 400): with the
+#: LFM ONNX default's prose, round 20's key phrases 62.5% -> 65.7 (240), 67.2 (320, CI +3.1 to +6.7), 67.8 (400), 68.5%
+#: (uncapped); absent objects and COCO CHAIR unchanged. The median line stays ~117 words on text-heavy pages (10 on a
+#: general mix); 400 bounds the dense ones (uncapped reached 1,985 words) and cuts 7% of text-heavy pages.
+CAPTION_TEXT_WORDS: Final[int] = 400
 
 #: `caption(deep=true)` stops Moondream2's long caption once it loops: when LOOP_RUN consecutive
 #: LOOP_NGRAM-word spans all repeat earlier text, the caption is cut where that run began. The
