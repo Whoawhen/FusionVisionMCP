@@ -57,6 +57,9 @@ uv run --with mypy --with types-requests --with scipy-stubs mypy src
 
 # Tests. `testpaths` is set, so bare `pytest` collects only tests/.
 # Integration tests spawn the real server and download Florence-2-base on first run.
+# Since 2026-10-23 they also load both LFM2.5-VL-3B copies (the ONNX default, ~8 GB at peak, and bf16 `deep`, ~6.4 GB),
+# and the test server keeps every model loaded. Run the suite (and the pre-commit hook) only while no benchmark holds a
+# model: on 2026-10-23 test_caption and test_caption_deep failed with is_error during VisionBench runs, then passed 502/502 alone.
 uv run --with pytest --with anyio pytest tests -q
 
 # Faster inner loop: skip the suite that loads real models (~ several minutes)
