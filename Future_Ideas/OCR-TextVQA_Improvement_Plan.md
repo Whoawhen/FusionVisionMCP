@@ -175,7 +175,7 @@ Nothing here runs while the user's timed job is on the CPU.
    Gate 0's rule (0.3d). If any does, Track 4 is not run, under the no-wasted-runs rule. Reading of the same
    answer for tuning: PP-OCRv6 is the shipped engine with no non-Chinese replacement that meets the goals (sprint
    R), so engine-portable tuning on it (grey-zone band, `text_score`, photo-routed detector settings) is in scope.
-   The user may correct this reading.
+   **Superseded by 0.13** (user, 2026-10-23).
 2. **Fresh TextVQA set and TextOCR download:** approved, as long as they don't conflict with the user's CHAIR
    performance run. Build only when that run is not using the CPU.
 3. **`Windows.Media.Ocr`:** "maybe". The server is cross-platform today: CI installs it and runs the full
@@ -303,8 +303,80 @@ metadata, cached in `oi_train_licenses_cache.json`; the questions carry no licen
    - **Timing is read from the shipped setup on CPU.** The caption gate's 2.9 s median, at ~97 generated tokens/s,
      should be confirmed as CPU-only before the 5 s budget is judged on it. Gate 0 records median and p90 seconds
      for LFM separately.
+     **Answered (2026-10-23):** the 2.9 s was GPU (Vulkan). The caption overnight workplan measured `llama-server`
+     at 25.6 s on CPU and ONNX Runtime at 10.6 s per image. The default caption now runs LFM on ONNX (`16266f8`),
+     so that is the wrapper 3D and 2h use. At about 10 s per call, 3D cannot fit the 5 s OCR budget as an
+     always-on step. It can only be an opt-in slow path, or run where `caption` already pays for LFM. 2h is the
+     same, one call over a montage at most. Neither runs before the rule for that is fixed.
    - Its whole-image boxes also make it a candidate for Track 1's diagnosis: report whether LFM boxed the answer
      region on Bucket C items, alongside TextOCR's boxes.
+
+### 0.13 User decision (2026-10-23): tuning PP-OCRv6
+
+"I'm ok with tuning PP-OCRv6 if we have decided it can't be replaced." This replaces 0.10.1's reading on tuning.
+What has been decided, part by part:
+
+- **The whole engine and its detector: decided, so tuning is allowed now.** Sprint R gate 1 (2026-10-12) found no
+  replacement (best docTR pair 54.3 against PP-OCRv6's 67.8), and this plan proposes no replacement detector.
+  CRAFT (3C) and LFM (3D) only add boxes. So detector and pipeline settings on the photo path (`box_thresh`,
+  `limit_side_len` / `limit_type`, `use_cls`, the 1.2 crop handling) can be Gate 0 arms.
+- **The recognizer: not decided yet.** Gate 0's arms 2a′, 2b, 2b-small, 2g and 2h are each a possible non-Chinese
+  replacement for PP-OCR's recognizer on grey-zone crops. Tuning that only matters while PP-OCR's recognizer
+  stays the final reader (the grey-zone band on PP-OCR scores, `text_score`, the 0.75 floor) is held back until
+  Gate 0 shows none of them passes 0.3d. Then it runs as a follow-up arm on the same tune split. The A3 diagnostic
+  (`text_score` 0, raw quads saved) is measurement, not tuning, so it runs as planned.
+- **Engine-portable plumbing is not affected** (0.7's per-engine threshold table, quad and padding code).
+
+### 0.14 A1 results (2026-10-23)
+
+VisionBench `benchmarks/ocr_a1_routing_zones.py` (router + `reading_blocks` only, no models; rules in its docstring,
+fixed before the run; `results/ocr_a1_routing_zones.json`):
+
+| Set | Images | Route photo | Split into > 1 zone | Photo and split |
+| --- | --- | --- | --- | --- |
+| textvqa | 184 | 184 (100%) | 8 | 8 |
+| lines | 100 | 80 (80%) | 10 | 8 |
+| p11_text | 315 | 258 (82%) | 42 | 34 |
+| p11_textfree | 85 | 79 (93%) | 3 | 3 |
+| rendered (PNG) | 60 | 4 (7%) | 37 | 3 |
+| rendered_jpeg (q85) | 60 | 36 (60%) | 37 | 21 |
+
+- **Item 1.1 (skip `reading_blocks` on photos) is dropped** by the rule fixed before the run: only 8 of 184
+  TextVQA images split (under 10). It would act mostly on p11_text and `lines`, where splitting is wanted.
+- **`rendered_jpeg` failed its 80% rule as defined** (60% route photo). A JPEG text page with large white areas
+  still counts as flat. Proposed fix, chosen by the router rather than by any OCR result: the control is **the 36
+  pages that route photo as JPEG q85** (21 of them split into zones), scored against their unchanged line truth. The
+  24 that stay flat add nothing a photo-branch arm can change. Needs the user's OK, since the rule as written failed.
+- Every TextVQA image takes the photo path, so all of TextVQA measures photo-branch changes. The PNG `rendered`
+  control sees almost none of them (4 of 60), as 0.2 said.
+
+### 0.15 A3 results (2026-10-23)
+
+VisionBench `benchmarks/ocr_a3_diagnostic.py`, `results/ocr_a3_diagnostic.json`: the server's `ocr_pages` over the
+92 tune TextVQA items, RapidOCR `text_score` 0, raw spans and quads saved, then re-filtered.
+
+- **Reproduces the baseline: 59.8% (55 / 92) at the 0.75 floor.**
+- **The floor costs nothing here.** At 0.5 and at 0 the score is still 59.8%, with no item gained or lost. No
+  answer is sitting in a span under 0.75 (`B_floor` = 0). The held recognizer-score tuning (0.13: grey band,
+  `text_score`, the floor) has no TextVQA headroom, so it is dropped as a Gate 0 arm. A grey band only pays off
+  through a second recognizer re-reading those spans, which is arm 2's job.
+- **Buckets for the 37 misses.** The automatic rule gave A 20 / B 10 / C 7. TextOCR's own transcriptions are
+  partial or wrong in places ("Red Labr", "OLD'S GYM", "Prouder resents", "{OWA."; #179 has no words at all), and
+  the whole-token match fails on "600" inside "600ml". A hand reading of the 37 by text (answers, OCR output,
+  TextOCR words; no images viewed) gives:
+
+  | Bucket | Items | Which |
+  | --- | --- | --- |
+  | A, not written (VQA) | ~9–12 | #19, 63, 73, 76, 101, 110, 173, 184, 197; unclear #25, 168, 182 |
+  | B, region found, misread | ~14 | #23, 29, 70, 72, 106, 117, 123, 126, 190, 196 (automatic) + #16 "RedLab", #79 "proudly resents", #125 "OSTATES OF", #154 "RAVAR!" |
+  | C, region not found | ~10–11 | #88, 136, 144, 171, 172, 185, 188 (automatic) + #55, 67, 179, maybe #191 |
+
+  This matches Argon's 9 / 11 / 17 on A, and moves about 6 items from C to B. **Bucket B is the largest
+  reachable bucket**, so arm 2 (re-read found boxes with a better recognizer or a better crop, plus 2-0) comes
+  first in Gate 0. Track 3 (detector additions) targets about 10 items.
+- **For round 22:** TextOCR's partial transcriptions mean its automatic "written" match under-counts. Stage B
+  (the worker's `written` call on every unmatched question) is therefore needed, as planned, and the A bucket
+  must come from stage B, not TextOCR alone.
 
 ### 0.9 Open questions for the user (answered 2026-10-21, see 0.10)
 
