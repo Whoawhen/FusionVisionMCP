@@ -59,7 +59,7 @@ root-caused against the exact fixture that exposed it, not patched at the sympto
 | Captioning | LFM2.5-VL-3B (whole scene), Florence-2 (per region) |
 | Object detection / grounding | SAM 3 on photos and flat images (it can say "not here") — scored boxes and center points for a named object |
 | Instance counting | Grounding DINO — parallel object queries, not a sequential emission, so overlapping-but-separate instances don't collapse into one |
-| Visual question answering | Moondream2 — free-form questions about image content |
+| Visual question answering | LFM2.5-VL-3B (ONNX, the default caption's model) — free-form questions about image content |
 | Spatial measurement | SAM2 masks plus a from-scratch geometry module — touch, gap, containment depth, shape |
 | Aesthetic scoring | CLIP + a LAION-trained aesthetic head |
 | Memory footprint | Configurable idle-release timers, per model, chosen at install time |
@@ -73,7 +73,7 @@ root-caused against the exact fixture that exposed it, not patched at the sympto
 | `caption` | LFM2.5-VL-3B (ONNX; `deep` in bf16) | Describe what an image shows as one detailed prose caption of the whole scene: key facts 71.0% vs 64.8% for Florence-2, its captioner before 2026-10-23, on 280 held-out images, at ~11 s vs ~7 s (`--caption-model florence2` keeps Florence-2). `verify_text=true` also corrects close text misses against a verbatim OCR pass; `deep=true` gives a longer, fuller description (~35 s; 74.8%, by saying more rather than more sharply). By default (`read_text`) the caption ends with `Visible text: "..."`, the `ocr` engine's verbatim reading of any text in the image. `region=[x1, y1, x2, y2]` captions just that part at full resolution, for small text or HUD detail (named the answer 80% of the time vs 68% for the whole image). |
 | `detect_objects` | SAM 3 (Florence-2 / Grounding DINO if it can't load) | Locate a named object, returning scored bounding boxes, center points and labels. On photos it rarely boxes an object that isn't there. |
 | `dense_region_caption` | Florence-2 | Caption every salient region of an image at once, without naming objects first. |
-| `query_image` | Moondream2 | Ask a free-form question about an image (visual question answering). `check_consistency=true` routes a low-confidence answer to the measurement that actually answers it, when one applies. |
+| `query_image` | LFM2.5-VL-3B (ONNX) | Ask a free-form question about an image (visual question answering): 78.5% right vs 66.5% for Moondream2, its answerer before 2026-10-24, on 892 fresh questions, at ~5 s vs ~10 s, and far less prone to answering a false premise ("what does the sign say" with no sign). A question about text gets the `ocr` reading as context. `--vqa-model moondream` keeps Moondream2. `check_consistency=true` routes a low-confidence answer to the measurement that actually answers it, when one applies. |
 | `classify_image` | CLIP | Pick which of your labels an image shows (species, landmark, art style, kind of image), with a probability for each. 98.5% vs `query_image`'s 77.5% on 200 fresh images, in 0.25 s. It only chooses among the labels given. |
 | `count_objects` | Grounding DINO (photos), Florence-2 (flat images) | Count how many instances of a named object an image contains. Use this, not `detect_objects`, for "how many" questions. Flat images (clip art, vector charts, synthetic shapes) count less reliably: touching shapes can merge into one. On a collapse, adds an actionable outline estimate. On photos, `possibly_more: {upper, extra_candidates, reliability}` flags a count that may be too low, and on crowds `crowd_range: {low, high}` (Grounding DINO and SAM 3 together) holds the true count 86% of the time. |
 | `spatial_relations` | Grounding DINO + SAM2 | Measure contact, gaps, containment depth and shape between two named objects. |
@@ -219,7 +219,7 @@ a session that only captions never loads the segmentation or aesthetic models at
 The main models, each loaded on demand and released on its own idle timer:
 
 - **Florence-2** (Microsoft) — OCR with regions, object detection/grounding, dense region captioning (and `caption` with `--caption-model florence2`)
-- **Moondream2** (Vikhyat) — visual question answering
+- **Moondream2** (Vikhyat) — `critique_composition`'s busy-background and subject hints, `count_objects`' estimate (and `query_image` with `--vqa-model moondream`)
 - **LFM2.5-VL-3B** (Liquid AI) — `caption`: ONNX Runtime for the default caption, bf16 for `deep=true` (weights under the LFM Open License v1.0)
 - **SAM2** (Meta) — segmentation masks, the basis for `spatial_relations`
 - **Grounding DINO** (IDEA-Research) — open-vocabulary detection backing `count_objects`

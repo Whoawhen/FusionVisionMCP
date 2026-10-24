@@ -31,6 +31,9 @@ from fusion_vision_mcp.constants import (
     DEEP_TEXT_WORDS,
     DETECT_BOX_THRESHOLD,
     MAIN_SUBJECT_QUESTION,
+    VQA_OCR_WORDS,
+    VQA_TEXT_QUESTION,
+    VQA_TEXT_SUFFIX,
     CaptionLevel,
 )
 from fusion_vision_mcp.detection_policy import execute_detection
@@ -740,6 +743,36 @@ def ocr_pages(app: AppContext, images: Sequence[Image]) -> list[dict[str, Any]]:
     return pages
 
 
+_TEXT_QUESTION_RE: Final = re.compile(VQA_TEXT_QUESTION, re.IGNORECASE)
+
+
+def lfm_vqa_prompt(question: str, ocr_text: str) -> str:
+    """The prompt LFM gets for a text question: the `ocr` reading in front, VQA_TEXT_SUFFIX after (VisionBench
+    `vqa_premise.ocr_prompt`, which the gate measured, byte for byte)."""
+    words = " / ".join(line.strip() for line in ocr_text.splitlines() if line.strip()).split()
+    if not words:
+        return "An OCR pass found no readable text in this image.\n" + question + VQA_TEXT_SUFFIX
+    quoted = " ".join(words[:VQA_OCR_WORDS])
+    return (
+        f'Text read from the image by OCR (it may be incomplete or misread): "{quoted}"\n' + question + VQA_TEXT_SUFFIX
+    )
+
+
+def vqa_answers(app: AppContext, images: Sequence[Image], question: str) -> list[str]:
+    """`query_image`'s answers: LFM2.5-VL-3B ONNX (`app.answerer`), a text question carrying the `ocr` reading; Moondream2
+    (`app.vqa`) without an answerer or when LFM cannot load."""
+    if app.answerer is not None:
+        try:
+            if _TEXT_QUESTION_RE.search(question):
+                prompts = [lfm_vqa_prompt(question, p["text"]) for p in ocr_pages(app, images)]
+            else:
+                prompts = [question] * len(images)
+            return app.answerer.answer(list(images), prompts)
+        except (OSError, ImportError) as exc:
+            logger.warning(f"LFM2.5-VL ONNX unavailable ({exc}); answering with Moondream2")
+    return app.vqa.query(list(images), question)
+
+
 def _text_line_key(line: str) -> str:
     return re.sub(r"\W+", " ", line.lower()).strip()
 
@@ -800,7 +833,7 @@ def _dispatch(app: AppContext, operation: str, images: list[Image], *, question:
     if operation == "query":
         if not question:
             raise ValueError("question is required for the 'query' operation")
-        return app.vqa.query(images, question)
+        return vqa_answers(app, images, question)
     if operation == "count":
         if not object_name:
             raise ValueError("object_name is required for the 'count' operation")

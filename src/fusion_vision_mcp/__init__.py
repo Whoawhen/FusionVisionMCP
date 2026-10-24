@@ -29,6 +29,7 @@ from fusion_vision_mcp.constants import (
     DEFAULT_MOONDREAM_MODEL,
     DEFAULT_MOONDREAM_REVISION,
     DEFAULT_SAM2_MODEL,
+    VQA_MODELS,
 )
 from fusion_vision_mcp.idle import IdleProxy, IdleReleased
 from fusion_vision_mcp.images import SERVER_NAME, get_images
@@ -59,6 +60,7 @@ if TYPE_CHECKING:
 
 from fusion_vision_mcp.protocols import (
     AestheticScorer,
+    Answerer,
     AppContext,
     Captioner,
     CropEmbedder,
@@ -84,6 +86,7 @@ async def app_lifespan(
     idle_timeout: float = 0,
     device: str | None = None,
     caption_model: str = CAPTION_MODELS[0],
+    vqa_model: str = VQA_MODELS[0],
 ) -> AsyncIterator[AppContext]:
     """Context manager for the FastMCP app lifespan.
 
@@ -238,11 +241,15 @@ async def app_lifespan(
     deep_captioner = cast(Captioner, IdleProxy(IdleReleased(_make_lfm, idle_timeout, "LFM2.5-VL")))
 
     # `caption`'s default (~8 GB at peak, CPU). `--caption-model florence2` keeps Florence-2's caption instead.
-    captioner = (
-        cast(Captioner, IdleProxy(IdleReleased(_make_lfm_onnx, idle_timeout, "LFM2.5-VL ONNX")))
-        if caption_model == "lfm-onnx"
+    # `query_image`'s answerer is the same model: one proxy, so one loaded copy serves both. `--vqa-model moondream`
+    # answers with Moondream2 instead.
+    lfm_onnx = (
+        IdleProxy(IdleReleased(_make_lfm_onnx, idle_timeout, "LFM2.5-VL ONNX"))
+        if "lfm-onnx" in (caption_model, vqa_model)
         else None
     )
+    captioner = cast(Captioner, lfm_onnx) if caption_model == "lfm-onnx" else None
+    answerer = cast(Answerer, lfm_onnx) if vqa_model == "lfm-onnx" else None
 
     yield AppContext(
         florence2,
@@ -258,6 +265,7 @@ async def app_lifespan(
         locator,
         deep_captioner,
         captioner,
+        answerer,
     )
 
 
@@ -275,6 +283,7 @@ def server(
     idle_timeout: float = 0,
     device: str | None = None,
     caption_model: str = CAPTION_MODELS[0],
+    vqa_model: str = VQA_MODELS[0],
 ) -> MCPServer:
     """Creates a new FastMCP server instance with the specified name and model ID."""
     mcp = MCPServer(
@@ -293,6 +302,7 @@ def server(
             idle_timeout=idle_timeout,
             device=device,
             caption_model=caption_model,
+            vqa_model=vqa_model,
         ),
     )
 
@@ -312,6 +322,7 @@ __all__: Final = [
     "DEFAULT_MOONDREAM_REVISION",
     "DEFAULT_SAM2_MODEL",
     "SERVER_NAME",
+    "VQA_MODELS",
     "get_images",
     "server",
 ]

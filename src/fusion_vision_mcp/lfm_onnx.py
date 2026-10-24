@@ -1,4 +1,4 @@
-"""LiquidAI LFM2.5-VL-3B on ONNX Runtime, the default `caption` since 2026-10-23.
+"""LiquidAI LFM2.5-VL-3B on ONNX Runtime, the default `caption` since 2026-10-23 and `query_image` since 2026-10-24.
 
 Runs as VisionBench `lfm_onnx.py` measured it (arm `single`): see DEFAULT_CAPTION_ONNX_MODEL in `constants` for the
 numbers and why each setting is what it is. The export has no generation loop, so this is one: the image tokens from
@@ -23,6 +23,8 @@ from .constants import (
     DEFAULT_CAPTION_ONNX_REVISION,
     DEFAULT_DEEP_CAPTION_MODEL,
     DEFAULT_DEEP_CAPTION_REVISION,
+    VQA_MAX_NEW_TOKENS,
+    VQA_SEED,
 )
 
 #: The model card's text decoding, with llama.cpp's names as the gate ran it.
@@ -143,4 +145,12 @@ class LfmOnnxCaptioner:
         for img in images:
             with img.convert("RGB") as rgb_img:
                 res.append(self.generate(rgb_img, CAPTION_PROMPT, self.seed))
+        return res
+
+    def answer(self, images: list[Image], prompts: list[str], seed: int = VQA_SEED) -> list[str]:
+        """`query_image`'s answers: one reply per image to its prompt (`analysis.lfm_vqa_prompt` builds them)."""
+        res = []
+        for img, prompt in zip(images, prompts, strict=True):
+            with img.convert("RGB") as rgb_img:
+                res.append(self.generate(rgb_img, prompt, seed, VQA_MAX_NEW_TOKENS))
         return res

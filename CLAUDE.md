@@ -260,6 +260,19 @@ the gate's captions on 8 of 8 (`lfm_onnx_wrapper_parity.py`). Four tiles took 20
 image in detail.") named more but failed CHAIR (16.7 / 31.7%). Florence-2 still backs `verify_text`, dense captions,
 flat-image detection and counting, the composition subject box and `process`.
 
+**2026-10-24: `query_image` answers with the same LFM2.5-VL-3B ONNX model, not Moondream2.** `analysis.vqa_answers`
+(`AppContext.answerer`, the default caption's proxy, so one loaded copy serves both; `--vqa-model moondream` or a failed
+load falls back to Moondream2) sends the question verbatim, except that a question matching `VQA_TEXT_QUESTION` gets the
+`ocr` reading in front (`lfm_vqa_prompt`, at most 160 words) and "answer that there is none" after; the card's decoding,
+`VQA_SEED`, 128 tokens. VisionBench, rules fixed before each run: `vqa_premise.py` screened arms on phase 11 (`ocr_text`
+82.4 vs Moondream2 78.8; tiles did not replace it), then `vqa_round23.py` confirmed on round 23 (892 fresh questions on
+223 round 21 images, a third false-premise; the user's spot-check 60 of 60 right): **78.5 vs 66.5%** (+12.0), premise
+66.4 vs 32.3% (no-text 65.7 vs 13.3), no question type worse (yes/no +0.6 the smallest), median 4.9 vs 9.8 s per answer,
+0 errors. The server reproduced the gate's prompts and answers 8 of 8 (`lfm_onnx_vqa_parity.py`). `batch_analyze_images`'
+`query` uses the same path. **Moondream2 stays loaded for** `critique_composition`'s busy-background and subject-naming
+questions and `count_objects`' `estimates.vqa`; each needs its own gate before Moondream2 (~7.5 GB fp32, its remote-code
+pin, `pyvips`) can go. `check_consistency`'s control question now goes to LFM too: same mechanism, not re-measured.
+
 **llama-server ran on the GPU without being asked.** The winget llama.cpp build ships Vulkan and defaults to
 `--n-gpu-layers auto`: every llama-server timing in the runs above was the RTX 5060 (2.4 s), not CPU (25.6 s). Recall
 was unaffected (CPU vs GPU +0.0 on tune). Any llama.cpp run here sets `LLAMA_ARG_N_GPU_LAYERS=0`,

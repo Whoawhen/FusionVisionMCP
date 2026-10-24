@@ -184,6 +184,25 @@ CAPTION_ONNX_THREADS: Final[int] = 18
 #: `--caption-model` choices.
 CAPTION_MODELS: Final[tuple[str, ...]] = ("lfm-onnx", "florence2")
 
+#: `query_image` since 2026-10-24: the same LFM2.5-VL-3B ONNX model as the default caption (one loaded copy serves
+#: both), answering the question verbatim, except that a question matching VQA_TEXT_QUESTION gets the `ocr` engine's
+#: reading of the image in front (at most VQA_OCR_WORDS words) and VQA_TEXT_SUFFIX after; the card's decoding with
+#: VQA_SEED, at most VQA_MAX_NEW_TOKENS tokens. VisionBench `vqa_premise.py` arm `ocr_text` (screened on phase 11, 82.4
+#: vs Moondream2's 78.8%) and `vqa_round23.py` (rule fixed before round 23's questions existed): on 892 fresh questions
+#: 78.5% vs 66.5% (+12.0), false-premise questions 66.4% vs 32.3% (text that is not there 65.7 vs 13.3%), no question
+#: type worse, median 4.9 s vs 9.8 s per answer. The regex was fixed before phase 11's labels were looked at; changing
+#: it or the prompts means re-running the gate. Moondream2 keeps critique_composition's hints and count_objects' estimate.
+VQA_TEXT_QUESTION: Final[str] = (
+    r"\b(text|written|writing|say|says|said|read|reads|title|headline|label|labell?ed|word|words|printed|print|"
+    r"inscription|inscribed|caption|slogan|lettering|letters|spelled|brand name)\b"
+)
+VQA_TEXT_SUFFIX: Final[str] = "\nIf the question asks about text that is not in the image, answer that there is none."
+VQA_OCR_WORDS: Final[int] = 160
+VQA_MAX_NEW_TOKENS: Final[int] = 128
+VQA_SEED: Final[int] = 0
+#: `--vqa-model` choices.
+VQA_MODELS: Final[tuple[str, ...]] = ("lfm-onnx", "moondream")
+
 #: `caption(deep=true)` on Moondream2 (the fallback when no deep captioner is configured) tiles the image into at most DEEP_CROPS_TEXT local crops when the page's `ocr` text
 #: has DEEP_TEXT_WORDS words or more, and DEEP_CROPS below that (Moondream2's own setting is 12; plan step
 #: 1C-b, VisionBench `caption_1c_b.py`, 2026-10-21, both arms greedy). 6 crops: tune keyword recall 71.8 ->

@@ -241,7 +241,7 @@ the first download) falls back to it. The weights are under the LFM Open License
   why it is not the default captioner. Its weights are under Liquid AI's LFM Open License v1.0, not Apache: free for
   personal, research and commercial use, except commercial use by an organisation with $10M or more in annual
   revenue; downloaded from Hugging Face on first use, not redistributed here.
-  Moondream2 stays for `query_image` and `critique_composition`; without the LFM captioner (a hand-built context)
+  Moondream2 stays for `critique_composition` (and `query_image` with `--vqa-model moondream`); without the LFM captioner (a hand-built context)
   `deep` falls back to Moondream2's long caption, at 6 crops on pages under 30 OCR words and 12 above (plan
   step 1C-b).
 - **region**: `[x1, y1, x2, y2]` in the image's pixels: caption only that part, so it gets the captioner's whole
@@ -512,9 +512,25 @@ about.
 
 ### query_image ➕
 
-Ask a free-form question about an image (visual question answering). Backed by Moondream2.
+Ask a free-form question about an image (visual question answering). Backed by **LFM2.5-VL-3B on ONNX Runtime**
+since 2026-10-24 (Moondream2 before), the same loaded model as `caption`'s default, so it costs no extra memory when
+both are used. The question goes in verbatim, except that one mentioning text (written, says, label, title, brand
+name, ...: `VQA_TEXT_QUESTION`) gets the `ocr` engine's reading of the image in front of it (at most 160 words) and
+"If the question asks about text that is not in the image, answer that there is none." after it.
 
-> **Not reliable for open-ended judgment.** Moondream2 is a small VLM, and is documented to answer
+Measured on VisionBench round 23, 892 questions the Gemini worker wrote for 223 fresh images (three ordinary
+questions each and one false-premise question, about text or an object that is not there; the user found 60 of 60
+sampled questions right), against a rule fixed before the questions existed (`vqa_round23.py`): **78.5% vs
+Moondream2's 66.5%** (+12.0), ahead or level on every kind (text 68.7 vs 62.2, colour 95.8 vs 88.1, object 81.2 vs
+75.0, count 75.4 vs 73.8, yes/no 95.3 vs 94.7), at a median 4.9 s vs 9.8 s per answer. The big difference is false
+premises: asked what is written somewhere with no text, LFM said there was none 65.7% of the time and Moondream2
+13.3%; asked about an absent object, 66.9% vs 49.2%. So LFM still goes along with a false premise about a third of
+the time. The server reproduced the gate's prompts and answers on 8 of 8 questions (`lfm_onnx_vqa_parity.py`).
+`--vqa-model moondream` keeps Moondream2, and a server that cannot load the ONNX model falls back to it. The
+`check_consistency` control question goes to the same answerer; that check was designed and verified on Moondream2
+(below) and has not been re-measured on LFM.
+
+> **Not reliable for open-ended judgment.** (Measured on Moondream2, the answerer until 2026-10-24.) Moondream2 is a small VLM, and is documented to answer
 > "describe anything wrong in this image" with a flat "None" on six different images that all had a real,
 > human-visible defect, and to give the same yes/no answer across genuinely different images — a default
 > response, not an observation. This is exactly why `spatial_relations` only measures and never judges: a

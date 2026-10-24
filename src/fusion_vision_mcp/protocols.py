@@ -120,6 +120,14 @@ class Captioner(Protocol):
         ...
 
 
+class Answerer(Protocol):
+    """Represents a protocol for `query_image`'s answerer (LFM2.5-VL-3B ONNX), given a finished prompt per image."""
+
+    def answer(self, images: list[Image], prompts: list[str]) -> list[str]:
+        """One reply per image to its prompt."""
+        ...
+
+
 class InstanceDetector(Protocol):
     """Represents a protocol for open-vocabulary detection that tallies instances."""
 
@@ -214,3 +222,6 @@ class AppContext:
     # LFM2.5-VL-3B on ONNX Runtime, `caption`'s default captioner since 2026-10-23. None with
     # `--caption-model florence2`, in tests and in hand-built contexts, where the default caption is Florence-2's.
     captioner: Captioner | None = None
+    # The same LFM2.5-VL-3B ONNX model (one proxy, one loaded copy), `query_image`'s answerer since 2026-10-24. None
+    # with `--vqa-model moondream`, in tests and in hand-built contexts, where `query_image` answers with Moondream2.
+    answerer: Answerer | None = None

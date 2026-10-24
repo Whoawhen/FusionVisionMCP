@@ -834,6 +834,25 @@ async def test_query_image_check_consistency_false_keeps_string_shape(
 
 
 @pytest.mark.anyio
+async def test_query_image_text_question_on_textless_image_says_none(
+    mcp_client_session: ClientSession,
+) -> None:
+    """A question about text that is not there gets LFM's "there is none", not invented text.
+
+    This is the false-premise case LFM won the round 23 gate on (65.7% vs Moondream2's 13.3%): the question names
+    text, so `ocr`'s (empty) reading of the text-free `sample.jpg` goes in front of it.
+    """
+    res = await mcp_client_session.call_tool(
+        "query_image",
+        arguments={"src": SAMPLE_IMAGE_FILEPATH, "question": "What text is written on the vase?"},
+    )
+    text = "\n".join(cast(TextContent, c).text for c in res.content).lower()
+
+    assert not res.is_error
+    assert "no text" in text or "none" in text
+
+
+@pytest.mark.anyio
 async def test_query_image_structured_analysis_returns_anomalies(
     mcp_client_session: ClientSession,
 ) -> None:

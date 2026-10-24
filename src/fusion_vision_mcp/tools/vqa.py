@@ -7,7 +7,14 @@ from typing import Annotated, Any
 from mcp.server.mcpserver import Context, MCPServer
 from pydantic import Field
 
-from fusion_vision_mcp.analysis import _dispatch, _vqa_consistency, _vqa_cross_check, classify_pages, clean_labels
+from fusion_vision_mcp.analysis import (
+    _dispatch,
+    _vqa_consistency,
+    _vqa_cross_check,
+    classify_pages,
+    clean_labels,
+    vqa_answers,
+)
 from fusion_vision_mcp.forensics import analyze_metadata_anomalies
 from fusion_vision_mcp.images import get_images
 from fusion_vision_mcp.inspection import Anomaly, Observation, analyze_inspection
@@ -30,10 +37,11 @@ def register(mcp: MCPServer) -> None:
                     "When true, also ask a rephrased control question and report whether the "
                     "two answers agree. `confidence` is 'low' in two cases: the answers agree "
                     "on a short default-looking token ('None', 'Yes', 'No', 'Nothing', ...), "
-                    "or they substantively contradict each other. Moondream2 is a small VLM that "
-                    "answers open-ended judgment questions ('describe anything wrong') with a "
-                    "flat 'None' on images that all had real visible defects -- this layer makes "
-                    "that default-answer behavior visible instead of presenting it as reliable. "
+                    "or they substantively contradict each other. Small VLMs answer open-ended "
+                    "judgment questions ('describe anything wrong') with a flat default (Moondream2, "
+                    "the answerer before 2026-10-24, said 'None' on images that all had real visible "
+                    "defects) -- this layer makes that visible instead of presenting it as reliable. "
+                    "It has not been re-measured with LFM2.5-VL, today's answerer. "
                     "On a low-confidence answer it also routes to the measurement that actually "
                     "answers the question when one applies (spatial_relations for a "
                     "contact/containment question, count_objects for 'how many', ocr for a "
@@ -72,11 +80,19 @@ def register(mcp: MCPServer) -> None:
         which transcribes verbatim and returns an empty result when there is
         no text, rather than asking this tool what the text says.
 
-        Moondream2 is a small model and is documented to answer open-ended judgment
-        questions ("describe anything wrong in this image") with a flat "None" on
-        images that all had real visible defects, and to give the same yes/no answer
-        across genuinely different images -- a default response, not a real
-        observation. Set `check_consistency=true` to make that visible: the tool also
+        Answered by LFM2.5-VL-3B (Liquid AI) on ONNX Runtime since 2026-10-24, the model behind
+        `caption`'s default, replacing Moondream2: on 892 fresh questions it answered 78.5% right
+        against Moondream2's 66.5%, ahead or level on every kind (text, colour, object, count, yes/no),
+        in a median 4.9 s against 9.8 s. A question that mentions text (written, says, label, brand
+        name, ...) gets the `ocr` engine's reading of the image as context. It is also much less
+        prone to going along with a false premise: asked about text or an object that is not there,
+        it said so 66% of the time against Moondream2's 32% -- which still means it invents an answer
+        about a third of the time. An answer is not a measurement: for "how many" use
+        `count_objects`, for touching/inside `spatial_relations`.
+
+        Small VLMs also answer open-ended judgment questions ("describe anything wrong in this
+        image") with a flat default; Moondream2 said "None" on images that all had real visible
+        defects. Set `check_consistency=true` to make that visible: the tool also
         asks a rephrased control question and returns, per image,
         `{answer, control_answer, consistent, confidence}`. `confidence` is `"low"`
         in either of two failure modes: the two answers agree on a short
@@ -100,7 +116,7 @@ def register(mcp: MCPServer) -> None:
         """
         app = ctx.request_context.lifespan_context
         with get_images(src) as images:
-            answers = app.vqa.query(images, question)
+            answers = vqa_answers(app, images, question)
 
             if structured_analysis:
                 results = []
@@ -156,7 +172,7 @@ def register(mcp: MCPServer) -> None:
             # A rephrasing a genuinely-looking model answers with the same substance,
             # but a model defaulting to a flat answer returns the same short default to.
             control_question = f"Looking carefully at this image, answer precisely: {question}"
-            control_answers = app.vqa.query(images, control_question)
+            control_answers = vqa_answers(app, images, control_question)
 
             results = []
             for image, answer, control_answer in zip(images, answers, control_answers, strict=True):

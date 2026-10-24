@@ -12,6 +12,7 @@ from . import (
     DEFAULT_MOONDREAM_REVISION,
     DEFAULT_SAM2_MODEL,
     SERVER_NAME,
+    VQA_MODELS,
     server,
 )
 
@@ -65,6 +66,17 @@ def resolve_memory_mode(memory_mode: str) -> float:
     help=(
         "Captioner behind `caption`'s default: 'lfm-onnx' (LFM2.5-VL-3B on ONNX Runtime, ~11 s, ~6.3 GB download, "
         "names more of an image) or 'florence2' (the --model Florence-2, ~7 s)."
+    ),
+)
+@click.option(
+    "--vqa-model",
+    type=click.Choice(VQA_MODELS),
+    default=VQA_MODELS[0],
+    show_default=True,
+    help=(
+        "Answerer behind `query_image`: 'lfm-onnx' (the same LFM2.5-VL-3B ONNX model as the default caption, one "
+        "loaded copy; ~5 s, more answers right) or 'moondream' (Moondream2, ~10 s). Moondream2 still backs "
+        "critique_composition's hints and count_objects' estimate either way."
     ),
 )
 @click.option(
@@ -154,6 +166,7 @@ def resolve_memory_mode(memory_mode: str) -> float:
 def main(
     model: str,
     caption_model: str,
+    vqa_model: str,
     moondream_model: str,
     moondream_revision: str,
     sam2_model: str,
@@ -187,6 +200,7 @@ def main(
         idle_timeout=idle_minutes * 60,
         device=device,
         caption_model=caption_model,
+        vqa_model=vqa_model,
     )
 
     logger.info(f"Starting server with {model} + {moondream_model}@{moondream_revision} (Press CTRL+D to quit)")
