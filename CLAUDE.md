@@ -915,9 +915,12 @@ raises `ModelMemoryError`, a tool error rather than a dead server. Short on RAM 
 session-scoped test server pass (523 of 523, 25 releases to make room; `Future_Ideas/memory_manager.md`).
 
 Two things to know. **The cache name is the table key**: a new `_lazy(factory, "Name")` in `app_lifespan` needs a
-`MODEL_MEMORY_GB` entry or it is estimated at 1 GB. And the table is estimates (step M2 measures them): the private-
-bytes delta logged on each load misses memory-mapped weights (Moondream +3.6 GB against 7.5) and reads ~0 for
-PP-OCRv6, EasyOCR and ImageQuality, which load on first call, so a measurement only ever raises an estimate.
+`MODEL_MEMORY_GB` entry (measure it with VisionBench `model_memory.py`) or it is estimated at 1 GB. And **the table is
+peaks, measured** (2026-10-25, one fresh process per model, one call): the private-bytes delta the server logs after
+each load misses what a call adds (SAM 3 +3.2 GB loaded, 6.5 GB peak; Grounding DINO 0.7 / 1.9; SAM2 0.2 / 1.3) and
+reads ~0 for PP-OCRv6, EasyOCR and ImageQuality, which load on first call, so a logged size only ever raises a figure.
+Moondream2 peaks at 4.5 GB on CPU here, not the ~7.5 GB fp32 quoted elsewhere in this file; LFM ONNX 7.9, LFM bf16
+6.4. Everything loaded at once would peak near 40 GB.
 
 ## Package import must stay torch-free, or MCP clients time out on connect
 

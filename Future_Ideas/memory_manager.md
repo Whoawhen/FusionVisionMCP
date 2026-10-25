@@ -1,6 +1,6 @@
 # Memory manager: a RAM budget across models, instead of only an idle timer
 
-**Status:** 2026-10-25: diagnosed (commit exhaustion, see below); step M1 built; M2-M5 open. Raised by the user after a
+**Status:** 2026-10-25: diagnosed (commit exhaustion, see below); steps M1 and M2 done; M3-M5 open. Raised by the user after a
 crash on 2026-10-24.
 
 ## Diagnosis (2026-10-25): it was commit exhaustion
@@ -50,10 +50,15 @@ Each step is shippable alone; M1 is the one that stops the crashes.
   running, 13 GB RAM free at the start), where on 2026-10-24 it died twice. Its log: 31 loads, 25 idle models
   released to make room (all for RAM; e.g. the ONNX LFM copy for the bf16 one and back), no load that went ahead
   short, no refusal. The default never needed `--memory-budget`.
-- **M2. Measure the size table.** One script, one fresh subprocess per model: load it, run one representative call,
+- **M2. Measure the size table (done).** One script, one fresh subprocess per model: load it, run one representative call,
   read the process's *peak* commit (`PeakPagefileUsage`, exact per process on Windows). Replaces the M1 estimates.
-  **Private bytes alone undercount**: in the suite run Moondream measured +3.6 GB private against its 7.5 GB estimate
-  (weights memory-mapped from safetensors are not private). Measure peak commit *and* peak working set.
+  **Done 2026-10-25** (VisionBench `benchmarks/model_memory.py`, `results/model_memory.json`; rule fixed before
+  running: max(peak commit, peak working set) above the post-import baseline x 1.1, rounded up to 0.1 GB). New table
+  (GB, old estimate in brackets): Florence-2 2.9 (2.0), Moondream 5.0 (7.5), LFM bf16 7.0 (6.4), LFM ONNX 8.7 (8.0),
+  SAM2 1.5 (0.6), SAM 3 7.1 (3.5), CLIP 2.0 (1.7), Grounding DINO 2.1 (0.7), DINOv2 1.4 (1.2), EasyOCR 1.7 (0.5),
+  PP-OCRv6 0.5 (0.3), ImageQuality 0.2 (0.3). Two corrections to M1's reading of its suite log: Moondream's +3.6 GB
+  was right (it peaks at 4.5 GB; the 7.5 GB in CLAUDE.md was stale), not memory-mapped weights going uncounted; the
+  real undercount is call-time peaks, which no after-load figure sees (SAM 3 3.2 GB loaded, 6.5 GB peak).
   Loads every model once (~10 loads, one at a time); run only when no benchmark holds a model.
 - **M3. Stress test (the judging rule below).** VisionBench script: concurrent calls across the big models with a
   second model-loading process beside the server. Pass: no process dies, a refused load is a clear tool error, single-

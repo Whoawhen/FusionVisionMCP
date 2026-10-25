@@ -266,25 +266,27 @@ OCR_DET_BOX_THRESHOLD: Final[float] = 0.4
 #: `max(image side) / MASK_DECODE_RESOLUTION` pixels is not actually resolved.
 MASK_DECODE_RESOLUTION: Final[int] = 256
 
-#: Estimated memory each model needs to load and run, in GB, keyed by the name its `IdleReleased`
+#: Memory each model needs to load and run once, in GB, keyed by the name its `IdleReleased`
 #: cache is given in `app_lifespan`. `memory.MemoryManager` checks this against live free memory
-#: before a load. **Estimates, not measurements** (Future_Ideas/memory_manager.md, step M2 measures
-#: them): the LFM and Moondream2 figures are the ones CLAUDE.md records, the rest are parameter
-#: counts at their load dtype plus overhead, rounded up. A size measured on load in the running
-#: process replaces the estimate for later reloads there.
+#: before a load. Measured 2026-10-25 on CPU (VisionBench `model_memory.py`: one fresh process per
+#: model, one representative call on a 2,000 px image), by a rule fixed before running: max(peak
+#: commit, peak working set) above the post-import baseline, x 1.1, rounded up to 0.1 GB. Peaks,
+#: not after-load sizes: SAM 3 holds 3.2 GB once loaded but peaks at 6.5 GB inside a call.
+#: VisionReasoner is not measured (Ollama runs out of process). A size measured on load in the
+#: running process can raise a figure there, never lower it.
 MODEL_MEMORY_GB: Final[dict[str, float]] = {
-    "Florence-2": 2.0,
-    "Moondream": 7.5,
-    "LFM2.5-VL": 6.4,
-    "LFM2.5-VL ONNX": 8.0,
-    "SAM2": 0.6,
-    "SAM 3": 3.5,
-    "Aesthetic": 1.7,
-    "Grounding DINO": 0.7,
-    "DINOv2": 1.2,
-    "EasyOCR": 0.5,
-    "PP-OCRv6": 0.3,
-    "ImageQuality": 0.3,
+    "Florence-2": 2.9,
+    "Moondream": 5.0,
+    "LFM2.5-VL": 7.0,
+    "LFM2.5-VL ONNX": 8.7,
+    "SAM2": 1.5,
+    "SAM 3": 7.1,
+    "Aesthetic": 2.0,
+    "Grounding DINO": 2.1,
+    "DINOv2": 1.4,
+    "EasyOCR": 1.7,
+    "PP-OCRv6": 0.5,
+    "ImageQuality": 0.2,
     "VisionReasoner": 0.1,
 }
 
