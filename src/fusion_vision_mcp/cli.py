@@ -27,6 +27,13 @@ MEMORY_MODE_MINUTES: Final[dict[str, float]] = {
 
 DEFAULT_MEMORY_MODE: Final[str] = "standard"
 
+#: Hosts the streamable-http server treats as local. The first is the default. The MCP SDK turns on
+#: DNS-rebinding protection (Host and Origin checks) by itself only for these.
+LOOPBACK_HOSTS: Final[tuple[str, ...]] = ("127.0.0.1", "localhost", "::1")
+
+#: An uncommon port, so the shared server doesn't collide with the 8000/8080 every dev server picks.
+DEFAULT_HTTP_PORT: Final[int] = 8765
+
 
 def resolve_memory_mode(memory_mode: str) -> float:
     """Turns a `--memory-mode` value into minutes of idle time before models are released.
@@ -175,6 +182,34 @@ def resolve_memory_mode(memory_mode: str) -> float:
         "specific accelerator, force CPU on a shared GPU box, or target a non-default GPU index."
     ),
 )
+@click.option(
+    "--transport",
+    type=click.Choice(["stdio", "streamable-http"]),
+    default="stdio",
+    show_default=True,
+    help=(
+        "'stdio' (the default) is one server per client: the client starts it and talks over a pipe. "
+        "'streamable-http' runs one long-lived server that several MCP clients connect to by URL "
+        "(http://HOST:PORT/mcp), so they share one copy of each model and one memory manager instead of "
+        "each loading their own. Start it yourself (e.g. at logon); clients do not."
+    ),
+)
+@click.option(
+    "--host",
+    default=LOOPBACK_HOSTS[0],
+    show_default=True,
+    help=(
+        "Address the streamable-http server listens on. Keep it on loopback: there is no authentication, "
+        "and anyone who can reach the port can make the server read any image file this user can read."
+    ),
+)
+@click.option(
+    "--port",
+    type=click.IntRange(1, 65535),
+    default=DEFAULT_HTTP_PORT,
+    show_default=True,
+    help="Port the streamable-http server listens on.",
+)
 @click.version_option()
 def main(
     model: str,
@@ -192,6 +227,9 @@ def main(
     idle_timeout: float | None,
     memory_budget: float | None,
     device: str | None,
+    transport: Literal["stdio", "streamable-http"],
+    host: str,
+    port: int,
 ) -> None:
     """
     An MCP server for processing images using Florence-2, Moondream2, SAM2, CLIP and Grounding DINO.
@@ -225,5 +263,15 @@ def main(
         logger.info("Models will stay loaded for the lifetime of the server, unless memory runs short")
     if memory_budget is not None:
         logger.info(f"Loaded models are kept under a {memory_budget:g} GB budget")
-    s.run()
+    if transport == "stdio":
+        s.run()
+    else:
+        if host not in LOOPBACK_HOSTS:
+            # The SDK also only turns DNS-rebinding protection on by itself for loopback hosts.
+            logger.warning(
+                f"Listening on {host}, not loopback, with no authentication: anyone who can reach port {port} "
+                "can make this server read any image file this user can read."
+            )
+        logger.info(f"Serving MCP over streamable HTTP at http://{host}:{port}/mcp")
+        s.run("streamable-http", host=host, port=port)
     logger.info("Server stopped")

@@ -190,6 +190,10 @@ selects fp16 on a non-CPU device.
 
 Swap `standard` for `aggressive`, `persistent`, or any number of minutes.
 
+Running several MCP clients at once (Claude Code with a few chats open, Cline, Claude Desktop)? Each starts its own
+server and loads its own copy of the models. `--transport streamable-http` runs one server they all share instead:
+see [docs/shared_server.md](docs/shared_server.md).
+
 ### System Requirements
 
 - **RAM**: 8GB minimum (16GB+ recommended)

@@ -938,6 +938,14 @@ idle timer when other processes squeeze the machine; that is the point, and the 
 live free memory, heavy calls running, and the last 20 loads, releases with their reason, and refusals. It loads no
 model. Any new release or refusal path should `record()` an event, or the tool will not explain it.
 
+**`--transport streamable-http` shares one server between clients** (`docs/shared_server.md`; opt-in, stdio stays the
+default for everyone who downloads this). The SDK's streamable-HTTP manager enters `app_lifespan` **once** for all
+sessions (`mcp/server/streamable_http_manager.py`), so every client shares one `AppContext`, one copy of each model
+and one `MemoryManager`; `tests/test_http_transport.py` pins that (a second session sees the model the first loaded),
+plus the SDK's loopback DNS-rebinding protection and the non-loopback warning. There is no authentication, so it
+listens on 127.0.0.1 unless told otherwise. `scripts/run_shared_server.ps1` restarts it on Windows, where Task
+Scheduler does not.
+
 ## Package import must stay torch-free, or MCP clients time out on connect
 
 **This invariant has now been broken twice and restored twice. Check it before assuming it holds** — there is a

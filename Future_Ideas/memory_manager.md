@@ -1,6 +1,6 @@
 # Memory manager: a RAM budget across models, instead of only an idle timer
 
-**Status:** 2026-10-25: diagnosed (commit exhaustion, see below); steps M1, M2, M2b, M2c and M4 done; M3, M5 and option C open. Raised by the user after a
+**Status:** 2026-10-25: diagnosed (commit exhaustion, see below); steps M1, M2, M2b, M2c, M4 and option C done; M3 and M5 open. Raised by the user after a
 crash on 2026-10-24.
 
 ## Diagnosis (2026-10-25): it was commit exhaustion
@@ -79,9 +79,14 @@ Each step is shippable alone; M1 is the one that stops the crashes.
   idle 2 minutes or more, until 25% again (the idle timer running faster when memory is tight; on 31.5 GB that is
   about 7.9 GB free). The 30 s floor keeps it from dropping a model between two steps of one tool call. Thresholds
   were set from the reserve and the machine, not tuned; M3 is where they get tested.
-- **Option C, not started: one server shared by every client.** Claude Code, Cline and Antigravity each spawn their
-  own server and can each hold an 8.7 GB LFM copy; a single local HTTP server would load it once. Changes client
-  configuration, so it waits on the user.
+- **Option C, built 2026-10-25: one server shared by every client.** Each client (and each Claude Code chat) spawned
+  its own server and could hold its own 8.7 GB LFM copy. `--transport streamable-http` (opt-in; stdio stays the
+  default) runs one on `127.0.0.1:8765/mcp` that they all share: the SDK enters `app_lifespan` once for all sessions,
+  so one `AppContext`, one copy of each model, one `MemoryManager` (`tests/test_http_transport.py`). No
+  authentication, loopback by default, the SDK's DNS-rebinding protection on; `docs/shared_server.md` has client
+  entries, a Windows supervisor (`scripts/run_shared_server.ps1`) and launchd/systemd units. Found while setting it
+  up: Cline's and Antigravity's FusionVision entries are disabled, so on this machine the duplicates were Claude Code
+  chats.
 - **M3. Stress test (the judging rule below).** VisionBench script: concurrent calls across the big models with a
   second model-loading process beside the server. Pass: no process dies, a refused load is a clear tool error, single-
   client median latency within 5%.

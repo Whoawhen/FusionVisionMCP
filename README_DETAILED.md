@@ -863,6 +863,10 @@ task tokens this server does not expose as their own tool.
 - **--idle-timeout**: Deprecated alias for `--memory-mode` expressed in minutes; overrides it when given.
 - **--memory-budget**: Optional cap, in GB, on the total size of loaded models. See
   [Memory modes](#memory-modes) below.
+- **--transport**: `stdio` (default; each client starts its own server) or `streamable-http` (one long-lived server
+  that several clients share by URL, `http://HOST:PORT/mcp`). See [docs/shared_server.md](docs/shared_server.md).
+- **--host** / **--port**: Where the `streamable-http` server listens; `127.0.0.1` and `8765` by default. Keep the
+  host on loopback: there is no authentication.
 - **--device**: Torch device all models load onto, e.g. `cpu`, `cuda`, `cuda:1`, `mps`. Auto-detected (MPS,
   then CUDA, then CPU) when unset. Set this to pin the server to a specific accelerator, force CPU on a shared
   GPU box, or target a non-default GPU index — including a GPU-equipped cloud VM, since this is a plain local
