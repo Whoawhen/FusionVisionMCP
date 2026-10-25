@@ -77,7 +77,18 @@ async def test_list_tools(mcp_client_session: ClientSession) -> None:
         "spatial_relations",
         "score_aesthetics",
         "critique_composition",
+        "server_status",
     }
+
+
+@pytest.mark.anyio
+async def test_server_status_reports_managed_memory(mcp_client_session: ClientSession) -> None:
+    res = await mcp_client_session.call_tool("server_status", arguments={})
+    status = json.loads(cast(TextContent, res.content[0]).text)
+
+    assert status["managed"] is True
+    assert {"LFM2.5-VL ONNX", "SAM 3", "Florence-2"} <= {m["model"] for m in status["models"]}
+    assert status["machine"]["ram_free_gb"] > 0
 
 
 @pytest.mark.anyio

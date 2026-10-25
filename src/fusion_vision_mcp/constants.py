@@ -328,6 +328,9 @@ MEMORY_WATCH_MIN_IDLE_S: Final[float] = 30.0
 MEMORY_WATCH_TIGHT_FRACTION: Final[float] = 0.25
 MEMORY_WATCH_TIGHT_IDLE_S: Final[float] = 120.0
 
+#: How many recent loads, releases and refusals `server_status` reports.
+EVENT_LOG_SIZE: Final[int] = 20
+
 #: Used for a cache name missing from `MODEL_MEMORY_GB`.
 DEFAULT_MODEL_MEMORY_GB: Final[float] = 1.0
 

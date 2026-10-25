@@ -266,6 +266,7 @@ async def app_lifespan(
             deep_captioner,
             captioner,
             answerer,
+            memory,
         )
     finally:
         memory.stop_watcher()

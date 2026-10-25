@@ -934,6 +934,10 @@ in every memory mode): free commit under 4 GB releases any idle model, free RAM 
 under 25% of the total those idle 2 min+ (`MEMORY_WATCH_*` in `constants.py`). So a model can be gone well before its
 idle timer when other processes squeeze the machine; that is the point, and the next call reloads it.
 
+**`server_status` reports all of it** (`tools/status.py`, `MemoryManager.status()`): models loaded and what they hold,
+live free memory, heavy calls running, and the last 20 loads, releases with their reason, and refusals. It loads no
+model. Any new release or refusal path should `record()` an event, or the tool will not explain it.
+
 ## Package import must stay torch-free, or MCP clients time out on connect
 
 **This invariant has now been broken twice and restored twice. Check it before assuming it holds** — there is a

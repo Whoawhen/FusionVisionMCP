@@ -153,6 +153,8 @@ class IdleReleased[T]:
             logger.info("Released %s after %.0fs idle", self._name, self._timeout)
         else:
             logger.info("Released %s", self._name)
+        if self._manager is not None:
+            self._manager.record("released", self._name, "idle timer" if self._timeout > 0 else "on request")
 
     def try_release(self) -> bool:
         """Release now if the object is loaded and idle, without waiting for the lock.

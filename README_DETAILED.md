@@ -904,6 +904,9 @@ is using the memory: any idle model once free commit drops under 4 GB, models id
 free RAM, and models idle 2 minutes or more once free RAM falls under a quarter of the total. The memory modes above
 are therefore the longest a model stays idle, not a promise that it stays that long.
 
+`server_status` shows the current picture: which models are loaded and what each holds, live free memory, heavy
+calls running, and the last 20 loads, releases (with the reason) and refusals. A refusal's message points to it.
+
 There is deliberately no "release after every call" mode. The idle timer is restarted by attribute lookup, so a
 timeout short enough to approximate one would also fire mid-inference, while the caller still holds a live
 reference and nothing is actually freed. Set a small number of minutes instead if you want memory back quickly.

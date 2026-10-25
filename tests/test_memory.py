@@ -420,3 +420,66 @@ def test_watcher_thread_runs_and_stops() -> None:
 
     assert not old.loaded
     assert not any(t.name == "memory-watcher" for t in threading.enumerate())
+
+
+# --- status: what server_status reports ---------------------------------------------------------
+
+
+def test_status_reports_models_memory_and_events() -> None:
+    manager, (a, b, c) = setup(["a", "b", "c"], ram_gb=2.5, commit_gb=None)
+    a.get()
+    b.get()
+    c.get()  # pushes out the stalest, a
+
+    status = manager.status()
+
+    assert status["machine"]["ram_free_gb"] == 0.5
+    assert status["loaded_total_gb"] == 2.0
+    assert [(m["model"], m["loaded"]) for m in status["models"]] == [("b", True), ("c", True), ("a", False)]
+    assert status["models"][0]["in_use"] is False and status["models"][0]["idle_s"] >= 0
+    assert "idle_s" not in status["models"][2]
+    events = [(e["event"], e["model"]) for e in status["recent_events"]]
+    assert events == [("loaded", "a"), ("loaded", "b"), ("released", "a"), ("loaded", "c")]
+    assert "to make room for loading c" in status["recent_events"][2]["detail"]
+
+
+def test_status_records_refusals_and_running_heavy_calls() -> None:
+    manager, heavy, other, _ = heavy_setup(commit_gb=2.5)
+
+    with other.in_use(), pytest.raises(ModelMemoryError) as excinfo:
+        IdleProxy(heavy).answer()
+
+    assert "server_status" in str(excinfo.value)
+    assert manager.status()["recent_events"][-1]["event"] == "refused"
+
+    seen: list[list[dict[str, object]]] = []
+
+    class Probe(Model):
+        def answer(self) -> str:
+            seen.append(manager2.status()["heavy_calls_running"])
+            return "ok"
+
+    manager2, heavy2, _, _ = heavy_setup(commit_gb=20)
+    heavy2._factory = Probe
+    heavy2.release()
+    heavy2.get()
+    IdleProxy(heavy2).answer()
+    assert seen[0][0]["model"] == HEAVY and seen[0][0]["reserved_gb"] > 3
+    assert manager2.status()["heavy_calls_running"] == []
+
+
+def test_idle_timer_and_watcher_releases_are_events() -> None:
+    machine = Machine(100, 100)
+    manager = MemoryManager(reserve_gb=0, read_status=machine.status, read_process=lambda: None)
+    cache = IdleReleased(Model, timeout=0.1, name="a", manager=manager)
+    machine.caches = [cache]
+    cache.get()
+    deadline = time.monotonic() + 3  # generous: the full suite keeps the machine busy
+    while manager.status()["recent_events"][-1]["event"] != "released" and time.monotonic() < deadline:
+        time.sleep(0.05)
+    last = manager.status()["recent_events"][-1]
+    assert (last["event"], last["detail"]) == ("released", "idle timer")
+
+    manager, _, _ = watched(ram_gb=None, commit_gb=3 + 2)
+    manager.relieve_pressure()
+    assert manager.status()["recent_events"][-1]["detail"] == "commit nearly exhausted"

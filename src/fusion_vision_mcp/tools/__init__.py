@@ -8,7 +8,7 @@ client sees them listed.
 
 from mcp.server.mcpserver import MCPServer
 
-from fusion_vision_mcp.tools import aesthetics, detection, text, vqa
+from fusion_vision_mcp.tools import aesthetics, detection, status, text, vqa
 
 
 def register_all(mcp: MCPServer) -> None:
@@ -17,6 +17,7 @@ def register_all(mcp: MCPServer) -> None:
     detection.register(mcp)
     vqa.register(mcp)
     aesthetics.register(mcp)
+    status.register(mcp)
 
 
 __all__ = ["register_all"]

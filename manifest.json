@@ -91,6 +91,10 @@
     {
       "name": "process",
       "description": "Run a raw Florence-2 task token against an image, for tasks the named tools do not cover."
+    },
+    {
+      "name": "server_status",
+      "description": "Report what the server holds in memory: models loaded, live free memory, heavy calls running, and recent loads, releases and refusals with their reasons."
     }
   ],
   "keywords": [

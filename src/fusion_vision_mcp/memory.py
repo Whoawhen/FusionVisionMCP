@@ -37,14 +37,17 @@ import logging
 import sys
 import threading
 import time
+from collections import deque
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from fusion_vision_mcp.constants import (
     CALL_CHECK_MIN_GB,
     DEFAULT_MODEL_MEMORY_GB,
+    EVENT_LOG_SIZE,
     MEMORY_RESERVE_GB,
     MEMORY_WATCH_CRITICAL_GB,
     MEMORY_WATCH_INTERVAL_S,
@@ -195,6 +198,10 @@ def _gb(size: float) -> str:
     return f"{size / GB:.1f} GB"
 
 
+def _round_gb(size: float | None) -> float | None:
+    return None if size is None else round(size / GB, 2)
+
+
 class MemoryManager:
     """Makes room before each model load and each heavy call, across every registered `IdleReleased`.
 
@@ -232,13 +239,64 @@ class MemoryManager:
         self._load_lock = threading.Lock()
         # Extra bytes reserved by heavy calls now running, keyed by (thread id, call number).
         self._calls = threading.Condition()
-        self._reserved: dict[tuple[int, int], int] = {}
+        self._reserved: dict[tuple[int, int], tuple[str, int]] = {}
         self._next_call = 0
         self._watcher: threading.Thread | None = None
         self._stop_watching = threading.Event()
+        # What happened lately, newest last, for `status()`: loads, releases and why, refusals.
+        self._events: deque[dict[str, str]] = deque(maxlen=EVENT_LOG_SIZE)
 
     def register(self, cache: IdleReleased[Any]) -> None:
         self._caches.append(cache)
+
+    def record(self, event: str, model: str, detail: str) -> None:
+        """Note an event for `status()`; thread-safe (deque appends are atomic)."""
+        self._events.append(
+            {
+                "time": datetime.now(UTC).astimezone().isoformat(timespec="seconds"),
+                "event": event,
+                "model": model,
+                "detail": detail,
+            }
+        )
+
+    def status(self) -> dict[str, Any]:
+        """What is loaded, what it holds, live free memory, running heavy calls and recent events.
+
+        Backs the `server_status` tool, so a caller can see why a call was slow (a reload after
+        a release) or refused, without reading the server's log.
+        """
+        now = time.monotonic()
+        machine = self._read_status()
+        with self._calls:
+            running = list(self._reserved.values())
+        models = []
+        for cache in sorted(self._caches, key=lambda c: (not c.loaded, c.name)):
+            row: dict[str, Any] = {
+                "model": cache.name,
+                "loaded": cache.loaded,
+                "holds_gb": _round_gb(self.resident(cache.name)) if cache.loaded else 0.0,
+                "peak_gb": _round_gb(self.estimate(cache.name)),
+                "call_adds_gb": _round_gb(self.call_extra(cache.name)),
+            }
+            if cache.loaded:
+                row["in_use"] = not cache.idle
+                row["idle_s"] = round(now - cache.last_used)
+            models.append(row)
+        return {
+            "machine": {
+                "ram_free_gb": _round_gb(machine.available_ram),
+                "ram_total_gb": _round_gb(machine.total_ram),
+                "hard_limit": machine.commit_label,
+                "hard_limit_free_gb": _round_gb(machine.available_commit),
+            },
+            "reserve_gb": _round_gb(self._reserve),
+            "budget_gb": _round_gb(self._budget),
+            "loaded_total_gb": _round_gb(sum(self.resident(c.name) for c in self._caches if c.loaded)),
+            "models": models,
+            "heavy_calls_running": [{"model": name, "reserved_gb": _round_gb(size)} for name, size in running],
+            "recent_events": list(self._events),
+        }
 
     def estimate(self, name: str) -> int:
         """Bytes a load of `name` is expected to need at its peak.
@@ -275,6 +333,7 @@ class MemoryManager:
             started = time.monotonic()
             yield
             after = self._read_process()
+            self.record("loaded", cache.name, f"in {time.monotonic() - started:.1f}s")
             if before is not None and after is not None:
                 took = max(after - before, 0)
                 self._measured[cache.name] = took
@@ -310,7 +369,7 @@ class MemoryManager:
         """
         me = threading.get_ident()
         with self._calls:
-            return sum(size for (thread, _), size in self._reserved.items() if thread != me)
+            return sum(size for (thread, _), (_, size) in self._reserved.items() if thread != me)
 
     def _reserve_call(self, cache: IdleReleased[Any], extra: int) -> tuple[int, int]:
         with self._calls:
@@ -329,19 +388,21 @@ class MemoryManager:
                     logger.info(
                         "Released %s to make room for a %s call (short on %s)", released, cache.name, ", ".join(short)
                     )
+                    self.record("released", released, f"to make room for a {cache.name} call (short on {short[0]})")
                     continue
                 if "commit" in short:
+                    self.record("refused", cache.name, f"call: {status.describe()}")
                     raise ModelMemoryError(
                         f"Not enough memory to run {cache.name}: a call adds about {_gb(extra)} plus a "
                         f"{_gb(self._reserve)} reserve, and the machine has {status.describe()}. Loaded in this "
                         f"server, all in use: {', '.join(self.loaded()) or 'nothing'}. Free memory elsewhere "
-                        "(other model processes) and retry."
+                        "(other model processes) and retry. `server_status` shows what is loaded."
                     )
                 logger.warning("Calling %s while short on %s (%s)", cache.name, ", ".join(short), status.describe())
                 break
             self._next_call += 1
             key = (threading.get_ident(), self._next_call)
-            self._reserved[key] = extra
+            self._reserved[key] = (cache.name, extra)
             return key
 
     def _shortfalls(self, cache: IdleReleased[Any], need: int, status: MemoryStatus, budget: bool = True) -> list[str]:
@@ -368,13 +429,16 @@ class MemoryManager:
             if released is None:
                 break
             logger.info("Released %s to make room for %s (short on %s)", released, cache.name, ", ".join(short))
+            self.record("released", released, f"to make room for loading {cache.name} (short on {short[0]})")
 
         still_loaded = ", ".join(self.loaded()) or "nothing"
         if "commit" in short:
+            self.record("refused", cache.name, f"load: {status.describe()}")
             raise ModelMemoryError(
                 f"Not enough memory to load {cache.name}: it needs about {_gb(need)} plus a {_gb(self._reserve)} "
                 f"reserve, and the machine has {status.describe()}. Loaded in this server, all in use: "
-                f"{still_loaded}. Free memory elsewhere (other model processes) or retry once other calls finish."
+                f"{still_loaded}. Free memory elsewhere (other model processes) or retry once other calls finish. "
+                "`server_status` shows what is loaded."
             )
         logger.warning(
             "Loading %s while short on %s (%s; loaded and in use: %s)",
@@ -433,6 +497,7 @@ class MemoryManager:
             released.append(name)
             status = self._read_status()
             logger.info("Released %s: %s (%s)", name, why, status.describe())
+            self.record("released", name, why)
             free = getattr(status, field)
             if free is None or free >= floor:
                 break

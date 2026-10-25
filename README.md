@@ -7,7 +7,7 @@
 
 🚧 **Work in progress** — see [README_DETAILED.md](README_DETAILED.md) for current limits and measured results before relying on this for anything important.
 
-An MCP server that fuses local, CPU-capable vision models — Florence-2, Moondream2, LFM2.5-VL, SAM2, Grounding DINO, PP-OCRv6, EasyOCR, IQA, and CLIP/LAION — behind twelve tools: OCR, captioning, object detection/grounding, instance counting, visual question answering, multiple-choice classification, spatial measurement (touch/gap/containment), and aesthetic scoring (including technical quality and artistic judgment via Ollama).
+An MCP server that fuses local, CPU-capable vision models — Florence-2, Moondream2, LFM2.5-VL, SAM2, Grounding DINO, PP-OCRv6, EasyOCR, IQA, and CLIP/LAION — behind twelve tools: OCR, captioning, object detection/grounding, instance counting, visual question answering, multiple-choice classification, spatial measurement (touch/gap/containment), and aesthetic scoring (including technical quality and artistic judgment via Ollama), plus a `server_status` report on what it holds in memory.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="FusionVisionMCP-Dark.jpg">
@@ -81,6 +81,7 @@ root-caused against the exact fixture that exposed it, not patched at the sympto
 | `critique_composition` | Florence-2 + CLIP/LAION + Moondream2 | Check framing against the rule of thirds; for low-scoring shots, explain what looks off. Also supports `compare_with`. |
 | `batch_analyze_images` | (routes to any tool above) | Run one operation across many images in a single call, isolating failures per image. |
 | `process` | Florence-2 | Run a raw Florence-2 task token for tasks the named tools don't cover. |
+| `server_status` | (no model) | Report what the server holds in memory: models loaded, live free RAM, heavy calls running, and recent loads, releases and refusals with their reasons. For when a call was slow or refused. |
 
 Full argument reference, measured accuracy, and known limits for each tool: [README_DETAILED.md](README_DETAILED.md).
 

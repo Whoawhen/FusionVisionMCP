@@ -1,6 +1,6 @@
 # Memory manager: a RAM budget across models, instead of only an idle timer
 
-**Status:** 2026-10-25: diagnosed (commit exhaustion, see below); steps M1, M2, M2b and M2c done; M3-M5 and option C open. Raised by the user after a
+**Status:** 2026-10-25: diagnosed (commit exhaustion, see below); steps M1, M2, M2b, M2c and M4 done; M3, M5 and option C open. Raised by the user after a
 crash on 2026-10-24.
 
 ## Diagnosis (2026-10-25): it was commit exhaustion
@@ -85,8 +85,11 @@ Each step is shippable alone; M1 is the one that stops the crashes.
 - **M3. Stress test (the judging rule below).** VisionBench script: concurrent calls across the big models with a
   second model-loading process beside the server. Pass: no process dies, a refused load is a clear tool error, single-
   client median latency within 5%.
-- **M4. Report it.** A `server_status` tool or a field in error results: loaded models, their sizes, live RAM /
-  commit. Small once M1 exists.
+- **M4. Report it (done 2026-10-25).** A `server_status` tool (`tools/status.py`, `MemoryManager.status()`): each
+  model loaded or not, what it holds, its peak and what a call adds, in use / idle seconds; live free RAM, total RAM
+  and the hard limit; the reserve and budget; heavy calls running and their reservations; and the last 20 loads,
+  releases (with why: idle timer, to make room for X, RAM tight, commit nearly exhausted) and refusals. Loads no
+  model. Both refusal messages point to it.
 - **M5. Cross-process lock (opt-in), only if M3 shows M1 isn't enough.** M1 already sees other processes' memory
   through the live reading; a lock only adds queueing.
 - **Not a manager step but bigger than any of them:** dropping Moondream2 (~7.5 GB) once `critique_composition`'s and

@@ -225,3 +225,6 @@ class AppContext:
     # The same LFM2.5-VL-3B ONNX model (one proxy, one loaded copy), `query_image`'s answerer since 2026-10-24. None
     # with `--vqa-model moondream`, in tests and in hand-built contexts, where `query_image` answers with Moondream2.
     answerer: Answerer | None = None
+    # The memory manager every model shares (`memory.MemoryManager`), for `server_status`. None in tests and
+    # hand-built contexts, where `server_status` reports that memory is not managed.
+    memory: Any | None = None
