@@ -13,7 +13,7 @@ imported inside their factories in `app_lifespan` instead, which run on first to
 
 import importlib.util
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from functools import partial
 from typing import TYPE_CHECKING, Final, Literal, cast
@@ -33,6 +33,7 @@ from fusion_vision_mcp.constants import (
 )
 from fusion_vision_mcp.idle import IdleProxy, IdleReleased
 from fusion_vision_mcp.images import SERVER_NAME, get_images
+from fusion_vision_mcp.memory import MemoryManager
 from fusion_vision_mcp.ocr_fusion import SpecialistOCR
 from fusion_vision_mcp.tools import register_all
 
@@ -87,6 +88,7 @@ async def app_lifespan(
     device: str | None = None,
     caption_model: str = CAPTION_MODELS[0],
     vqa_model: str = VQA_MODELS[0],
+    memory_budget_gb: float | None = None,
 ) -> AsyncIterator[AppContext]:
     """Context manager for the FastMCP app lifespan.
 
@@ -97,6 +99,11 @@ async def app_lifespan(
     `idle_timeout` is what the CLI's `--memory-mode` resolves to: a positive value
     releases each model that many seconds after its last use, while 0 leaves them
     resident for the process's lifetime -- the fastest, most memory-hungry setting.
+
+    Every model also shares one `MemoryManager`, whatever the timeout: before a load it
+    releases least-recently-used idle models when free memory (or `memory_budget_gb`)
+    is short, and refuses the load with a tool error rather than letting the process
+    run out of commit. "Persistent" means no idle timer, not "crash rather than release".
     """
     vqa: VqaProcessor
     segmenter: Segmenter
@@ -172,52 +179,47 @@ async def app_lifespan(
 
         return VisionReasoner(provider=reasoner_provider, model=reasoner_model)
 
-    if idle_timeout > 0:
-        # Keep each model in this process so repeat calls stay fast, and let the
-        # idle timer hand its memory back once the work stops.
-        florence2 = cast(
-            Processor,
-            IdleProxy(IdleReleased(_make_florence2, idle_timeout, "Florence-2")),
-        )
-        vqa = cast(
-            VqaProcessor,
-            IdleProxy(IdleReleased(_make_moondream, idle_timeout, "Moondream")),
-        )
-    else:
-        # timeout 0 never schedules a release, so this is a persistent in-process model
-        # that is still built lazily on first use.
-        florence2 = cast(Processor, IdleProxy(IdleReleased(_make_florence2, 0, "Florence-2")))
-        vqa = cast(VqaProcessor, IdleProxy(IdleReleased(_make_moondream, 0, "Moondream")))
+    memory = MemoryManager(budget_gb=memory_budget_gb)
+
+    def _lazy(factory: Callable[[], object], name: str) -> IdleProxy:
+        # The name is also the key into `constants.MODEL_MEMORY_GB`.
+        return IdleProxy(IdleReleased(factory, idle_timeout, name, manager=memory))
+
+    # Keep each model in this process so repeat calls stay fast, and let the idle timer
+    # hand its memory back once the work stops. A timeout of 0 never schedules a
+    # release, so that is a persistent in-process model, still built lazily on first use.
+    florence2 = cast(Processor, _lazy(_make_florence2, "Florence-2"))
+    vqa = cast(VqaProcessor, _lazy(_make_moondream, "Moondream"))
 
     # Always lazy, on both paths. `IdleReleased` builds on first use and, with a
     # timeout of 0, simply never schedules a release — so a session that never
     # calls `spatial_relations` never pays for SAM2 at all.
     segmenter = cast(
         Segmenter,
-        IdleProxy(IdleReleased(_make_sam2, idle_timeout, "SAM2")),
+        _lazy(_make_sam2, "SAM2"),
     )
     # Same rationale as SAM2: always idle-wrapped regardless of idle_timeout, since only
     # score_aesthetics/critique_composition pay for the CLIP backbone, and most sessions
     # never call either.
     aesthetic = cast(
         AestheticScorer,
-        IdleProxy(IdleReleased(_make_aesthetic, idle_timeout, "Aesthetic")),
+        _lazy(_make_aesthetic, "Aesthetic"),
     )
     # Same rationale again: only count_objects loads Grounding DINO, so a session that
     # never counts never pays the ~690MB.
     counter = cast(
         InstanceDetector,
-        IdleProxy(IdleReleased(_make_grounding_dino, idle_timeout, "Grounding DINO")),
+        _lazy(_make_grounding_dino, "Grounding DINO"),
     )
     # Both OCR engines are lazy too. EasyOCR now loads only for structured_analysis's
     # gibberish check -- or for everything, when non-English languages are requested,
     # because the PP-OCRv6 recognizer here is English-only.
     ocr_specialist = cast(
         SpecialistOCR,
-        IdleProxy(IdleReleased(_make_easyocr, idle_timeout, "EasyOCR")),
+        _lazy(_make_easyocr, "EasyOCR"),
     )
     if tuple(ocr_languages) == ("en",):
-        ocr_engine = cast(SpecialistOCR, IdleProxy(IdleReleased(_make_ppocr, idle_timeout, "PP-OCRv6")))
+        ocr_engine = cast(SpecialistOCR, _lazy(_make_ppocr, "PP-OCRv6"))
     else:
         ocr_engine = ocr_specialist
 
@@ -225,29 +227,25 @@ async def app_lifespan(
     # optional [iqa] extra stays genuinely optional and genuinely lazy.
     iqa = None
     if importlib.util.find_spec("onnxruntime") is not None:
-        iqa = IdleProxy(IdleReleased(_make_image_quality, idle_timeout, "ImageQuality"))
+        iqa = _lazy(_make_image_quality, "ImageQuality")
 
     reasoner = None
     if reasoner_provider != "none":
-        reasoner = IdleProxy(IdleReleased(_make_reasoner, idle_timeout, "VisionReasoner"))
+        reasoner = _lazy(_make_reasoner, "VisionReasoner")
 
     # Only query_image(structured_analysis=true) loads it, and only when an image has a hand or face.
-    defect_embedder = cast(CropEmbedder, IdleProxy(IdleReleased(_make_dinov2, idle_timeout, "DINOv2")))
+    defect_embedder = cast(CropEmbedder, _lazy(_make_dinov2, "DINOv2"))
 
     # Only detect_objects (and batch "detect") loads SAM 3, on photographs.
-    locator = cast(InstanceDetector, IdleProxy(IdleReleased(_make_sam3, idle_timeout, "SAM 3")))
+    locator = cast(InstanceDetector, _lazy(_make_sam3, "SAM 3"))
 
     # Only caption(deep=true) loads it (~6.4 GB in bf16).
-    deep_captioner = cast(Captioner, IdleProxy(IdleReleased(_make_lfm, idle_timeout, "LFM2.5-VL")))
+    deep_captioner = cast(Captioner, _lazy(_make_lfm, "LFM2.5-VL"))
 
     # `caption`'s default (~8 GB at peak, CPU). `--caption-model florence2` keeps Florence-2's caption instead.
     # `query_image`'s answerer is the same model: one proxy, so one loaded copy serves both. `--vqa-model moondream`
     # answers with Moondream2 instead.
-    lfm_onnx = (
-        IdleProxy(IdleReleased(_make_lfm_onnx, idle_timeout, "LFM2.5-VL ONNX"))
-        if "lfm-onnx" in (caption_model, vqa_model)
-        else None
-    )
+    lfm_onnx = _lazy(_make_lfm_onnx, "LFM2.5-VL ONNX") if "lfm-onnx" in (caption_model, vqa_model) else None
     captioner = cast(Captioner, lfm_onnx) if caption_model == "lfm-onnx" else None
     answerer = cast(Answerer, lfm_onnx) if vqa_model == "lfm-onnx" else None
 
@@ -284,6 +282,7 @@ def server(
     device: str | None = None,
     caption_model: str = CAPTION_MODELS[0],
     vqa_model: str = VQA_MODELS[0],
+    memory_budget_gb: float | None = None,
 ) -> MCPServer:
     """Creates a new FastMCP server instance with the specified name and model ID."""
     mcp = MCPServer(
@@ -303,6 +302,7 @@ def server(
             device=device,
             caption_model=caption_model,
             vqa_model=vqa_model,
+            memory_budget_gb=memory_budget_gb,
         ),
     )
 

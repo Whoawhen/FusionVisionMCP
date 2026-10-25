@@ -902,6 +902,23 @@ model in order to release it.
 Regression tests in `tests/test_idle.py` cover all three: a call outlasting the timeout, thread count across 25
 lookups, and `proxy.release()` on an unloaded proxy.
 
+## A load has to fit: `MemoryManager` releases idle models first (2026-10-25)
+
+The 2026-10-24 test-server deaths were **commit exhaustion**: Windows logged a low-virtual-memory condition with one
+python.exe at 26.8 GB of commit, and two earlier crashes were access violations in torch's allocator (`c10.dll`).
+`memory.MemoryManager` (torch-free, on the eager path) is shared by every `IdleReleased`. Before a factory runs it
+reads live free RAM and commit (`GlobalMemoryStatusEx`; free RAM + swap on Linux), compares them with the model's
+`constants.MODEL_MEMORY_GB` estimate plus `MEMORY_RESERVE_GB`, and releases least-recently-used idle models
+(`try_release`, never mid-call, never blocking on another model's lock) until it fits. Still short on commit: it
+raises `ModelMemoryError`, a tool error rather than a dead server. Short on RAM alone: it loads with a warning.
+`--memory-budget GB` adds a soft cap. Loads are serialised. This runs in `persistent` mode too, which is what lets the
+session-scoped test server pass (523 of 523, 25 releases to make room; `Future_Ideas/memory_manager.md`).
+
+Two things to know. **The cache name is the table key**: a new `_lazy(factory, "Name")` in `app_lifespan` needs a
+`MODEL_MEMORY_GB` entry or it is estimated at 1 GB. And the table is estimates (step M2 measures them): the private-
+bytes delta logged on each load misses memory-mapped weights (Moondream +3.6 GB against 7.5) and reads ~0 for
+PP-OCRv6, EasyOCR and ImageQuality, which load on first call, so a measurement only ever raises an estimate.
+
 ## Package import must stay torch-free, or MCP clients time out on connect
 
 **This invariant has now been broken twice and restored twice. Check it before assuming it holds** — there is a

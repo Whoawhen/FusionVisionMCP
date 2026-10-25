@@ -861,6 +861,8 @@ task tokens this server does not expose as their own tool.
 - **--memory-mode**: How long each model stays in memory after its last use. See
   [Memory modes](#memory-modes) below.
 - **--idle-timeout**: Deprecated alias for `--memory-mode` expressed in minutes; overrides it when given.
+- **--memory-budget**: Optional cap, in GB, on the total size of loaded models. See
+  [Memory modes](#memory-modes) below.
 - **--device**: Torch device all models load onto, e.g. `cpu`, `cuda`, `cuda:1`, `mps`. Auto-detected (MPS,
   then CUDA, then CPU) when unset. Set this to pin the server to a specific accelerator, force CPU on a shared
   GPU box, or target a non-default GPU index — including a GPU-equipped cloud VM, since this is a plain local
@@ -876,12 +878,21 @@ the trade between memory and speed. When installing the `.mcpb` bundle, the same
 | --- | --- | --- |
 | `aggressive` | Releases after **5 minutes** of inactivity. | Memory is tight, or you work in short scattered bursts. Lowest memory of the presets. |
 | `standard` | Releases after **10 minutes** of inactivity. **Default.** | General use — repeat calls stay fast during a burst of work, and the memory comes back once the work stops. |
-| `persistent` | Never releases; models stay loaded for the server's lifetime. | Throughput matters more than memory, e.g. a dedicated machine or a long batch job. Highest memory, fastest. |
+| `persistent` | Never releases on a timer; models stay loaded for the server's lifetime unless memory runs short (below). | Throughput matters more than memory, e.g. a dedicated machine or a long batch job. Highest memory, fastest. |
 | *a number* | Releases after that many minutes, e.g. `--memory-mode 30`. | You know your own working rhythm and want to match it. `0` is the same as `persistent`. |
 
 Every mode reloads automatically on the next request, so none of them can lose work — only time. Releasing is
 also per model: a session that only ever captions never loads SAM2 or the CLIP backbone in the first place, so
 these settings govern what is held *after* use, not what gets loaded.
+
+**Whatever the mode, a load has to fit.** Before loading a model the server reads the machine's free memory and
+compares it with that model's estimated size (`MODEL_MEMORY_GB` in `constants.py`). If it is short, the least
+recently used idle models are released first; a model in the middle of a call never is. If a load still cannot fit
+in free commit (Windows' RAM + pagefile allowance, past which allocations fail), the call returns a tool error
+naming the model, what it needs and what is free, instead of the server dying. Short on RAM alone, it loads anyway
+and logs a warning, since the cost there is paging, not a crash. `--memory-budget GB` adds a cap of your own: idle
+models are released to keep the loaded total under it. Every load logs its estimate, the free memory and what it
+actually took.
 
 There is deliberately no "release after every call" mode. The idle timer is restarted by attribute lookup, so a
 timeout short enough to approximate one would also fire mid-inference, while the caller still holds a live

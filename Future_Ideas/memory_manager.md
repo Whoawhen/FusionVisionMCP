@@ -1,6 +1,71 @@
 # Memory manager: a RAM budget across models, instead of only an idle timer
 
-**Status:** idea, 2026-10-24. Nothing measured or built yet. Raised by the user after a crash the same day.
+**Status:** 2026-10-25: diagnosed (commit exhaustion, see below); step M1 built; M2-M5 open. Raised by the user after a
+crash on 2026-10-24.
+
+## Diagnosis (2026-10-25): it was commit exhaustion
+
+The Windows event logs settle candidate 1 without a reproduction:
+
+- **System log, Resource-Exhaustion-Detector (event 2004), 2026-10-24 22:04:46 and 22:21:38:** "Windows successfully
+  diagnosed a low virtual memory condition." Top consumers: one `python.exe` at **26.8 GB** of commit (then 17.1 GB at
+  the second event), another at 7.9 GB, NVIDIA Overlay 4.8 GB. The 26.8 GB process fits the test server, which keeps
+  every model it touches.
+- **Application log, 2026-10-23 20:47 and 23:03:** two `python.exe` crashes in `c10.dll` (torch's allocator), exception
+  `0xc0000005`. An access violation in the allocator is what a failed allocation under commit pressure looks like.
+- **The commit limit moves.** The pagefile (`G:\pagefile.sys`) is system-managed: 80 GB allocated and a commit limit of
+  111.5 GB on 2026-10-25, peak pagefile use 15.7 GB. Windows grows it *after* a low-memory event, so the limit at the
+  moment of a crash can be far lower than what a later reading shows. A check has to read it live, every time.
+
+So the hard guard is **available commit** (what Windows refuses to hand out), and the soft one is **available
+physical memory** (past it, loads page instead of failing, which is slow but survivable).
+
+## Plan
+
+Each step is shippable alone; M1 is the one that stops the crashes.
+
+- **M1. Load-time guard, in-process (built 2026-10-25).** A torch-free `memory.py`: `MemoryManager` reads live memory
+  (`GlobalMemoryStatusEx` on Windows, `/proc/meminfo` on Linux, psutil if installed elsewhere; none of them a new
+  dependency) and every `IdleReleased` consults it before its factory runs. "Commit" below is Windows' commit; on
+  Linux and macOS the hard limit is free RAM + free swap, which is what the OOM killer acts on. Loads are serialised (one at a time, so
+  two calls can't both pass the check and then both load). Before a load of estimated size S:
+  1. if available commit < S + reserve, or available RAM < S + reserve, or (with `--memory-budget`) the loaded
+     models' sizes + S exceed the budget: release the least recently used *idle* model (never one in flight, never by
+     blocking on its lock) and re-read; repeat;
+  2. still short on **commit** with nothing left to release: raise `ModelMemoryError` ("not enough memory to load X:
+     N GB of commit free, needs about M GB; loaded: ..."), which reaches the client as a tool error instead of a dead
+     process;
+  3. still short on RAM or budget only: load anyway, with a warning.
+  This applies in `persistent` mode too: persistent means "no idle timer", not "crash rather than release". That is
+  what fixes the test suite, whose session server is persistent.
+  Every load logs the estimate, live RAM / commit, and the measured private-bytes delta afterwards; a measured size
+  can raise the estimate for later reloads in the same process, never lower it (it is the resident size, and a load
+  can peak higher). PP-OCRv6, EasyOCR and ImageQuality build their sessions on first *call*, not in the constructor,
+  so their measurement reads ~0 and only their table estimate guards them; all three are 0.5 GB or less.
+  Sizes start from a static table in `constants.py` (`MODEL_MEMORY_GB`), from `CLAUDE.md`'s figures where they exist
+  and parameter counts otherwise.
+  **Built 2026-10-25:** `memory.py`, `IdleReleased(manager=...)` + `try_release()`, `--memory-budget GB`,
+  `tests/test_memory.py` (12 tests). End to end through a spawned server: the check and measurement log on load.
+  **The real-model suite passes: 523 of 523 in 10 min 34 s** (2026-10-25, persistent test server, nothing else
+  running, 13 GB RAM free at the start), where on 2026-10-24 it died twice. Its log: 31 loads, 25 idle models
+  released to make room (all for RAM; e.g. the ONNX LFM copy for the bf16 one and back), no load that went ahead
+  short, no refusal. The default never needed `--memory-budget`.
+- **M2. Measure the size table.** One script, one fresh subprocess per model: load it, run one representative call,
+  read the process's *peak* commit (`PeakPagefileUsage`, exact per process on Windows). Replaces the M1 estimates.
+  **Private bytes alone undercount**: in the suite run Moondream measured +3.6 GB private against its 7.5 GB estimate
+  (weights memory-mapped from safetensors are not private). Measure peak commit *and* peak working set.
+  Loads every model once (~10 loads, one at a time); run only when no benchmark holds a model.
+- **M3. Stress test (the judging rule below).** VisionBench script: concurrent calls across the big models with a
+  second model-loading process beside the server. Pass: no process dies, a refused load is a clear tool error, single-
+  client median latency within 5%.
+- **M4. Report it.** A `server_status` tool or a field in error results: loaded models, their sizes, live RAM /
+  commit. Small once M1 exists.
+- **M5. Cross-process lock (opt-in), only if M3 shows M1 isn't enough.** M1 already sees other processes' memory
+  through the live reading; a lock only adds queueing.
+- **Not a manager step but bigger than any of them:** dropping Moondream2 (~7.5 GB) once `critique_composition`'s and
+  `count_objects`' questions are gated on LFM, and one LFM copy for default and `deep`.
+
+**Original note (2026-10-24):** idea; nothing measured or built yet. Raised by the user after a crash the same day.
 
 ## Why
 

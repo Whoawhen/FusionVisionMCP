@@ -138,7 +138,8 @@ def resolve_memory_mode(memory_mode: str) -> float:
     help=(
         "How long models stay in memory after their last use, trading memory against speed. "
         "'aggressive' releases after 5 minutes idle (lowest memory); 'standard' after 10 minutes; "
-        "'persistent' never releases (fastest, highest memory). Any number of minutes also works, "
+        "'persistent' never releases on a timer (fastest, highest memory; idle models still make way "
+        "when memory runs short). Any number of minutes also works, "
         "e.g. '30' or '2.5'. Models always reload automatically on the next request, so no mode can "
         "lose work -- only time."
     ),
@@ -151,6 +152,18 @@ def resolve_memory_mode(memory_mode: str) -> float:
     help=(
         "Deprecated alias for --memory-mode expressed in minutes; overrides it when given. "
         "0 keeps the models loaded for the lifetime of the server."
+    ),
+)
+@click.option(
+    "--memory-budget",
+    type=click.FloatRange(min=0, min_open=True),
+    default=None,
+    metavar="GB",
+    help=(
+        "Cap on the total size of loaded models, in GB: before a load, the least recently used idle "
+        "models are released to stay under it. Unset by default. Independently of this, idle models are "
+        "always released when a load would not fit in free memory, and a load that cannot fit at all "
+        "returns a tool error instead of crashing the server."
     ),
 )
 @click.option(
@@ -177,6 +190,7 @@ def main(
     ocr_languages: tuple[str, ...],
     memory_mode: str,
     idle_timeout: float | None,
+    memory_budget: float | None,
     device: str | None,
 ) -> None:
     """
@@ -201,12 +215,15 @@ def main(
         device=device,
         caption_model=caption_model,
         vqa_model=vqa_model,
+        memory_budget_gb=memory_budget,
     )
 
     logger.info(f"Starting server with {model} + {moondream_model}@{moondream_revision} (Press CTRL+D to quit)")
     if idle_minutes > 0:
         logger.info(f"Models will be released after {idle_minutes:g} minutes of inactivity")
     else:
-        logger.info("Models will stay loaded for the lifetime of the server")
+        logger.info("Models will stay loaded for the lifetime of the server, unless memory runs short")
+    if memory_budget is not None:
+        logger.info(f"Loaded models are kept under a {memory_budget:g} GB budget")
     s.run()
     logger.info("Server stopped")

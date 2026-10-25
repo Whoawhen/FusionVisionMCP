@@ -22,7 +22,10 @@ import sys
 import threading
 import time
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from fusion_vision_mcp.memory import MemoryManager
 
 logger = logging.getLogger(__name__)
 
@@ -64,25 +67,58 @@ class IdleReleased[T]:
     Args:
         factory: Called to build the object. May be called again after a release.
         timeout: Seconds of inactivity before the object is released.
-        name: Human readable name, used in log messages.
+        name: Human readable name, used in log messages and as the key into the memory
+            manager's size table.
+        manager: Optional `MemoryManager` consulted before each build; it may release
+            other idle objects to make room, or refuse the build.
     """
 
-    def __init__(self, factory: Callable[[], T], timeout: float, name: str) -> None:
+    def __init__(
+        self,
+        factory: Callable[[], T],
+        timeout: float,
+        name: str,
+        manager: MemoryManager | None = None,
+    ) -> None:
         self._factory = factory
         self._timeout = timeout
         self._name = name
+        self._manager = manager
         self._value: T | None = None
         self._timer: threading.Timer | None = None
         self._lock = threading.RLock()
         self._last_used = 0.0
         self._in_flight = 0
+        if manager is not None:
+            manager.register(self)
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def loaded(self) -> bool:
+        return self._value is not None
+
+    @property
+    def idle(self) -> bool:
+        """No call is running on the object right now."""
+        return self._in_flight == 0
+
+    @property
+    def last_used(self) -> float:
+        return self._last_used
 
     def get(self) -> T:
         """Return the object, building it if necessary, and restart the idle countdown."""
         with self._lock:
             if self._value is None:
-                logger.info("Loading %s", self._name)
-                self._value = self._factory()
+                if self._manager is None:
+                    logger.info("Loading %s", self._name)
+                    self._value = self._factory()
+                else:
+                    with self._manager.loading(self):
+                        self._value = self._factory()
             self._last_used = time.monotonic()
             self._arm_timer()
             return self._value
@@ -103,19 +139,40 @@ class IdleReleased[T]:
     def release(self) -> None:
         """Drop the object now and hand its memory back to the operating system."""
         with self._lock:
-            self._cancel_timer()
-            if self._value is None:
+            if not self._drop_locked():
                 return
-            self._value = None
-            # Collect under the lock so a concurrent `get()` cannot rebuild the model
-            # while the old one is still being collected -- that briefly doubled
-            # resident memory on the very path that exists to reduce it.
-            gc.collect()
-            trim_working_set()
         if self._timeout > 0:
             logger.info("Released %s after %.0fs idle", self._name, self._timeout)
         else:
             logger.info("Released %s", self._name)
+
+    def try_release(self) -> bool:
+        """Release now if the object is loaded and idle, without waiting for the lock.
+
+        For the memory manager, which calls this on *other* objects while one is being
+        built: blocking on their locks could deadlock against a thread holding one of them
+        while it waits to load. Returns whether the object was released.
+        """
+        if not self._lock.acquire(blocking=False):
+            return False
+        try:
+            if self._in_flight > 0:
+                return False
+            return self._drop_locked()
+        finally:
+            self._lock.release()
+
+    def _drop_locked(self) -> bool:
+        self._cancel_timer()
+        if self._value is None:
+            return False
+        self._value = None
+        # Collect under the lock so a concurrent `get()` cannot rebuild the model
+        # while the old one is still being collected -- that briefly doubled
+        # resident memory on the very path that exists to reduce it.
+        gc.collect()
+        trim_working_set()
+        return True
 
     def _arm_timer(self) -> None:
         """Start the idle timer if it is not already running.
@@ -172,7 +229,9 @@ class IdleProxy:
 
     Callables are wrapped so the idle timer sees the *call*, not just the lookup:
     an inference longer than the timeout would otherwise be released while still
-    running.
+    running. The wrapper looks the method up again once the call is marked in use, so
+    a memory-manager release between the lookup and the call costs a reload rather
+    than leaving a released model running (and a second copy loading beside it).
     """
 
     def __init__(self, cache: IdleReleased[Any]) -> None:
@@ -191,6 +250,6 @@ class IdleProxy:
 
         def _tracked(*args: Any, **kwargs: Any) -> Any:
             with cache.in_use():
-                return attr(*args, **kwargs)
+                return getattr(cache.get(), name)(*args, **kwargs)
 
         return _tracked
