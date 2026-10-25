@@ -899,6 +899,11 @@ holds between calls (SAM 3 holds about 3.6 GB and briefly needs 3.5 GB more insi
 at once, beside others; one that doesn't waits for other running calls to finish rather than piling its peak on
 theirs, and with nothing else running it releases idle models first or returns the same clear error.
 
+Between calls, a background check every 5 seconds releases idle models early when the machine runs short, whatever
+is using the memory: any idle model once free commit drops under 4 GB, models idle 30 seconds or more under 4 GB of
+free RAM, and models idle 2 minutes or more once free RAM falls under a quarter of the total. The memory modes above
+are therefore the longest a model stays idle, not a promise that it stays that long.
+
 There is deliberately no "release after every call" mode. The idle timer is restarted by attribute lookup, so a
 timeout short enough to approximate one would also fire mid-inference, while the caller still holds a live
 reference and nothing is actually freed. Set a small number of minutes instead if you want memory back quickly.

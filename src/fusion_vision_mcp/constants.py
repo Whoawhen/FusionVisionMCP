@@ -310,6 +310,24 @@ MODEL_RESIDENT_GB: Final[dict[str, float]] = {
 #: CLIP and DINOv2 calls add about 0.1 GB; every other measured model adds 0.4 GB or more.
 CALL_CHECK_MIN_GB: Final[float] = 0.25
 
+#: The memory watcher (`MemoryManager.relieve_pressure`) reads free memory this often, in seconds.
+MEMORY_WATCH_INTERVAL_S: Final[float] = 5.0
+
+#: Free commit or RAM under this, in GB, is critical: the watcher releases idle models until
+#: `MEMORY_WATCH_TARGET_GB` is free again. Twice the load reserve, so a load would already be
+#: releasing to fit here.
+MEMORY_WATCH_CRITICAL_GB: Final[float] = 4.0
+MEMORY_WATCH_TARGET_GB: Final[float] = 6.0
+
+#: Under critical RAM (not commit), only models idle at least this long go: a tool calls several
+#: models in turn, and the one between steps is idle for a moment without being done with.
+MEMORY_WATCH_MIN_IDLE_S: Final[float] = 30.0
+
+#: Free RAM under this share of the total is tight: models idle `MEMORY_WATCH_TIGHT_IDLE_S` or
+#: longer are released, as if the idle timer ran faster. 25% of 31.5 GB is about 7.9 GB.
+MEMORY_WATCH_TIGHT_FRACTION: Final[float] = 0.25
+MEMORY_WATCH_TIGHT_IDLE_S: Final[float] = 120.0
+
 #: Used for a cache name missing from `MODEL_MEMORY_GB`.
 DEFAULT_MODEL_MEMORY_GB: Final[float] = 1.0
 

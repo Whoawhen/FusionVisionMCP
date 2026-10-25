@@ -1,6 +1,6 @@
 # Memory manager: a RAM budget across models, instead of only an idle timer
 
-**Status:** 2026-10-25: diagnosed (commit exhaustion, see below); steps M1, M2 and M2b done; M3-M5 open. Raised by the user after a
+**Status:** 2026-10-25: diagnosed (commit exhaustion, see below); steps M1, M2, M2b and M2c done; M3-M5 and option C open. Raised by the user after a
 crash on 2026-10-24.
 
 ## Diagnosis (2026-10-25): it was commit exhaustion
@@ -69,8 +69,19 @@ Each step is shippable alone; M1 is the one that stops the crashes.
   (RAM). Loads count running calls' reservations too. A thread never waits on its own reservation, so a call made
   from inside another can't deadlock. Checked calls: SAM 3, Grounding DINO, SAM2, LFM ONNX, Moondream, Florence-2,
   LFM bf16, and the OCR/IQA engines' first-call loads are covered by their load check. Tools run in worker threads
-  (`anyio.to_thread`), so a waiting call blocks only itself. Not done: a background watcher releasing idle models
-  when *other* processes take memory between calls (option B), and one server shared by all clients (option C).
+  (`anyio.to_thread`), so a waiting call blocks only itself.
+- **M2c. A watcher for pressure between calls (done 2026-10-25).** Loads and calls only check when they happen; if
+  another process grows while this server sits idle, nothing reacted until the idle timer. `MemoryManager` now runs a
+  daemon thread (`start_watcher`, started and stopped by `app_lifespan`, in every memory mode) that reads free memory
+  every `MEMORY_WATCH_INTERVAL_S` (5 s; the read is microseconds, so polling beats Windows' low-memory notification on
+  portability for no real cost) and runs `relieve_pressure`: free commit under 4 GB -> release any idle model until
+  6 GB is free; free RAM under 4 GB -> models idle 30 s or more, until 6 GB; free RAM under 25% of the total -> models
+  idle 2 minutes or more, until 25% again (the idle timer running faster when memory is tight; on 31.5 GB that is
+  about 7.9 GB free). The 30 s floor keeps it from dropping a model between two steps of one tool call. Thresholds
+  were set from the reserve and the machine, not tuned; M3 is where they get tested.
+- **Option C, not started: one server shared by every client.** Claude Code, Cline and Antigravity each spawn their
+  own server and can each hold an 8.7 GB LFM copy; a single local HTTP server would load it once. Changes client
+  configuration, so it waits on the user.
 - **M3. Stress test (the judging rule below).** VisionBench script: concurrent calls across the big models with a
   second model-loading process beside the server. Pass: no process dies, a refused load is a clear tool error, single-
   client median latency within 5%.

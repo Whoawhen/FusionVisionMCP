@@ -929,6 +929,11 @@ they fit, wait for each other when they don't, and with nothing running a call r
 Reservations are per thread and a thread never waits on its own, so a model method that calls another proxy cannot
 deadlock; keep it that way if a wrapper ever starts calling proxies.
 
+**A watcher releases idle models between calls too.** `app_lifespan` starts `MemoryManager.start_watcher` (every 5 s,
+in every memory mode): free commit under 4 GB releases any idle model, free RAM under 4 GB those idle 30 s+, free RAM
+under 25% of the total those idle 2 min+ (`MEMORY_WATCH_*` in `constants.py`). So a model can be gone well before its
+idle timer when other processes squeeze the machine; that is the point, and the next call reloads it.
+
 ## Package import must stay torch-free, or MCP clients time out on connect
 
 **This invariant has now been broken twice and restored twice. Check it before assuming it holds** — there is a

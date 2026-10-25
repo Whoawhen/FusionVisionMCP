@@ -249,22 +249,26 @@ async def app_lifespan(
     captioner = cast(Captioner, lfm_onnx) if caption_model == "lfm-onnx" else None
     answerer = cast(Answerer, lfm_onnx) if vqa_model == "lfm-onnx" else None
 
-    yield AppContext(
-        florence2,
-        vqa,
-        segmenter,
-        aesthetic,
-        counter,
-        ocr_specialist,
-        ocr_engine,
-        iqa,
-        reasoner,
-        defect_embedder,
-        locator,
-        deep_captioner,
-        captioner,
-        answerer,
-    )
+    memory.start_watcher()
+    try:
+        yield AppContext(
+            florence2,
+            vqa,
+            segmenter,
+            aesthetic,
+            counter,
+            ocr_specialist,
+            ocr_engine,
+            iqa,
+            reasoner,
+            defect_embedder,
+            locator,
+            deep_captioner,
+            captioner,
+            answerer,
+        )
+    finally:
+        memory.stop_watcher()
 
 
 def server(

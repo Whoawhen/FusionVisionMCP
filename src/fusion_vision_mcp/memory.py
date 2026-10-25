@@ -21,6 +21,11 @@ An optional budget (`--memory-budget`) caps the summed size of loaded models the
 soft way. Loads are serialised, so two concurrent calls can't both pass the check and
 then both load.
 
+Between loads and calls, a watcher thread (`start_watcher`) reads free memory every few
+seconds and releases idle models when *something else* -- another process, another
+client's server -- squeezes the machine, instead of waiting for the idle timer. See
+`relieve_pressure` for its three tiers.
+
 This module is on the eager import path and must stay torch-free: sizes come from a
 static table (`constants.MODEL_MEMORY_GB`), not from inspecting a model.
 """
@@ -41,6 +46,12 @@ from fusion_vision_mcp.constants import (
     CALL_CHECK_MIN_GB,
     DEFAULT_MODEL_MEMORY_GB,
     MEMORY_RESERVE_GB,
+    MEMORY_WATCH_CRITICAL_GB,
+    MEMORY_WATCH_INTERVAL_S,
+    MEMORY_WATCH_MIN_IDLE_S,
+    MEMORY_WATCH_TARGET_GB,
+    MEMORY_WATCH_TIGHT_FRACTION,
+    MEMORY_WATCH_TIGHT_IDLE_S,
     MODEL_MEMORY_GB,
     MODEL_RESIDENT_GB,
 )
@@ -69,6 +80,7 @@ class MemoryStatus:
     available_ram: int | None
     available_commit: int | None
     commit_label: str = "commit"
+    total_ram: int | None = None
 
     def describe(self) -> str:
         parts = []
@@ -140,20 +152,21 @@ def read_memory_status() -> MemoryStatus:
         status.dwLength = ctypes.sizeof(_MemoryStatusEx)
         if not _K32.GlobalMemoryStatusEx(ctypes.byref(status)):
             return MemoryStatus(None, None)
-        return MemoryStatus(int(status.ullAvailPhys), int(status.ullAvailPageFile))
+        return MemoryStatus(int(status.ullAvailPhys), int(status.ullAvailPageFile), total_ram=int(status.ullTotalPhys))
     try:
         with open("/proc/meminfo", encoding="ascii") as meminfo:
             fields = {line.split(":")[0]: int(line.split()[1]) * 1024 for line in meminfo if line.count(":") == 1}
         if "MemAvailable" in fields:
             ram = fields["MemAvailable"]
-            return MemoryStatus(ram, ram + fields.get("SwapFree", 0), "RAM + swap")
+            return MemoryStatus(ram, ram + fields.get("SwapFree", 0), "RAM + swap", fields.get("MemTotal"))
     except (OSError, ValueError, IndexError):
         pass
     try:
         import psutil  # type: ignore[import-untyped]  # optional, not a dependency
 
-        ram = int(psutil.virtual_memory().available)
-        return MemoryStatus(ram, ram + int(psutil.swap_memory().free), "RAM + swap")
+        vm = psutil.virtual_memory()
+        ram = int(vm.available)
+        return MemoryStatus(ram, ram + int(psutil.swap_memory().free), "RAM + swap", int(vm.total))
     except Exception:  # noqa: BLE001 - no reading is an answer too
         return MemoryStatus(None, None)
 
@@ -221,6 +234,8 @@ class MemoryManager:
         self._calls = threading.Condition()
         self._reserved: dict[tuple[int, int], int] = {}
         self._next_call = 0
+        self._watcher: threading.Thread | None = None
+        self._stop_watching = threading.Event()
 
     def register(self, cache: IdleReleased[Any]) -> None:
         self._caches.append(cache)
@@ -369,9 +384,83 @@ class MemoryManager:
             still_loaded,
         )
 
-    def _release_one(self, exclude: IdleReleased[Any]) -> str | None:
+    def start_watcher(self, interval_s: float = MEMORY_WATCH_INTERVAL_S) -> None:
+        """Start the background thread that runs `relieve_pressure` every `interval_s`."""
+        if self._watcher is not None:
+            return
+        self._stop_watching.clear()
+        self._watcher = threading.Thread(target=self._watch, args=(interval_s,), name="memory-watcher", daemon=True)
+        self._watcher.start()
+
+    def stop_watcher(self) -> None:
+        if self._watcher is None:
+            return
+        self._stop_watching.set()
+        self._watcher.join(timeout=5)
+        self._watcher = None
+
+    def _watch(self, interval_s: float) -> None:
+        while not self._stop_watching.wait(interval_s):
+            try:
+                self.relieve_pressure()
+            except Exception:
+                logger.warning("Memory watcher check failed", exc_info=True)
+
+    def relieve_pressure(self, now: float | None = None) -> list[str]:
+        """Release idle models while the machine is short of memory; the names released.
+
+        Three tiers, checked in this order, each releasing least-recently-used idle models
+        until its own level is regained (so it does not flap at the boundary):
+
+        - free **commit** under `MEMORY_WATCH_CRITICAL_GB`: any idle model, until
+          `MEMORY_WATCH_TARGET_GB` is free. Allocations fail past this; age doesn't matter.
+        - free **RAM** under `MEMORY_WATCH_CRITICAL_GB`: models idle `MEMORY_WATCH_MIN_IDLE_S`
+          or longer, until `MEMORY_WATCH_TARGET_GB` is free. The age floor keeps it from
+          dropping a model between two steps of one tool call (`caption` uses several).
+        - free RAM under `MEMORY_WATCH_TIGHT_FRACTION` of the total: models idle
+          `MEMORY_WATCH_TIGHT_IDLE_S` or longer, until that fraction is free again. This is
+          the idle timer running faster while memory is tight.
+        """
+        now = time.monotonic() if now is None else now
+        status = self._read_status()
+        tier = self._pressure_tier(status)
+        released: list[str] = []
+        while tier is not None:
+            min_idle_s, field, floor, why = tier
+            name = self._release_one(exclude=None, min_idle_s=min_idle_s, now=now)
+            if name is None:
+                break
+            released.append(name)
+            status = self._read_status()
+            logger.info("Released %s: %s (%s)", name, why, status.describe())
+            free = getattr(status, field)
+            if free is None or free >= floor:
+                break
+        return released
+
+    def _pressure_tier(self, status: MemoryStatus) -> tuple[float, str, int, str] | None:
+        """(minimum idle seconds, MemoryStatus field, free bytes to regain, reason), or None."""
+        critical = int(MEMORY_WATCH_CRITICAL_GB * GB)
+        target = int(MEMORY_WATCH_TARGET_GB * GB)
+        commit, ram = status.available_commit, status.available_ram
+        if commit is not None and commit < critical:
+            return 0.0, "available_commit", target, f"{status.commit_label} nearly exhausted"
+        if ram is not None and ram < critical:
+            return MEMORY_WATCH_MIN_IDLE_S, "available_ram", target, "RAM nearly exhausted"
+        if ram is not None and status.total_ram:
+            tight = int(status.total_ram * MEMORY_WATCH_TIGHT_FRACTION)
+            if ram < tight:
+                return MEMORY_WATCH_TIGHT_IDLE_S, "available_ram", tight, "RAM tight"
+        return None
+
+    def _release_one(
+        self, exclude: IdleReleased[Any] | None, min_idle_s: float = 0.0, now: float | None = None
+    ) -> str | None:
         """Release the least recently used idle model; its name, or None if none could go."""
-        candidates = [c for c in self._caches if c is not exclude and c.loaded and c.idle]
+        now = time.monotonic() if now is None else now
+        candidates = [
+            c for c in self._caches if c is not exclude and c.loaded and c.idle and now - c.last_used >= min_idle_s
+        ]
         for cache in sorted(candidates, key=lambda c: c.last_used):
             if cache.try_release():
                 return cache.name

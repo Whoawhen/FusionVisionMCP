@@ -320,3 +320,103 @@ def test_a_nested_heavy_call_does_not_wait_on_its_own_caller() -> None:
     thread.join(3)
 
     assert done == ["ok"]
+
+
+# --- the watcher: releasing idle models when something else squeezes the machine ----------------
+
+
+def watched(
+    ram_gb: float | None, commit_gb: float | None, total_ram_gb: float | None = 32
+) -> tuple[MemoryManager, list[IdleReleased[Model]], Machine]:
+    machine = Machine(ram_gb, commit_gb)
+
+    def status() -> MemoryStatus:
+        base = machine.status()
+        total = None if total_ram_gb is None else int(total_ram_gb * GB)
+        return MemoryStatus(base.available_ram, base.available_commit, total_ram=total)
+
+    manager = MemoryManager(reserve_gb=0, read_status=status, read_process=lambda: None)
+    caches = [IdleReleased(Model, timeout=0, name=name, manager=manager) for name in ("old", "mid", "new")]
+    machine.caches = caches
+    for cache in caches:
+        cache.get()
+    machine.ram_gb, machine.commit_gb = ram_gb, commit_gb  # now what the test says, with all three loaded
+    return manager, caches, machine
+
+
+def at(cache: IdleReleased[Model], seconds_ago: float, now: float) -> None:
+    cache._last_used = now - seconds_ago
+
+
+def test_watcher_does_nothing_with_room_to_spare() -> None:
+    manager, caches, _ = watched(ram_gb=3 + 20, commit_gb=3 + 50)
+
+    assert manager.relieve_pressure() == []
+    assert all(c.loaded for c in caches)
+
+
+def test_critical_commit_releases_any_idle_model_until_the_target() -> None:
+    now = 1000.0
+    # 3 loaded; free commit 2 GB (critical, under 4); each release frees 1; the target is 6 free.
+    manager, (old, mid, new), _ = watched(ram_gb=None, commit_gb=3 + 2)
+    for cache, ago in ((old, 5), (mid, 3), (new, 1)):
+        at(cache, ago, now)
+
+    released = manager.relieve_pressure(now=now)
+
+    assert released == ["old", "mid", "new"]  # oldest first, age no object; 5 free is still under 6
+
+
+def test_critical_commit_never_releases_a_model_mid_call() -> None:
+    manager, (old, _, _), _ = watched(ram_gb=None, commit_gb=3 + 2)
+
+    with old.in_use():
+        released = manager.relieve_pressure()
+
+    assert "old" not in released and old.loaded
+
+
+def test_critical_ram_spares_models_used_in_the_last_half_minute() -> None:
+    now = 1000.0
+    manager, (old, mid, new), _ = watched(ram_gb=3 + 2, commit_gb=None)
+    at(old, 600, now)
+    at(mid, 45, now)
+    at(new, 10, now)  # likely between two steps of one tool call
+
+    released = manager.relieve_pressure(now=now)
+
+    assert released == ["old", "mid"] and new.loaded
+
+
+def test_tight_ram_releases_only_models_idle_two_minutes() -> None:
+    now = 1000.0
+    # 32 GB total, tight under 8 GB free; 7.5 GB free is tight but not critical.
+    manager, (old, mid, new), _ = watched(ram_gb=3 + 7.5, commit_gb=None)
+    at(old, 300, now)
+    at(mid, 200, now)
+    at(new, 60, now)
+
+    released = manager.relieve_pressure(now=now)
+
+    assert released == ["old"]  # 8.5 GB free after one release: tight no longer
+
+
+def test_tight_needs_the_total_to_be_known() -> None:
+    manager, caches, _ = watched(ram_gb=3 + 7.5, commit_gb=None, total_ram_gb=None)
+    for cache in caches:
+        at(cache, 900, time.monotonic())
+
+    assert manager.relieve_pressure() == []
+
+
+def test_watcher_thread_runs_and_stops() -> None:
+    manager, (old, _, _), _ = watched(ram_gb=None, commit_gb=3 + 2)
+
+    manager.start_watcher(interval_s=0.02)
+    deadline = time.monotonic() + 3
+    while old.loaded and time.monotonic() < deadline:
+        time.sleep(0.02)
+    manager.stop_watcher()
+
+    assert not old.loaded
+    assert not any(t.name == "memory-watcher" for t in threading.enumerate())
