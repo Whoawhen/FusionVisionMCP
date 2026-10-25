@@ -168,12 +168,16 @@ def test_repeated_lookups_do_not_spawn_a_timer_each_time() -> None:
     cache = IdleReleased(Counter, timeout=30, name="counter")
     proxy = IdleProxy(cache)
 
-    before = threading.active_count()
+    # This cache's own timer, not the process's thread count: other tests' timers and the HTTP
+    # test's leftovers start and stop threads at any moment, which made a global count flaky.
+    # The objects themselves, not their ids: a freed timer's id can be reused by its replacement.
+    timers = []
     for _ in range(25):
         proxy.double(2)
-    after = threading.active_count()
+        timers.append(cache._timer)
 
-    assert after - before <= 1
+    assert timers[0] is not None and timers[0].is_alive()
+    assert all(timer is timers[0] for timer in timers)
     cache.release()
 
 

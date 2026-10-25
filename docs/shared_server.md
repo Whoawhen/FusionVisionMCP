@@ -34,7 +34,8 @@ reconnect.
 
 **Windows.** Task Scheduler starts a program at logon but does not restart one that exits, so
 `scripts/run_shared_server.ps1` does that (with a backoff, logging to
-`%LOCALAPPDATA%\FusionVisionMCP\shared_server.log`). Register it to start at logon with no console window:
+`%LOCALAPPDATA%\FusionVisionMCP\shared_server.log`; add `-CpuOnly` before the server options to hide the GPU).
+Register it to start at logon with no console window:
 
 ```powershell
 $script = (Resolve-Path scripts\run_shared_server.ps1).Path
@@ -46,7 +47,10 @@ Register-ScheduledTask -TaskName "FusionVisionMCP shared server" -Action $action
 Start-ScheduledTask -TaskName "FusionVisionMCP shared server"
 ```
 
-Remove it with `Unregister-ScheduledTask -TaskName "FusionVisionMCP shared server"`.
+Remove it with `Unregister-ScheduledTask -TaskName "FusionVisionMCP shared server"`. `Stop-ScheduledTask` does not
+stop the supervisor or the server it started; stop those too (`Get-NetTCPConnection -LocalPort 8765 -State Listen`
+gives the server's process id, and the supervisor is the `powershell.exe` whose command line names
+`run_shared_server`), or the old server keeps the port.
 
 **macOS** (launchd restarts it itself): `~/Library/LaunchAgents/com.fusionvisionmcp.shared.plist`
 
