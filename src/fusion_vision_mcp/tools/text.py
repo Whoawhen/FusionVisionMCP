@@ -11,7 +11,7 @@ from typing import Annotated, Any
 from mcp.server.mcpserver import Context, MCPServer
 from pydantic import Field
 
-from fusion_vision_mcp.analysis import deep_crops, ocr_pages, visible_text_line
+from fusion_vision_mcp.analysis import deep_crops, image_type_lines, ocr_pages, visible_text_line
 from fusion_vision_mcp.constants import CaptionLevel
 from fusion_vision_mcp.images import crop_region, get_images
 from fusion_vision_mcp.ocr_fusion import fuse_caption_ocr
@@ -126,6 +126,20 @@ def register(mcp: MCPServer) -> None:
                 )
             ),
         ] = True,
+        image_type: Annotated[
+            bool,
+            Field(
+                description=(
+                    "When true (the default), start the default caption with `Image type: <x>.`, CLIP's pick of "
+                    "what kind of image it is among 24 types (photograph, screenshot of a website / mobile app / "
+                    "desktop application, video game screenshot, chart or graph, scanned document, oil painting, "
+                    "3D render, ...). Took key facts named from 64.6% to 67.0% on 194 fresh images (game UI +10, "
+                    "app and web screenshots +6), adding ~0.35 s. It is a best guess, not a fact: it agreed with "
+                    "the image's labelled kind about 7 times in 10, and it has no 'AI-generated' type. Not added "
+                    "with `deep` or `region` (not measured there). Set false to leave it out."
+                )
+            ),
+        ] = True,
         region: Annotated[
             list[float] | None,
             Field(
@@ -164,6 +178,15 @@ def register(mcp: MCPServer) -> None:
         sharper per word (-1.3 at equal length), and it names absent objects
         more often (COCO: 16.5% of the objects it names, against about
         11-12% for the default).
+
+        By default the caption also starts with `Image type: <x>.` (`image_type`),
+        CLIP's pick among 24 kinds of image (photograph, website / mobile app /
+        desktop screenshot, video game screenshot, chart, scanned document, oil
+        painting, 3D render, ...). On 194 fresh images it took key facts named
+        from 64.6% to 67.0% (game UI +10, app and web screenshots +6; 71.3% to
+        73.2% on the 280 held-out images) for ~0.35 s. Treat it as a best guess:
+        it matched the image's labelled kind about 7 times in 10. Only the
+        default caption gets it, not `deep` or a `region`.
 
         By default the caption ends with `Visible text: "..."`, the `ocr`
         engine's verbatim reading of any text in the image (`read_text`). On
@@ -219,6 +242,8 @@ def register(mcp: MCPServer) -> None:
         app = ctx.request_context.lifespan_context
         with get_images(src) as pages:
             images = [crop_region(page, region) for page in pages] if region is not None else pages
+            types = [""] * len(images)
+            lfm_default = False
             # Moondream2's `deep` (the fallback) reads the text first: a text-heavy page keeps 12 crops (DEEP_CROPS).
             moondream_deep = deep and app.deep_captioner is None
             page_texts = (
@@ -232,12 +257,20 @@ def register(mcp: MCPServer) -> None:
             elif app.captioner is not None:
                 try:
                     captions = app.captioner.caption(images)
+                    lfm_default = True
                 except (OSError, ImportError) as exc:
                     # No network for the first download, or no onnxruntime: the caption before 2026-10-23.
                     logger.warning(f"LFM2.5-VL ONNX unavailable ({exc}); caption falls back to Florence-2")
                     captions = app.florence2.caption(images, CaptionLevel.MORE_DETAILED)
             else:
                 captions = app.florence2.caption(images, CaptionLevel.MORE_DETAILED)
+            # The type line was measured on this caption only (not `deep`, a region or Florence-2's). A CLIP that
+            # cannot load drops the line, never the caption.
+            if lfm_default and image_type and region is None:
+                try:
+                    types = image_type_lines(app, images)
+                except (OSError, ImportError) as exc:
+                    logger.warning(f"CLIP unavailable ({exc}); caption without the image type line")
             texts = page_texts if read_text else [""] * len(captions)
             # A captioner can emit U+FFFD for a split multi-byte character; mend it from the page's text.
             captions = [repair_replacement_chars(c, t) for c, t in zip(captions, texts, strict=True)]
@@ -245,15 +278,16 @@ def register(mcp: MCPServer) -> None:
             # quotes, never the verbatim line.
             lines = [visible_text_line(t) for t in texts] if read_text else [""] * len(captions)
 
-            def with_text(caption_text: str, line: str) -> str:
-                return f"{caption_text.rstrip()} {line}" if line else caption_text
+            def with_text(caption_text: str, line: str, kind: str) -> str:
+                caption_text = f"{caption_text.rstrip()} {line}" if line else caption_text
+                return f"{kind} {caption_text}" if kind else caption_text
 
             if not verify_text:
-                return [with_text(c, line) for c, line in zip(captions, lines, strict=True)]
+                return [with_text(c, line, k) for c, line, k in zip(captions, lines, types, strict=True)]
 
             regioned = app.florence2.ocr_with_regions(images)
             results = []
-            for caption_text, page_regions, line in zip(captions, regioned, lines, strict=True):
+            for caption_text, page_regions, line, kind in zip(captions, regioned, lines, types, strict=True):
                 text_regions = [
                     {"text": text, "box": [int(v) for v in box]}
                     for text, box in zip(page_regions.get("labels", []), page_regions.get("bboxes", []))
@@ -261,7 +295,7 @@ def register(mcp: MCPServer) -> None:
                 fused = fuse_caption_ocr(caption_text, text_regions)
                 for key in ("caption", "caption_corrected"):
                     if isinstance(fused.get(key), str):
-                        fused[key] = with_text(fused[key], line)
+                        fused[key] = with_text(fused[key], line, kind)
                 results.append(fused)
             return results
 

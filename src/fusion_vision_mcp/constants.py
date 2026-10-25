@@ -188,6 +188,20 @@ CAPTION_ONNX_THREADS: Final[int] = 18
 #: `--caption-model` choices.
 CAPTION_MODELS: Final[tuple[str, ...]] = ("lfm-onnx", "florence2")
 
+#: Since 2026-10-24 the default caption (LFM ONNX, not `deep` or `region`) starts with `Image type: <x>.`, x being CLIP's
+#: top pick among these (prompts "a/an <type>", `Aesthetic.zero_shot`, the `score_aesthetics` model). VisionBench
+#: `caption_type_line.py`, rules fixed before each run: tune 72.0 -> 74.5% (an LFM question instead: 74.0%, 4.4 s, its
+#: answers vaguer), round 21 64.6 -> 67.0% (+2.4, CI 1.4 to 3.6; matched +1.1; game UI +10.4, app/web +6.2, no kind
+#: worse), the 280 confirm images 71.3 -> 73.2%; 0.35 s. No label names a COCO object, so CHAIR is unchanged by
+#: construction. The line agreed with the labelled kind on 69% of round 21. The list was written before looking at
+#: which types the labels name; changing it means re-running the gate.
+CAPTION_IMAGE_TYPES: Final[tuple[str, ...]] = (
+    "photograph", "screenshot of a website", "screenshot of a mobile app", "screenshot of a desktop application",
+    "video game screenshot", "chart or graph", "diagram", "infographic", "map", "satellite image", "scanned document",
+    "text document", "poster", "logo", "product packaging", "street sign", "oil painting", "watercolor painting",
+    "drawing or sketch", "cartoon or comic", "anime illustration", "digital illustration", "3D render", "pixel art",
+)  # fmt: skip
+
 #: `query_image` since 2026-10-24: the same LFM2.5-VL-3B ONNX model as the default caption (one loaded copy serves
 #: both), answering the question verbatim, except that a question matching VQA_TEXT_QUESTION gets the `ocr` engine's
 #: reading of the image in front (at most VQA_OCR_WORDS words) and VQA_TEXT_SUFFIX after; the card's decoding with

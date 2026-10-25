@@ -281,6 +281,17 @@ load falls back to Moondream2) sends the question verbatim, except that a questi
 questions and `count_objects`' `estimates.vqa`; each needs its own gate before Moondream2 (~7.5 GB fp32, its remote-code
 pin, `pyvips`) can go. `check_consistency`'s control question now goes to LFM too: same mechanism, not re-measured.
 
+**2026-10-24: the default caption starts with `Image type: <x>.`** (`image_type`, default on; `analysis.image_type_lines`,
+CLIP ViT-L/14 over `CAPTION_IMAGE_TYPES`, prompts "a/an <type>", ~0.35 s). 106 of the default's 291 misses on the 280
+confirm images named the kind of image, and the two prompt rounds that asked for it in the prompt lost on confirm, so it
+is a separate line in front of the prose. VisionBench `caption_type_line.py` (rules fixed before each run): CLIP beat an
+LFM question on tune (74.5 vs 74.0%, 0.35 vs 4.4 s); round 21 64.6 -> 67.0% (+2.4, CI 1.4 to 3.6; matched +1.1; game UI
++10.4, app/web +6.2, no kind worse); the 280 confirm images 71.3 -> 73.2%. CHAIR unchanged by construction (no type
+label names a COCO object; asserted, so `coco_chair3` was not captioned). It agreed with the labelled kind on 69% of
+round 21. Parity 20 of 20 (`caption_type_line_parity.py`). Only the LFM default gets it: `deep` is untested (to do), and
+`region` and the Florence-2 fallback were not measured. Loads CLIP (~1.7 GB) on caption calls; a CLIP that cannot load
+drops the line, never the caption.
+
 **llama-server ran on the GPU without being asked.** The winget llama.cpp build ships Vulkan and defaults to
 `--n-gpu-layers auto`: every llama-server timing in the runs above was the RTX 5060 (2.4 s), not CPU (25.6 s). Recall
 was unaffected (CPU vs GPU +0.0 on tune). Any llama.cpp run here sets `LLAMA_ARG_N_GPU_LAYERS=0`,

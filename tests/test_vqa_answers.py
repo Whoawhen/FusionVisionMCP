@@ -88,3 +88,25 @@ def test_falls_back_to_moondream_when_lfm_cannot_load(ocr_calls: list[int]) -> N
 def test_without_an_answerer_moondream_answers(ocr_calls: list[int]) -> None:
     assert vqa_answers(_app(None), [Image.new("RGB", (8, 8))], "What does it say?") == ["moondream:What does it say?"]
     assert ocr_calls == []
+
+
+class _Clip:
+    def __init__(self) -> None:
+        self.prompts: list[str] = []
+
+    def zero_shot(self, images: list[Any], prompts: list[str]) -> list[list[float]]:
+        self.prompts = prompts
+        # The second image's top pick is the last label.
+        return [[0.9] + [0.0] * (len(prompts) - 1), [0.0] * (len(prompts) - 1) + [0.9]][: len(images)]
+
+
+def test_image_type_lines_name_clips_top_label() -> None:
+    from fusion_vision_mcp.analysis import image_type_lines
+    from fusion_vision_mcp.constants import CAPTION_IMAGE_TYPES
+
+    clip = _Clip()
+    app = cast(AppContext, SimpleNamespace(aesthetic=clip))
+    lines = image_type_lines(app, [Image.new("RGB", (8, 8))] * 2)
+    assert lines == [f"Image type: {CAPTION_IMAGE_TYPES[0]}.", f"Image type: {CAPTION_IMAGE_TYPES[-1]}."]
+    # The prompts the gate measured: "a"/"an" + the label.
+    assert clip.prompts[0] == "a photograph" and "an oil painting" in clip.prompts

@@ -1069,6 +1069,36 @@ async def test_caption_text_free_image_gets_no_text_line(mcp_client_session: Cli
 
 
 @pytest.mark.anyio
+async def test_caption_starts_with_an_image_type_only_by_default(mcp_client_session: ClientSession) -> None:
+    """The default caption leads with CLIP's `Image type: <x>.` (one of CAPTION_IMAGE_TYPES); `image_type=false`
+    and `deep` (not measured there) do not, and the rest of the caption is the same either way."""
+    from fusion_vision_mcp.constants import CAPTION_IMAGE_TYPES
+
+    typed = cast(
+        TextContent,
+        (await mcp_client_session.call_tool("caption", arguments={"src": SAMPLE_IMAGE_FILEPATH})).content[0],
+    ).text
+    plain = cast(
+        TextContent,
+        (
+            await mcp_client_session.call_tool("caption", arguments={"src": SAMPLE_IMAGE_FILEPATH, "image_type": False})
+        ).content[0],
+    ).text
+    deep = cast(
+        TextContent,
+        (await mcp_client_session.call_tool("caption", arguments={"src": SAMPLE_IMAGE_FILEPATH, "deep": True})).content[
+            0
+        ],
+    ).text
+
+    head, rest = typed.split(". ", 1)
+    assert head.removeprefix("Image type: ") in CAPTION_IMAGE_TYPES
+    assert rest == plain
+    assert not plain.startswith("Image type:")
+    assert not deep.startswith("Image type:")
+
+
+@pytest.mark.anyio
 async def test_caption_read_text_false_returns_bare_caption(mcp_client_session: ClientSession) -> None:
     res = await mcp_client_session.call_tool("caption", arguments={"src": BANNER_IMAGE_FILEPATH, "read_text": False})
 

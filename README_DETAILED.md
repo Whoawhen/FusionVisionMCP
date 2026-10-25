@@ -244,6 +244,20 @@ the first download) falls back to it. The weights are under the LFM Open License
   Moondream2 stays for `critique_composition` (and `query_image` with `--vqa-model moondream`); without the LFM captioner (a hand-built context)
   `deep` falls back to Moondream2's long caption, at 6 crops on pages under 30 OCR words and 12 above (plan
   step 1C-b).
+- **image_type** (default `true`, since 2026-10-24): start the default caption with `Image type: <x>.`, CLIP
+  ViT-L/14's top pick (the `score_aesthetics` model, ~0.35 s) among 24 kinds of image (`CAPTION_IMAGE_TYPES`:
+  photograph, website / mobile app / desktop application screenshot, video game screenshot, chart or graph, diagram,
+  infographic, map, satellite image, scanned or text document, poster, logo, product packaging, street sign, oil or
+  watercolor painting, drawing or sketch, cartoon or comic, anime or digital illustration, 3D render, pixel art).
+  About a third of the default's misses were the kind of image, and asking for it in the prompt shortened the caption
+  and lost on confirm (two rounds), so it is a separate line. VisionBench `caption_type_line.py`, rules fixed before
+  each run: CLIP beat asking LFM the question (tune 74.5 vs 74.0%, 0.35 vs 4.4 s, its line matching the labelled kind
+  76 vs 49%); on round 21 (194 fresh images) key facts 64.6 -> 67.0% (+2.4, CI 1.4 to 3.6; +1.1 at equal length),
+  game UI +10.4, app and web screenshots +6.2, no kind worse; on the 280 held-out images 71.3 -> 73.2%. No type
+  names a COCO object, so it cannot add a hallucinated object. It is a guess: it matched the labelled kind on 69% of
+  round 21, and there is no "AI-generated" type (nothing here detects that). The server reproduced the gate's line on
+  20 of 20 images. Not added with `deep`, a `region` or the Florence-2 fallback (none measured), and a CLIP that
+  cannot load drops the line, not the caption.
 - **region**: `[x1, y1, x2, y2]` in the image's pixels: caption only that part, so it gets the captioner's whole
   input resolution (the default caption sees about 512 px; Florence-2 shrank every image to 768 px). The box is widened by 15% on each side, to at
   least 32 px, and clipped to the image; the caption then describes the region, not the image. Measured

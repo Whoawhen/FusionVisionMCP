@@ -19,6 +19,7 @@ from PIL.Image import Image, Transpose
 from fusion_vision_mcp import geometry, layout, question
 from fusion_vision_mcp.constants import (
     BUSY_BACKGROUND_QUESTION,
+    CAPTION_IMAGE_TYPES,
     CAPTION_TEXT_WORDS,
     CLASSIFY_MAX_LABELS,
     CLASSIFY_TEMPLATE,
@@ -741,6 +742,13 @@ def ocr_pages(app: AppContext, images: Sequence[Image]) -> list[dict[str, Any]]:
         regions = _read_upright(app, image)
         pages.append({"text": "\n".join(r["text"] for r in regions), "text_regions": regions})
     return pages
+
+
+def image_type_lines(app: AppContext, images: Sequence[Image]) -> list[str]:
+    """`Image type: <x>.` per image: CLIP's top pick among CAPTION_IMAGE_TYPES (VisionBench `caption_type_line.py`)."""
+    prompts = [("an " if t[0].lower() in "aeiou" else "a ") + t for t in CAPTION_IMAGE_TYPES]
+    rows = app.aesthetic.zero_shot(list(images), prompts)
+    return [f"Image type: {CAPTION_IMAGE_TYPES[max(range(len(row)), key=row.__getitem__)]}." for row in rows]
 
 
 _TEXT_QUESTION_RE: Final = re.compile(VQA_TEXT_QUESTION, re.IGNORECASE)
