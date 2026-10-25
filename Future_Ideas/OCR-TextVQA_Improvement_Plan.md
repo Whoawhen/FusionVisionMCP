@@ -634,3 +634,34 @@ left: wave 2 (region proposers for bucket C). Its upper-bound check ran 2026-10-
 37 tune misses (>= 4, so wave 2 is built by the rule), but their own readings contain the answer on only 2, so the
 arms stand or fall on reading those new boxes correctly. Then Track 4
 (Chinese models, only if every non-Chinese arm fails, which by now they have; the user's call).
+
+### 0.18 Wave 2 read bound, Track 4 and its follow-up (2026-10-25): the plan ends with nothing to ship
+
+**Wave 2 read bound** (VisionBench `ocr_gate0_wave2_read_bound.py`, rules 6935f06, result 686c3c7). Seven readers on
+the 29 proposer boxes that cover an answer on the 8 box-reachable misses: 4 readable by some reader (the rule's line,
+so "build"), only 2 by two readers (#23 "select", #190); #188 rested on TrOCR-str alone, #126 on Florence-2 alone, and
+the boxes were oracle picks. The user chose Track 4 instead of building it.
+
+**Track 4** (`ocr_track4.py`, rules aa7bad0, result c9af80c). Bigger PaddleOCR models inside the shipped `ocr_pages`,
+screened on round 22's 146 tune questions (base reproduced 65.1%, 1.2 s) plus the text-free sets. Shipped today:
+`PP-OCRv6_det_small` + `PP-OCRv6_rec_small`. Smoke: v6 det medium everywhere read one invoice line fewer, out. Then
+every arm read text on text-free images: v6 det medium photos 63.0% (6 images), v6 rec medium 65.1% (8), **both
+medium 70.5%, net +8 (14 gained / 6 lost, CI -0.7 to +11.6), 2.5 s, but 10 images including 3 of 4 fixtures**, v5
+server det photos 66.4% (13), the same at side 1024 69.2%, net +6 (14). The strays were single characters and CJK
+glyphs: the medium recognizer is multilingual, and the 0.75 floor was set on the small models' scores. The v5 server
+recognizer is not an English option in RapidOCR 3.9; GOT-OCR2.0 was not an arm (generative, far past 5 s on CPU).
+
+**Follow-up** (`ocr_track4b.py`, rules 1468179, result d01ffbf; the user's request). Both medium models with a filter
+(none / drop non-Latin spans / also drop spans under 2 letters or digits) x floor 0.75-0.95, chosen on tune by
+text-free and controls, then round 22 confirm once. **No configuration qualified**: text-free held only at the
+strictest filter and 0.95, which loses 9 items net; raising the floor removes the gain as fast as the strays (+8 at
+0.75, +4 at 0.85, 0 at 0.90); the non-Latin filter costs sourced lines (73.0 -> 69.1%, that set has non-Latin signs).
+Confirm was not run, so round 22's 154 confirm questions are still unseen. The "at most 2 lost" screen check was
+dropped for this follow-up before it ran, and was not what failed it.
+
+**Where this leaves `ocr` on photos.** Every track has now failed cleanly on fresh data: better readers on found boxes
+(wave 1), pointing (`region=`), extra proposers (wave 2's bound), and bigger PaddleOCR models with or without
+filtering. The shipped `ocr` finds the answer on 65.1% of round 22's fresh tune questions; 8% of round 22 is not
+written at all. The one real signal is that the medium models read more (+8 net) at the price of stray text on blank
+images; making that usable would need a stray detector that is not a confidence floor (the strays score like real
+text), which is a new idea, not a setting. Round 22 confirm stays in reserve for whatever comes next.
