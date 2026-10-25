@@ -894,6 +894,11 @@ and logs a warning, since the cost there is paging, not a crash. `--memory-budge
 models are released to keep the loaded total under it. Every load logs its estimate, the free memory and what it
 actually took.
 
+The same applies to each heavy call on a model that is already loaded, because a call can need far more than the model
+holds between calls (SAM 3 holds about 3.6 GB and briefly needs 3.5 GB more inside every call). A call that fits runs
+at once, beside others; one that doesn't waits for other running calls to finish rather than piling its peak on
+theirs, and with nothing else running it releases idle models first or returns the same clear error.
+
 There is deliberately no "release after every call" mode. The idle timer is restarted by attribute lookup, so a
 timeout short enough to approximate one would also fire mid-inference, while the caller still holds a live
 reference and nothing is actually freed. Set a small number of minutes instead if you want memory back quickly.

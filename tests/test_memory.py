@@ -1,6 +1,7 @@
 import io
 import sys
 import threading
+import time
 
 import pytest
 
@@ -118,7 +119,7 @@ def test_a_measured_size_raises_the_estimate_but_never_lowers_it() -> None:
 
     assert manager.estimate("big") == 3 * GB
     assert manager.estimate("small") == GB  # measured 0.5 GB; the 1 GB table figure stands
-    assert manager.resident("small") == GB // 2
+    assert manager.resident("small") == GB  # nor what it is taken to hold between calls
 
 
 def test_try_release_does_not_wait_for_a_held_lock() -> None:
@@ -193,3 +194,129 @@ def test_linux_hard_limit_is_ram_plus_swap(monkeypatch: pytest.MonkeyPatch) -> N
     assert status.available_ram == 4000000 * 1024
     assert status.available_commit == 6000000 * 1024
     assert "RAM + swap free" in status.describe()
+
+
+# --- heavy calls: what a call adds on top of a loaded model -------------------------------------
+
+#: "SAM 3" is in both tables, so a call on it adds peak minus resident; the test names above add nothing.
+HEAVY = "SAM 3"
+
+
+def heavy_setup(commit_gb: float) -> tuple[MemoryManager, IdleReleased[Model], IdleReleased[Model], Machine]:
+    machine = Machine(ram_gb=None, commit_gb=100)
+    manager = MemoryManager(reserve_gb=0, read_status=machine.status, read_process=lambda: None, call_wait_s=0.05)
+    heavy = IdleReleased(Model, timeout=0, name=HEAVY, manager=manager)
+    other = IdleReleased(Model, timeout=0, name="other", manager=manager)
+    machine.caches = [heavy, other]
+    heavy.get()
+    other.get()
+    machine.commit_gb = commit_gb  # from here on, free memory is what the test says
+    return manager, heavy, other, machine
+
+
+def test_light_calls_are_not_checked() -> None:
+    manager, _, other, _ = heavy_setup(commit_gb=0)
+
+    assert manager.call_extra("other") == 0
+    assert IdleProxy(other).answer() == "ok"  # no memory at all, and nothing checked
+
+
+def test_a_heavy_call_that_fits_reserves_its_extra_only_while_running() -> None:
+    manager, heavy, _, _ = heavy_setup(commit_gb=10)
+    extra = manager.call_extra(HEAVY)
+    seen: list[int] = []
+
+    class Probe(Model):
+        def answer(self) -> str:
+            # Another thread sees this call's reservation; this thread does not count its own.
+            box: list[int] = []
+            thread = threading.Thread(target=lambda: box.append(manager.reserved_by_others()))
+            thread.start()
+            thread.join()
+            seen.append(box[0])
+            seen.append(manager.reserved_by_others())
+            return "ok"
+
+    heavy._factory = Probe
+    heavy.release()
+    heavy.get()
+
+    assert IdleProxy(heavy).answer() == "ok"
+    assert extra > 3 * GB and seen == [extra, 0]
+    assert manager.reserved_by_others() == 0
+
+
+def test_a_heavy_call_releases_an_idle_model_to_fit() -> None:
+    manager, heavy, other, machine = heavy_setup(commit_gb=0)
+    # Loaded heavy + other hold 2 GB of the simulated machine; releasing other frees 1.
+    machine.commit_gb = 2 + manager.call_extra(HEAVY) / GB - 0.5  # 0.5 GB short until other goes
+
+    assert IdleProxy(heavy).answer() == "ok"
+    assert not other.loaded and heavy.loaded
+
+
+def test_a_heavy_call_that_cannot_fit_is_refused() -> None:
+    _, heavy, other, _ = heavy_setup(commit_gb=2.5)  # 0.5 GB free, nowhere near a SAM 3 call
+
+    with other.in_use(), pytest.raises(ModelMemoryError) as excinfo:
+        IdleProxy(heavy).answer()
+
+    assert "run SAM 3" in str(excinfo.value)
+    assert heavy.loaded and other.loaded  # refusing the call drops nothing
+
+
+def test_a_heavy_call_waits_for_another_rather_than_stacking_on_it() -> None:
+    manager, heavy, _, machine = heavy_setup(commit_gb=0)
+    extra_gb = manager.call_extra(HEAVY) / GB
+    machine.commit_gb = 2 + extra_gb * 1.5  # room for one call's extra, not two
+    first_running = threading.Event()
+    let_first_finish = threading.Event()
+    order: list[str] = []
+
+    class Slow(Model):
+        def answer(self) -> str:
+            if threading.current_thread().name == "first":
+                first_running.set()
+                let_first_finish.wait(5)
+            order.append(threading.current_thread().name)
+            return "ok"
+
+    heavy._factory = Slow
+    heavy.release()
+    heavy.get()
+    proxy = IdleProxy(heavy)
+    first = threading.Thread(target=proxy.answer, name="first")
+    second = threading.Thread(target=proxy.answer, name="second")
+    first.start()
+    first_running.wait(5)
+    second.start()
+    time.sleep(0.3)
+    assert order == []  # second is waiting, not running beside first
+    let_first_finish.set()
+    first.join(5)
+    second.join(5)
+
+    assert order == ["first", "second"]
+
+
+def test_a_nested_heavy_call_does_not_wait_on_its_own_caller() -> None:
+    manager, heavy, _, machine = heavy_setup(commit_gb=0)
+    machine.commit_gb = 2 + manager.call_extra(HEAVY) / GB * 1.5
+    proxy = IdleProxy(heavy)
+
+    class Nested(Model):
+        def answer(self) -> str:
+            return "ok"
+
+        def outer(self) -> str:
+            return proxy.answer()  # a second heavy call from inside the first, same thread
+
+    heavy._factory = Nested
+    heavy.release()
+    heavy.get()
+    done: list[str] = []
+    thread = threading.Thread(target=lambda: done.append(proxy.outer()))
+    thread.start()
+    thread.join(3)
+
+    assert done == ["ok"]

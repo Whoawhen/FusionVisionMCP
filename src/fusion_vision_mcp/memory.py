@@ -37,7 +37,13 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from fusion_vision_mcp.constants import DEFAULT_MODEL_MEMORY_GB, MEMORY_RESERVE_GB, MODEL_MEMORY_GB
+from fusion_vision_mcp.constants import (
+    CALL_CHECK_MIN_GB,
+    DEFAULT_MODEL_MEMORY_GB,
+    MEMORY_RESERVE_GB,
+    MODEL_MEMORY_GB,
+    MODEL_RESIDENT_GB,
+)
 
 if TYPE_CHECKING:
     from fusion_vision_mcp.idle import IdleReleased
@@ -177,14 +183,22 @@ def _gb(size: float) -> str:
 
 
 class MemoryManager:
-    """Makes room before each model load, across every `IdleReleased` registered with it.
+    """Makes room before each model load and each heavy call, across every registered `IdleReleased`.
+
+    A load needs the model's peak (`MODEL_MEMORY_GB`). A call on a loaded model needs what
+    the call adds on top of what the model holds (peak minus `MODEL_RESIDENT_GB`): SAM 3
+    holds 3.6 GB but a call takes it 3.5 GB higher, on every call, not just the first. A
+    call adding at least `CALL_CHECK_MIN_GB` reserves that much while it runs, so concurrent
+    calls still run together when there is room, and one that would not fit waits for the
+    others to finish rather than stacking its peak on theirs.
 
     Args:
         budget_gb: Optional cap on the summed size of loaded models. Soft: idle models are
             released to stay under it, but a load is never refused for the budget alone.
-        reserve_gb: Free memory every load must leave for the OS, the client and inference.
+        reserve_gb: Free memory every load and heavy call must leave for the OS and client.
         read_status: Source of live free memory; replaceable for tests.
         read_process: Source of this process's private bytes, used to measure each load.
+        call_wait_s: How long a heavy call that does not fit waits for others between checks.
     """
 
     def __init__(
@@ -193,20 +207,26 @@ class MemoryManager:
         reserve_gb: float = MEMORY_RESERVE_GB,
         read_status: Callable[[], MemoryStatus] = read_memory_status,
         read_process: Callable[[], int | None] = process_private_bytes,
+        call_wait_s: float = 5.0,
     ) -> None:
         self._budget = int(budget_gb * GB) if budget_gb else None
         self._reserve = int(reserve_gb * GB)
         self._read_status = read_status
         self._read_process = read_process
+        self._call_wait_s = call_wait_s
         self._caches: list[IdleReleased[Any]] = []
         self._measured: dict[str, int] = {}
         self._load_lock = threading.Lock()
+        # Extra bytes reserved by heavy calls now running, keyed by (thread id, call number).
+        self._calls = threading.Condition()
+        self._reserved: dict[tuple[int, int], int] = {}
+        self._next_call = 0
 
     def register(self, cache: IdleReleased[Any]) -> None:
         self._caches.append(cache)
 
     def estimate(self, name: str) -> int:
-        """Bytes a load of `name` is expected to need.
+        """Bytes a load of `name` is expected to need at its peak.
 
         A size measured on an earlier load in this process can raise the table's figure
         but never lower it: the measurement is the resident size after loading, and the
@@ -216,10 +236,16 @@ class MemoryManager:
         return max(table, self._measured.get(name, 0))
 
     def resident(self, name: str) -> int:
-        """Bytes a loaded `name` is taken to hold, for the budget: measured if known."""
-        if name in self._measured:
-            return self._measured[name]
-        return int(MODEL_MEMORY_GB.get(name, DEFAULT_MODEL_MEMORY_GB) * GB)
+        """Bytes a loaded `name` is taken to hold between calls, for the budget."""
+        peak = MODEL_MEMORY_GB.get(name, DEFAULT_MODEL_MEMORY_GB)
+        table = int(MODEL_RESIDENT_GB.get(name, peak) * GB)
+        return max(table, self._measured.get(name, 0))
+
+    def call_extra(self, name: str) -> int:
+        """Bytes one call on a loaded `name` adds at its peak, from the two tables."""
+        peak = MODEL_MEMORY_GB.get(name, DEFAULT_MODEL_MEMORY_GB)
+        held = MODEL_RESIDENT_GB.get(name, peak)
+        return max(int((peak - held) * GB), 0)
 
     def loaded(self) -> list[str]:
         return [cache.name for cache in self._caches if cache.loaded]
@@ -246,13 +272,70 @@ class MemoryManager:
                     self._read_status().describe(),
                 )
 
-    def _shortfalls(self, cache: IdleReleased[Any], need: int, status: MemoryStatus) -> list[str]:
+    @contextmanager
+    def calling(self, cache: IdleReleased[Any]) -> Iterator[None]:
+        """Bracket one call on a loaded model: reserve what it adds while it runs."""
+        extra = self.call_extra(cache.name)
+        if extra < CALL_CHECK_MIN_GB * GB:
+            yield
+            return
+        key = self._reserve_call(cache, extra)
+        try:
+            yield
+        finally:
+            with self._calls:
+                del self._reserved[key]
+                self._calls.notify_all()
+
+    def reserved_by_others(self) -> int:
+        """Bytes reserved by heavy calls on other threads.
+
+        Never counts this thread's own: a call made from inside another call would
+        otherwise wait for its caller to finish, which it never would.
+        """
+        me = threading.get_ident()
+        with self._calls:
+            return sum(size for (thread, _), size in self._reserved.items() if thread != me)
+
+    def _reserve_call(self, cache: IdleReleased[Any], extra: int) -> tuple[int, int]:
+        with self._calls:
+            while True:
+                status = self._read_status()
+                running = self.reserved_by_others()
+                short = self._shortfalls(cache, extra + running, status, budget=False)
+                if not short:
+                    break
+                if running:
+                    # Other heavy calls hold memory this one needs; their ends free it.
+                    self._calls.wait(self._call_wait_s)
+                    continue
+                released = self._release_one(exclude=cache)
+                if released is not None:
+                    logger.info(
+                        "Released %s to make room for a %s call (short on %s)", released, cache.name, ", ".join(short)
+                    )
+                    continue
+                if "commit" in short:
+                    raise ModelMemoryError(
+                        f"Not enough memory to run {cache.name}: a call adds about {_gb(extra)} plus a "
+                        f"{_gb(self._reserve)} reserve, and the machine has {status.describe()}. Loaded in this "
+                        f"server, all in use: {', '.join(self.loaded()) or 'nothing'}. Free memory elsewhere "
+                        "(other model processes) and retry."
+                    )
+                logger.warning("Calling %s while short on %s (%s)", cache.name, ", ".join(short), status.describe())
+                break
+            self._next_call += 1
+            key = (threading.get_ident(), self._next_call)
+            self._reserved[key] = extra
+            return key
+
+    def _shortfalls(self, cache: IdleReleased[Any], need: int, status: MemoryStatus, budget: bool = True) -> list[str]:
         short = []
         if status.available_commit is not None and status.available_commit < need + self._reserve:
             short.append("commit")
         if status.available_ram is not None and status.available_ram < need + self._reserve:
             short.append("RAM")
-        if self._budget is not None:
+        if budget and self._budget is not None:
             held = sum(self.resident(c.name) for c in self._caches if c.loaded and c is not cache)
             if held + need > self._budget:
                 short.append("budget")
@@ -261,7 +344,8 @@ class MemoryManager:
     def _make_room(self, cache: IdleReleased[Any], need: int) -> None:
         while True:
             status = self._read_status()
-            short = self._shortfalls(cache, need, status)
+            # Heavy calls already running may not have reached their peak yet.
+            short = self._shortfalls(cache, need + self.reserved_by_others(), status)
             if not short:
                 logger.info("Loading %s (needs about %s; %s)", cache.name, _gb(need), status.describe())
                 return

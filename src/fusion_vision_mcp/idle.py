@@ -22,6 +22,7 @@ import sys
 import threading
 import time
 from collections.abc import Callable
+from contextlib import AbstractContextManager, nullcontext
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -126,6 +127,13 @@ class IdleReleased[T]:
     def in_use(self) -> _InUse:
         """Context manager marking a call in progress, so a release waits for it."""
         return _InUse(self)
+
+    def calling(self) -> AbstractContextManager[None]:
+        """Context manager around one call on the built object: the memory manager's check
+        that the call's own peak fits, or nothing without a manager."""
+        if self._manager is None:
+            return nullcontext()
+        return self._manager.calling(self)
 
     def _enter(self) -> None:
         with self._lock:
@@ -250,6 +258,8 @@ class IdleProxy:
 
         def _tracked(*args: Any, **kwargs: Any) -> Any:
             with cache.in_use():
-                return getattr(cache.get(), name)(*args, **kwargs)
+                target = getattr(cache.get(), name)
+                with cache.calling():
+                    return target(*args, **kwargs)
 
         return _tracked

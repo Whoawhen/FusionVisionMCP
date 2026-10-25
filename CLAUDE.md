@@ -922,6 +922,13 @@ reads ~0 for PP-OCRv6, EasyOCR and ImageQuality, which load on first call, so a 
 Moondream2 peaks at 4.5 GB on CPU here, not the ~7.5 GB fp32 quoted elsewhere in this file; LFM ONNX 7.9, LFM bf16
 6.4. Everything loaded at once would peak near 40 GB.
 
+**Heavy calls are checked too, not only loads.** `MODEL_RESIDENT_GB` is what a model holds between calls; a call needs
+`MODEL_MEMORY_GB` minus that on top, on every call. A call adding at least `CALL_CHECK_MIN_GB` reserves its extra
+while it runs (`MemoryManager.calling`, entered by `IdleProxy` around each method call): calls run side by side when
+they fit, wait for each other when they don't, and with nothing running a call releases idle models or is refused.
+Reservations are per thread and a thread never waits on its own, so a model method that calls another proxy cannot
+deadlock; keep it that way if a wrapper ever starts calling proxies.
+
 ## Package import must stay torch-free, or MCP clients time out on connect
 
 **This invariant has now been broken twice and restored twice. Check it before assuming it holds** — there is a

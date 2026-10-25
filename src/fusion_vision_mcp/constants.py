@@ -290,6 +290,26 @@ MODEL_MEMORY_GB: Final[dict[str, float]] = {
     "VisionReasoner": 0.1,
 }
 
+#: What each model holds once loaded, between calls, in GB: the same 2026-10-25 run's after-load
+#: figures by the same rule. A call needs `MODEL_MEMORY_GB` minus this on top (SAM 3: 3.6 held,
+#: 3.5 more inside a call). PP-OCRv6, EasyOCR and ImageQuality build their sessions on first call,
+#: so they are left out: taken to hold their peak once used. So is anything unmeasured.
+MODEL_RESIDENT_GB: Final[dict[str, float]] = {
+    "Florence-2": 2.3,
+    "Moondream": 4.1,
+    "LFM2.5-VL": 6.6,
+    "LFM2.5-VL ONNX": 7.7,
+    "SAM2": 0.3,
+    "SAM 3": 3.6,
+    "Aesthetic": 1.9,
+    "Grounding DINO": 0.8,
+    "DINOv2": 1.3,
+}
+
+#: A call adding less than this over the model's resident size is neither checked nor reserved.
+#: CLIP and DINOv2 calls add about 0.1 GB; every other measured model adds 0.4 GB or more.
+CALL_CHECK_MIN_GB: Final[float] = 0.25
+
 #: Used for a cache name missing from `MODEL_MEMORY_GB`.
 DEFAULT_MODEL_MEMORY_GB: Final[float] = 1.0
 

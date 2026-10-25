@@ -1,6 +1,6 @@
 # Memory manager: a RAM budget across models, instead of only an idle timer
 
-**Status:** 2026-10-25: diagnosed (commit exhaustion, see below); steps M1 and M2 done; M3-M5 open. Raised by the user after a
+**Status:** 2026-10-25: diagnosed (commit exhaustion, see below); steps M1, M2 and M2b done; M3-M5 open. Raised by the user after a
 crash on 2026-10-24.
 
 ## Diagnosis (2026-10-25): it was commit exhaustion
@@ -60,6 +60,17 @@ Each step is shippable alone; M1 is the one that stops the crashes.
   was right (it peaks at 4.5 GB; the 7.5 GB in CLAUDE.md was stale), not memory-mapped weights going uncounted; the
   real undercount is call-time peaks, which no after-load figure sees (SAM 3 3.2 GB loaded, 6.5 GB peak).
   Loads every model once (~10 loads, one at a time); run only when no benchmark holds a model.
+- **M2b. Check heavy calls, not only loads (done 2026-10-25).** M2 showed a call can need far more than a loaded model
+  holds (SAM 3 3.6 GB held, 3.5 more inside every call), and a call on a loaded model had no check at all. Now
+  `constants.MODEL_RESIDENT_GB` holds M2's after-load figures beside the peaks, and every proxied call on a model whose
+  call adds at least `CALL_CHECK_MIN_GB` (0.25) *reserves* that extra while it runs (`MemoryManager.calling`): it fits
+  -> runs, beside other calls if there is room; doesn't fit and other heavy calls are running -> waits for them
+  instead of stacking its peak on theirs; nothing running -> releases idle models, then refuses (commit) or warns
+  (RAM). Loads count running calls' reservations too. A thread never waits on its own reservation, so a call made
+  from inside another can't deadlock. Checked calls: SAM 3, Grounding DINO, SAM2, LFM ONNX, Moondream, Florence-2,
+  LFM bf16, and the OCR/IQA engines' first-call loads are covered by their load check. Tools run in worker threads
+  (`anyio.to_thread`), so a waiting call blocks only itself. Not done: a background watcher releasing idle models
+  when *other* processes take memory between calls (option B), and one server shared by all clients (option C).
 - **M3. Stress test (the judging rule below).** VisionBench script: concurrent calls across the big models with a
   second model-loading process beside the server. Pass: no process dies, a refused load is a clear tool error, single-
   client median latency within 5%.
