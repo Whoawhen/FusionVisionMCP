@@ -346,7 +346,7 @@ fixed before the run; `results/ocr_a1_routing_zones.json`):
 - **`rendered_jpeg` failed its 80% rule as defined** (60% route photo). A JPEG text page with large white areas
   still counts as flat. Proposed fix, chosen by the router rather than by any OCR result: the control is **the 36
   pages that route photo as JPEG q85** (21 of them split into zones), scored against their unchanged line truth. The
-  24 that stay flat add nothing a photo-branch arm can change. Needs the user's OK, since the rule as written failed.
+  24 that stay flat add nothing a photo-branch arm can change. **Approved by the user 2026-10-23.**
 - Every TextVQA image takes the photo path, so all of TextVQA measures photo-branch changes. The PNG `rendered`
   control sees almost none of them (4 of 60), as 0.2 said.
 
@@ -374,7 +374,7 @@ VisionBench `benchmarks/ocr_a3_diagnostic.py`, `results/ocr_a3_diagnostic.json`:
   This matches Argon's 9 / 11 / 17 on A, and moves about 6 items from C to B. **Bucket B is the largest
   reachable bucket**, so arm 2 (re-read found boxes with a better recognizer or a better crop, plus 2-0) comes
   first in Gate 0. Track 3 (detector additions) targets about 10 items.
-- **For round 22:** TextOCR's partial transcriptions mean its automatic "written" match under-counts. Stage B
+- **For round 22 (see 0.16 for Gate 0):** TextOCR's partial transcriptions mean its automatic "written" match under-counts. Stage B
   (the worker's `written` call on every unmatched question) is therefore needed, as planned, and the A bucket
   must come from stage B, not TextOCR alone.
 
@@ -577,3 +577,60 @@ The single winning configuration from Gate 1 (whether non-Chinese or the highest
 2. **Step 2 (User Review):** Review the Gate 0 table (comparing the best non-Chinese Point-OCR combination against the best Chinese-model `PP-OCRv5 Server + Point-OCR` combination) and pick the finalist(s) for Gate 1 / Gate 2.
 3. **Step 3 (Sonnet — ~45 min):** Run Gate 1 (full 534-item tune suite) and Gate 2 (confirm split) on the approved finalist.
 4. **Step 4 (Ship, if Gate 2 passes):** Wire the winning pipeline into `ppocr_engine.py` / `analysis.py` with unit tests in `tests/`.
+
+### 0.16 Gate 0 wave 1 result (night of 2026-10-23): re-reading PP-OCR's boxes does not pass
+
+VisionBench `benchmarks/ocr_gate0.py` + `ocr_gate0_score.py`, rules committed before scoring (a72b767), results
+`benchmarks/results/ocr_gate0_wave1.json`. Tune half: 520 items, 10,772 PP-OCR spans, each re-read on a padded,
+perspective-rectified crop (plus the opposite turn for tall boxes) by seven readers: PP-OCRv6's own recognizer (2-0),
+TrOCR-base-str, TrOCR-small-printed, EasyOCR, docTR PARSeq, PARSeq original (contaminated on TextVQA) and Windows OCR
+(paired). The baseline replays exactly (textvqa 59.8%, lines 73.0%, rendered_jpeg 97.5%, p11 76.8 / 37.4%).
+
+- **No arm advances.** At each arm's calibrated pick (lines + rendered_jpeg), TextVQA is +0 items for every arm
+  (TrOCR-small -1). Ignoring calibration, the best grid point anywhere is TrOCR-small +1 and contaminated PARSeq +3;
+  aggressive swapping loses items (TrOCR-str down to 43.5%). Line recall on the calibration sets moved at most +3 lines
+  of 1,587.
+- **Upper bound, which settles the held readers.** Of the 37 tune misses, **any** arm's reading of **any** span contains
+  the answer on 7 (union), 4 without PARSeq, and one of those is the counting question #19 hit by a stray digit. A
+  perfect arbiter over every non-contaminated reading could gain at most ~3-4 items, under the +4 rule. The generative
+  readers (2c Florence-2, 2e Moondream2, 2g SmolVLM) act only by agreeing with a confidence arm, so they cannot reach
+  it either. **They were not run** (no-wasted-runs), and they would also have failed latency (2-5.5 s per crop).
+- **Grey-zone rescue fails the text-free controls at every grid point**: agreement between two readers still brings
+  back strays such as "S" on blank images (p11 text-free non-empty 4 -> 5-10 images). Together with A3's
+  `B_floor` = 0, grey rescue is closed for TextVQA.
+- **Windows OCR returns nothing on 4,690 of 9,567 crops**: as a crop reader it barely works on text this small. It
+  stays untested as a whole-photo engine (2d's second mode).
+- Bucket B's misreads ("GEORGLA", "KINC'SCROSS", "RedLab") are mostly misread by the other recognizers too. Only
+  PARSeq-original, which trained on these images, reads GEORGIA. The recognizers available without new training don't
+  fix them.
+- Sanity: PP-OCR's recognizer on this module's tight crop equals the primary text on 89.1% of spans, so the crop is
+  close to RapidOCR's own but not identical.
+
+**What is left of the plan:** wave 2, region proposers for bucket C (~10 items: 3A Florence-2 regions, 3B docTR FAST,
+3C CRAFT, 3D LFM), and the `ocr(region=)` wider-pad track on round 22 (stage A boxes are in). Before wave 2 runs, the
+same kind of upper bound should be measured cheaply: do the proposers' new boxes cover the answer words (TextOCR) on
+the bucket C items at all? If fewer than 4 can be reached, wave 2 cannot pass either.
+
+### 0.17 Gate RO result (2026-10-24): `ocr(region=)` with a wider margin does not ship
+
+VisionBench `benchmarks/region_ocr_gate.py` (rules committed before the run), `results/region_ocr_gate.json`. Round 22's
+worker boxes (user blind check 33 good / 3 loose / 3 wrong / 1 can't tell) on the 146 tune questions, read by the server's
+own `ocr_pages` (parity 10 / 10 with gate R's live replies). Whole image **65.1%**. Crop with the box widened 15 / 50 /
+100% per side: 45.9 / 55.5 / 58.2%; even at 100%, 9 questions gained against 19 lost, 15 crops read nothing. No variant
+beat the whole image on tune, so by the rule confirm (154) and the round 15 guard were not run, and the confirm half is
+unseen. PP-OCR reads the whole photo better than any crop of it, so pointing is not a way to get more text from `ocr`
+(it stays shipped on `caption`, where it works).
+
+Also worth keeping: the shipped `ocr` finds the answer on **65.1%** of round 22's fresh tune questions, against 59.8% on
+the old, heavily used tune half. Round 22's answer-written split is done and validated (stage B, 59 checked by the worker;
+the user's blind check agreed on 26 of 28, 92.9%, with the one worker error corrected), so 24 of 300 (8%) are
+not-written questions, out of `ocr`'s reach. "Written" means the answer's own text is printed (what `ocr` could
+return), not inferable from text: "yes" to "is Bells a brewery?" is not written even with "Bells Brewery" on the sign,
+and an analogue clock time is not OCR.
+
+**Where the plan stands:** wave 1 (better readers on found boxes) and the region track both failed cleanly. What is
+left: wave 2 (region proposers for bucket C). Its upper-bound check ran 2026-10-24 (VisionBench
+`ocr_gate0_wave2_bound.py`, 2c18c87): Florence-2, CRAFT and docTR FAST box the answer words PP-OCR missed on 8 of the
+37 tune misses (>= 4, so wave 2 is built by the rule), but their own readings contain the answer on only 2, so the
+arms stand or fall on reading those new boxes correctly. Then Track 4
+(Chinese models, only if every non-Chinese arm fails, which by now they have; the user's call).
