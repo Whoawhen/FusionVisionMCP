@@ -938,7 +938,9 @@ idle timer when other processes squeeze the machine; that is the point, and the 
 free RAM to 3.05 GB; within 5 s Windows paged other programs out and held ~4.6 GB free, above the 4 GB critical level,
 while 10 GB of idle models stayed loaded. `memory.PagingMonitor` reads `\Memory\Pages Output/sec` through pdh.dll
 (ctypes, English counter name; 0 at idle here) or Linux's `/proc/pressure/memory`; high on two checks in a row with
-RAM under the tight level releases one model idle 30 s+ per check ("paging: N pages out/s"). Not Pages Input/sec:
+RAM under the tight level is a burst, remembered 60 s (`MEMORY_WATCH_PAGING_MEMORY_S`): while it is, one model is
+released per check as it passes 30 s idle ("paging: N pages out/s Xs ago"). The S3 re-run showed why: the burst
+lasted ~10 s, right after the models were used, so requiring both at once never fired. Not Pages Input/sec:
 it counts memory-mapped file reads, which every model load here is.
 
 **`server_status` reports all of it** (`tools/status.py`, `MemoryManager.status()`): models loaded and what they hold,

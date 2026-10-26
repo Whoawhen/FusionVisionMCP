@@ -336,9 +336,14 @@ MEMORY_WATCH_TIGHT_IDLE_S: Final[float] = 120.0
 MEMORY_WATCH_PAGES_OUT_PER_S: Final[float] = 500.0
 #: Linux: `/proc/pressure/memory` "some avg10" (percent of the last 10 s some task stalled on memory) at or above this.
 MEMORY_WATCH_PSI_SOME_AVG10: Final[float] = 10.0
-#: High paging on this many consecutive watcher checks, with free RAM under the tight level, releases one idle model
-#: (idle `MEMORY_WATCH_MIN_IDLE_S` or longer) per check while it lasts.
+#: High paging on this many consecutive watcher checks is a burst.
 MEMORY_WATCH_PAGING_CHECKS: Final[int] = 2
+
+#: A burst is remembered this long, in seconds: while it is, with free RAM under the tight level, the watcher releases
+#: one model per check as it passes `MEMORY_WATCH_MIN_IDLE_S` idle. On Windows a squeeze is a short burst (the S3
+#: re-run, 2026-10-25: 70,622 then 27,562 pages out/s, then 0 within 10 s), usually while the models were just used,
+#: so requiring the burst and a 30 s-idle model at the same moment missed. Set before its run, not tuned.
+MEMORY_WATCH_PAGING_MEMORY_S: Final[float] = 60.0
 
 #: How many recent loads, releases and refusals `server_status` reports.
 EVENT_LOG_SIZE: Final[int] = 20

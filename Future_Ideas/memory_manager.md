@@ -109,6 +109,18 @@ Each step is shippable alone; M1 is the one that stops the crashes.
   2 consecutive checks, with free RAM under the tight level -> release one model idle 30 s+ per check, above the
   2-minute tight tier. Pages Input/sec is deliberately not used (it counts memory-mapped reads, i.e. model loads).
   S3's rule now also accepts a "paging" release; the re-run is S2 + S3 (S2 loads the models S3 squeezes).
+- **Re-run (2026-10-25, `results/memory_stress_s3_paging.json`): S2 and S3 pass, but not through the paging tier.**
+  The counter saw the squeeze (70,622 then 27,562 pages out/s: high on 2 checks, free RAM 3.0-3.6 GB), but both
+  loaded models had been used by S2 seconds earlier, so none was 30 s idle, and the burst was over in ~10 s (0 pages
+  out/s after). This time Windows held free RAM at ~3.6 GB, under the 4 GB critical level, so the critical tier
+  released LFM ONNX at t = 30 s, once it had been idle 30 s (free RAM 3.6 -> 9.3 GB). So the run did not reproduce
+  the first one's ~4.6 GB, and the paging tier never acted. What it shows: on Windows a squeeze is a short, intense
+  paging burst while the OS trims other programs, then nothing; a tier that needs the burst and a 30 s-idle model at
+  the same moment will often miss. A fix would remember a burst for a while (e.g. high paging in the last 60 s + RAM
+  under the tight level -> release models as they pass 30 s idle). **Built 2026-10-25 at the user's request**
+  (`MEMORY_WATCH_PAGING_MEMORY_S` 60 s, set before its run); tested by S3b in `memory_stress.py`, which holds free
+  RAM above 4 GB so only the paging tier can act, and S2b measures whether S2's churn is avoidable. S2's rounds
+  took 100 s / 104 s (78 / 68 s in the first run): release-and-reload churn under overlap is the bigger cost seen.
 - **M3. Stress test (the judging rule below).** VisionBench script: concurrent calls across the big models with a
   second model-loading process beside the server. Pass: no process dies, a refused load is a clear tool error, single-
   client median latency within 5%.

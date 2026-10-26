@@ -54,6 +54,7 @@ from fusion_vision_mcp.constants import (
     MEMORY_WATCH_MIN_IDLE_S,
     MEMORY_WATCH_PAGES_OUT_PER_S,
     MEMORY_WATCH_PAGING_CHECKS,
+    MEMORY_WATCH_PAGING_MEMORY_S,
     MEMORY_WATCH_PSI_SOME_AVG10,
     MEMORY_WATCH_TARGET_GB,
     MEMORY_WATCH_TIGHT_FRACTION,
@@ -344,6 +345,9 @@ class MemoryManager:
         # The latest paging reading and how many watcher checks in a row it has been high.
         self._paging: PagingReading | None = None
         self._paging_high_checks = 0
+        # The last burst (sustained high paging): when it was last seen, and its peak reading.
+        self._burst_at: float | None = None
+        self._burst_peak: PagingReading | None = None
         # What happened lately, newest last, for `status()`: loads, releases and why, refusals.
         self._events: deque[dict[str, str]] = deque(maxlen=EVENT_LOG_SIZE)
 
@@ -403,6 +407,7 @@ class MemoryManager:
                 "unit": self._paging.unit,
                 "high": self._paging.high,
                 "high_checks_in_a_row": self._paging_high_checks,
+                "last_burst_s_ago": None if self._burst_at is None else round(time.monotonic() - self._burst_at),
             },
             "recent_events": list(self._events),
         }
@@ -584,9 +589,11 @@ class MemoryManager:
         """Release idle models while the machine is short of memory; the names released.
 
         `paging` is this check's `PagingMonitor` reading. High on `MEMORY_WATCH_PAGING_CHECKS`
-        checks in a row while free RAM is under the tight level, it releases one model idle
-        `MEMORY_WATCH_MIN_IDLE_S` or longer per check: the OS is paging other programs out to
-        keep RAM free, which free RAM alone does not show. It ranks below the two critical
+        checks in a row is a burst, remembered `MEMORY_WATCH_PAGING_MEMORY_S`: while it is and
+        free RAM is under the tight level, one model idle `MEMORY_WATCH_MIN_IDLE_S` or longer is
+        released per check. The OS is paging other programs out to keep RAM free, which free
+        RAM alone does not show, and it does so in a short burst, often right after the models
+        were used, so the burst has to outlast the idle floor. It ranks below the two critical
         tiers and above "RAM tight".
 
         Three tiers by free memory, checked in this order, each releasing least-recently-used
@@ -605,16 +612,22 @@ class MemoryManager:
         if paging is not None:
             self._paging = paging
             self._paging_high_checks = self._paging_high_checks + 1 if paging.high else 0
+            if self._paging_high_checks >= MEMORY_WATCH_PAGING_CHECKS:
+                if self._burst_at is None or now - self._burst_at > MEMORY_WATCH_PAGING_MEMORY_S:
+                    self._burst_peak = paging  # a new burst
+                elif self._burst_peak is None or paging.value > self._burst_peak.value:
+                    self._burst_peak = paging
+                self._burst_at = now
         status = self._read_status()
         tier = self._pressure_tier(status)
-        if (tier is None or tier[3] == "RAM tight") and self._paging_sustained(status):
-            assert self._paging is not None
+        if (tier is None or tier[3] == "RAM tight") and self._paging_burst_recent(status, now):
+            assert self._burst_peak is not None and self._burst_at is not None
             # A floor of 0 is always regained, so this releases exactly one model per check.
             tier = (
                 MEMORY_WATCH_MIN_IDLE_S,
                 "available_ram",
                 0,
-                f"paging: {self._paging.value:.0f} {self._paging.unit}",
+                f"paging: {self._burst_peak.value:.0f} {self._burst_peak.unit} {now - self._burst_at:.0f}s ago",
             )
         released: list[str] = []
         while tier is not None:
@@ -631,8 +644,9 @@ class MemoryManager:
                 break
         return released
 
-    def _paging_sustained(self, status: MemoryStatus) -> bool:
-        if self._paging_high_checks < MEMORY_WATCH_PAGING_CHECKS:
+    def _paging_burst_recent(self, status: MemoryStatus, now: float) -> bool:
+        """A burst within `MEMORY_WATCH_PAGING_MEMORY_S`, with free RAM still under the tight level."""
+        if self._burst_at is None or now - self._burst_at > MEMORY_WATCH_PAGING_MEMORY_S:
             return False
         if status.available_ram is None or not status.total_ram:
             return False

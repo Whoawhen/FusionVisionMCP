@@ -503,7 +503,7 @@ def test_sustained_paging_with_ram_under_tight_releases_one_model_per_check() ->
     assert manager.relieve_pressure(now=now, paging=HIGH) == ["old"]  # one per check, not all at once
     assert manager.relieve_pressure(now=now, paging=HIGH) == ["mid"]
     assert manager.relieve_pressure(now=now, paging=HIGH) == []  # new was used 10 s ago
-    assert manager.status()["recent_events"][-1]["detail"] == "paging: 2000 pages out/s"
+    assert manager.status()["recent_events"][-1]["detail"] == "paging: 2000 pages out/s 0s ago"
     assert manager.status()["paging"]["high_checks_in_a_row"] == 4
 
 
@@ -525,6 +525,47 @@ def test_a_low_reading_resets_the_streak() -> None:
 
     for reading in (HIGH, LOW, HIGH):
         assert manager.relieve_pressure(now=now, paging=reading) == []
+
+
+def test_a_burst_is_remembered_while_models_age_past_the_idle_floor() -> None:
+    """The S3 re-run's shape: a 10 s burst while the models were just used, then quiet."""
+    start = 1000.0
+    manager, (old, mid, new), _ = watched(ram_gb=3 + 4.6, commit_gb=None)
+    at(old, 5, start)
+    at(mid, 3, start)
+    at(new, 1, start)
+
+    assert manager.relieve_pressure(now=start, paging=HIGH) == []
+    assert manager.relieve_pressure(now=start + 5, paging=HIGH) == []  # a burst, but nothing 30 s idle yet
+    assert manager.relieve_pressure(now=start + 10, paging=LOW) == []
+    assert manager.relieve_pressure(now=start + 26, paging=LOW) == ["old"]  # 31 s idle; burst 21 s ago
+    assert manager.relieve_pressure(now=start + 31, paging=LOW) == ["mid"]
+    assert manager.relieve_pressure(now=start + 36, paging=LOW) == ["new"]
+
+
+def test_a_burst_is_forgotten_after_a_minute() -> None:
+    start = 1000.0
+    manager, caches, _ = watched(ram_gb=3 + 4.6, commit_gb=None)
+    for cache in caches:
+        at(cache, 0, start)
+
+    manager.relieve_pressure(now=start, paging=HIGH)
+    manager.relieve_pressure(now=start + 5, paging=HIGH)
+
+    # 61 s after the burst every model is 66 s idle, but the burst no longer counts (and 66 s < the tight tier's 120 s).
+    assert manager.relieve_pressure(now=start + 66, paging=LOW) == []
+
+
+def test_a_burst_with_ram_recovered_releases_nothing() -> None:
+    start = 1000.0
+    manager, caches, machine = watched(ram_gb=3 + 4.6, commit_gb=None)
+    for cache in caches:
+        at(cache, 0, start)
+    manager.relieve_pressure(now=start, paging=HIGH)
+    manager.relieve_pressure(now=start + 5, paging=HIGH)
+    machine.ram_gb = 3 + 12  # the squeeze ended
+
+    assert manager.relieve_pressure(now=start + 40, paging=LOW) == []
 
 
 def test_psi_is_read_from_proc(monkeypatch: pytest.MonkeyPatch) -> None:
