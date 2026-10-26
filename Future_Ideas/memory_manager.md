@@ -133,7 +133,18 @@ Each step is shippable alone; M1 is the one that stops the crashes.
     models were loading and in use). With nothing to react to, nothing was released, which is correct. The paging
     tier remains unit-tested, and the counter is shown to see real bursts (70,622 pages out/s in the S3 re-run), but
     it has not yet been seen releasing a model end to end. A valid S3b needs a gate: the ballast must take at least
-    2 GB, or the run doesn't count. S2's rounds
+    2 GB, or the run doesn't count.
+- **S3b after a fresh restart (2026-10-26, `results/memory_stress_s3b_fresh.json`): valid, fails its rule.** 15.4 GB
+  free at the start; warmed with Grounding DINO, SAM2, CLIP (3.4 GB); the ballast took 6.75 GB and held free RAM at
+  ~5.1 GB for 70 s. **Pages Output/sec was 0 on every check**: with 5 GB free, Windows had no reason to page anything
+  out, so the paging tier had nothing to see and released nothing, which is correct; the tight tier's 2-minute floor
+  was not reached in 70 s. Calls fine, server alive.
+- **What four squeezes show.** Run 1: a dip to 3.05 GB, Windows refilled to 4.6 GB (paging not yet measured). Run 2:
+  3.0-3.6 GB, a 70,622 pages out/s burst, the critical tier released. Run 3: no squeeze (ballast 0 GB). Run 4: held
+  at 5.1 GB, no paging. Windows pages other programs out only as free RAM nears its own floor (~3-4 GB here), where the
+  4 GB critical tier already acts. The paging tier covers the narrow case of run 1 (paged out, refilled to just above
+  4 GB), which could not be reproduced on demand. It stays in: cheap, unit-tested, and it can only release idle
+  models; it is not proven end to end. S2's rounds
   took 100 s / 104 s (78 / 68 s in the first run): release-and-reload churn under overlap is the bigger cost seen.
 - **M3. Stress test (the judging rule below).** VisionBench script: concurrent calls across the big models with a
   second model-loading process beside the server. Pass: no process dies, a refused load is a clear tool error, single-
