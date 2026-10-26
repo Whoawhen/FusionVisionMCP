@@ -87,6 +87,22 @@ Each step is shippable alone; M1 is the one that stops the crashes.
   entries, a Windows supervisor (`scripts/run_shared_server.ps1`) and launchd/systemd units. Found while setting it
   up: Cline's and Antigravity's FusionVision entries are disabled, so on this machine the duplicates were Claude Code
   chats.
+- **M3 result (2026-10-25, VisionBench `memory_stress.py`, `results/memory_stress.json`; rules fixed before running,
+  against the setup the user runs).** S1, S2, S4 pass; **S3 fails its rule**.
+  - S1 normal speed, after/before medians: caption 1.005, query_image 0.997, count_objects 1.002, spatial_relations
+    1.001, detect_objects 0.946 but inconclusive (the two before runs drifted 9.3%). The manager costs nothing
+    measurable on the single-client path.
+  - S2 six overlapping heavy calls on one HTTP server, twice: every call returned, no transport error, server alive.
+    But each round took 78 s / 68 s against ~45 s for the same calls one after another: with ~15 GB free the manager
+    released a model one call needed to fit another, then reloaded it (LFM ONNX released for a SAM2 call, reloaded for
+    the caption). No crash, but churn.
+  - S3 squeeze: the ballast reached 3.05 GB free, but **within 5 s Windows paged other processes out and held free RAM
+    at ~4.6 GB** for the whole window, above the 4 GB critical level. The "RAM tight" tier (under 7.9 GB) applied, but
+    only to models idle 2 min+, and the loaded ones were idle 5-80 s. So no release, as specified; the ocr call during
+    the squeeze and detect after it both succeeded, server alive. The finding: on Windows, free RAM alone understates
+    pressure, because the OS keeps a few GB free by paging other programs out; 10 GB of idle models sat while that
+    happened.
+  - S4 forced commit refusal: clean tool error naming SAM 3, recorded, server kept answering.
 - **M3. Stress test (the judging rule below).** VisionBench script: concurrent calls across the big models with a
   second model-loading process beside the server. Pass: no process dies, a refused load is a clear tool error, single-
   client median latency within 5%.
