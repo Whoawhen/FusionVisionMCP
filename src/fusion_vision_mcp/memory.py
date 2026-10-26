@@ -52,6 +52,9 @@ from fusion_vision_mcp.constants import (
     MEMORY_WATCH_CRITICAL_GB,
     MEMORY_WATCH_INTERVAL_S,
     MEMORY_WATCH_MIN_IDLE_S,
+    MEMORY_WATCH_PAGES_OUT_PER_S,
+    MEMORY_WATCH_PAGING_CHECKS,
+    MEMORY_WATCH_PSI_SOME_AVG10,
     MEMORY_WATCH_TARGET_GB,
     MEMORY_WATCH_TIGHT_FRACTION,
     MEMORY_WATCH_TIGHT_IDLE_S,
@@ -194,6 +197,101 @@ def process_private_bytes() -> int | None:
     return None
 
 
+@dataclass(frozen=True)
+class PagingReading:
+    """One reading of how hard the OS is paging: the value, its unit, and whether it counts as high."""
+
+    value: float
+    unit: str
+    high: bool
+
+
+if sys.platform == "win32":  # pragma: no cover - platform specific
+
+    class _PdhValue(ctypes.Structure):
+        """PDH_FMT_COUNTERVALUE with the double member of its union (8-byte aligned after CStatus)."""
+
+        _fields_ = [("CStatus", ctypes.c_ulong), ("doubleValue", ctypes.c_double)]
+
+
+_PDH_FMT_DOUBLE = 0x00000200
+
+
+class PagingMonitor:
+    """Reads paging pressure: Pages Output/sec on Windows, memory PSI on Linux, nothing elsewhere.
+
+    Free RAM alone misses the pressure Windows absorbs by paging other programs out, so the
+    watcher reads this too. Pages Output/sec counts pages written out to make room, which is
+    ~0 unless memory is short; Pages Input/sec would also count memory-mapped file reads,
+    which every model load here is. A rate needs two samples, so the first Windows read
+    returns None. Keep one monitor per thread: a PDH query is not shared.
+    """
+
+    def __init__(self) -> None:
+        self._pdh: Any = None
+        self._query: Any = None
+        self._counter: Any = None
+        self._failed = False
+
+    def read(self) -> PagingReading | None:
+        if sys.platform == "win32":  # pragma: no cover - platform specific
+            return self._read_windows()
+        return read_psi()
+
+    def _read_windows(self) -> PagingReading | None:  # pragma: no cover - platform specific
+        if self._failed:
+            return None
+        try:
+            if self._query is None:
+                pdh = ctypes.WinDLL("pdh")
+                for fn, argtypes in (
+                    ("PdhOpenQueryW", [ctypes.c_wchar_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_void_p)]),
+                    (
+                        "PdhAddEnglishCounterW",
+                        [ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_void_p)],
+                    ),
+                    ("PdhCollectQueryData", [ctypes.c_void_p]),
+                    (
+                        "PdhGetFormattedCounterValue",
+                        [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_void_p, ctypes.POINTER(_PdhValue)],
+                    ),
+                ):
+                    getattr(pdh, fn).argtypes = argtypes
+                    getattr(pdh, fn).restype = ctypes.c_long
+                query, counter = ctypes.c_void_p(), ctypes.c_void_p()
+                if pdh.PdhOpenQueryW(None, 0, ctypes.byref(query)) != 0:
+                    raise OSError("PdhOpenQueryW failed")
+                if pdh.PdhAddEnglishCounterW(query, "\\Memory\\Pages Output/sec", 0, ctypes.byref(counter)) != 0:
+                    raise OSError("PdhAddEnglishCounterW failed")
+                pdh.PdhCollectQueryData(query)
+                self._pdh, self._query, self._counter = pdh, query, counter
+                return None
+            if self._pdh.PdhCollectQueryData(self._query) != 0:
+                return None
+            value = _PdhValue()
+            if self._pdh.PdhGetFormattedCounterValue(self._counter, _PDH_FMT_DOUBLE, None, ctypes.byref(value)) != 0:
+                return None
+            pages = float(value.doubleValue)
+            return PagingReading(pages, "pages out/s", pages >= MEMORY_WATCH_PAGES_OUT_PER_S)
+        except Exception:
+            logger.debug("Paging counter unavailable", exc_info=True)
+            self._failed = True
+            return None
+
+
+def read_psi() -> PagingReading | None:
+    """Linux memory pressure stall information: the share of the last 10 s some task waited on memory."""
+    try:
+        with open("/proc/pressure/memory", encoding="ascii") as psi:
+            for line in psi:
+                if line.startswith("some "):
+                    avg10 = float(line.split()[1].split("=")[1])
+                    return PagingReading(avg10, "% stalled (avg10)", avg10 >= MEMORY_WATCH_PSI_SOME_AVG10)
+    except (OSError, ValueError, IndexError):
+        pass
+    return None
+
+
 def _gb(size: float) -> str:
     return f"{size / GB:.1f} GB"
 
@@ -243,6 +341,9 @@ class MemoryManager:
         self._next_call = 0
         self._watcher: threading.Thread | None = None
         self._stop_watching = threading.Event()
+        # The latest paging reading and how many watcher checks in a row it has been high.
+        self._paging: PagingReading | None = None
+        self._paging_high_checks = 0
         # What happened lately, newest last, for `status()`: loads, releases and why, refusals.
         self._events: deque[dict[str, str]] = deque(maxlen=EVENT_LOG_SIZE)
 
@@ -295,6 +396,14 @@ class MemoryManager:
             "loaded_total_gb": _round_gb(sum(self.resident(c.name) for c in self._caches if c.loaded)),
             "models": models,
             "heavy_calls_running": [{"model": name, "reserved_gb": _round_gb(size)} for name, size in running],
+            "paging": None
+            if self._paging is None
+            else {
+                "value": round(self._paging.value, 1),
+                "unit": self._paging.unit,
+                "high": self._paging.high,
+                "high_checks_in_a_row": self._paging_high_checks,
+            },
             "recent_events": list(self._events),
         }
 
@@ -464,17 +573,24 @@ class MemoryManager:
         self._watcher = None
 
     def _watch(self, interval_s: float) -> None:
+        paging = PagingMonitor()
         while not self._stop_watching.wait(interval_s):
             try:
-                self.relieve_pressure()
+                self.relieve_pressure(paging=paging.read())
             except Exception:
                 logger.warning("Memory watcher check failed", exc_info=True)
 
-    def relieve_pressure(self, now: float | None = None) -> list[str]:
+    def relieve_pressure(self, now: float | None = None, paging: PagingReading | None = None) -> list[str]:
         """Release idle models while the machine is short of memory; the names released.
 
-        Three tiers, checked in this order, each releasing least-recently-used idle models
-        until its own level is regained (so it does not flap at the boundary):
+        `paging` is this check's `PagingMonitor` reading. High on `MEMORY_WATCH_PAGING_CHECKS`
+        checks in a row while free RAM is under the tight level, it releases one model idle
+        `MEMORY_WATCH_MIN_IDLE_S` or longer per check: the OS is paging other programs out to
+        keep RAM free, which free RAM alone does not show. It ranks below the two critical
+        tiers and above "RAM tight".
+
+        Three tiers by free memory, checked in this order, each releasing least-recently-used
+        idle models until its own level is regained (so it does not flap at the boundary):
 
         - free **commit** under `MEMORY_WATCH_CRITICAL_GB`: any idle model, until
           `MEMORY_WATCH_TARGET_GB` is free. Allocations fail past this; age doesn't matter.
@@ -486,8 +602,20 @@ class MemoryManager:
           the idle timer running faster while memory is tight.
         """
         now = time.monotonic() if now is None else now
+        if paging is not None:
+            self._paging = paging
+            self._paging_high_checks = self._paging_high_checks + 1 if paging.high else 0
         status = self._read_status()
         tier = self._pressure_tier(status)
+        if (tier is None or tier[3] == "RAM tight") and self._paging_sustained(status):
+            assert self._paging is not None
+            # A floor of 0 is always regained, so this releases exactly one model per check.
+            tier = (
+                MEMORY_WATCH_MIN_IDLE_S,
+                "available_ram",
+                0,
+                f"paging: {self._paging.value:.0f} {self._paging.unit}",
+            )
         released: list[str] = []
         while tier is not None:
             min_idle_s, field, floor, why = tier
@@ -502,6 +630,13 @@ class MemoryManager:
             if free is None or free >= floor:
                 break
         return released
+
+    def _paging_sustained(self, status: MemoryStatus) -> bool:
+        if self._paging_high_checks < MEMORY_WATCH_PAGING_CHECKS:
+            return False
+        if status.available_ram is None or not status.total_ram:
+            return False
+        return status.available_ram < status.total_ram * MEMORY_WATCH_TIGHT_FRACTION
 
     def _pressure_tier(self, status: MemoryStatus) -> tuple[float, str, int, str] | None:
         """(minimum idle seconds, MemoryStatus field, free bytes to regain, reason), or None."""

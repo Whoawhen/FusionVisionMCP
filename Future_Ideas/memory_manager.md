@@ -103,6 +103,12 @@ Each step is shippable alone; M1 is the one that stops the crashes.
     pressure, because the OS keeps a few GB free by paging other programs out; 10 GB of idle models sat while that
     happened.
   - S4 forced commit refusal: clean tool error naming SAM 3, recorded, server kept answering.
+- **M3 follow-up A (2026-10-25, user's choice over re-tuning thresholds): a paging signal.** `memory.PagingMonitor`
+  reads `\Memory\Pages Output/sec` (pdh.dll via ctypes; 0 at idle on this laptop over 30 s) or Linux memory PSI
+  ("some avg10"). Rules set before the re-run: >= 500 pages out/s (`MEMORY_WATCH_PAGES_OUT_PER_S`) or PSI >= 10%, on
+  2 consecutive checks, with free RAM under the tight level -> release one model idle 30 s+ per check, above the
+  2-minute tight tier. Pages Input/sec is deliberately not used (it counts memory-mapped reads, i.e. model loads).
+  S3's rule now also accepts a "paging" release; the re-run is S2 + S3 (S2 loads the models S3 squeezes).
 - **M3. Stress test (the judging rule below).** VisionBench script: concurrent calls across the big models with a
   second model-loading process beside the server. Pass: no process dies, a refused load is a clear tool error, single-
   client median latency within 5%.

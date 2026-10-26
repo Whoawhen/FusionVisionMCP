@@ -328,6 +328,18 @@ MEMORY_WATCH_MIN_IDLE_S: Final[float] = 30.0
 MEMORY_WATCH_TIGHT_FRACTION: Final[float] = 0.25
 MEMORY_WATCH_TIGHT_IDLE_S: Final[float] = 120.0
 
+#: Paging pressure, which free RAM alone misses on Windows: under a squeeze the OS keeps a few GB free by
+#: paging other programs out (VisionBench memory_stress S3, 2026-10-25: squeezed to 3.05 GB free, held at ~4.6 GB,
+#: above `MEMORY_WATCH_CRITICAL_GB`, while 10 GB of idle models stayed loaded). Windows: `\Memory\Pages Output/sec`
+#: at or above this, which read 0 at idle on the development laptop; Pages Input/sec is not used, as it also counts
+#: memory-mapped file reads such as this server's own model loads. Set before the re-run, not tuned.
+MEMORY_WATCH_PAGES_OUT_PER_S: Final[float] = 500.0
+#: Linux: `/proc/pressure/memory` "some avg10" (percent of the last 10 s some task stalled on memory) at or above this.
+MEMORY_WATCH_PSI_SOME_AVG10: Final[float] = 10.0
+#: High paging on this many consecutive watcher checks, with free RAM under the tight level, releases one idle model
+#: (idle `MEMORY_WATCH_MIN_IDLE_S` or longer) per check while it lasts.
+MEMORY_WATCH_PAGING_CHECKS: Final[int] = 2
+
 #: How many recent loads, releases and refusals `server_status` reports.
 EVENT_LOG_SIZE: Final[int] = 20
 

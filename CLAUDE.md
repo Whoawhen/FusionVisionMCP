@@ -934,6 +934,13 @@ in every memory mode): free commit under 4 GB releases any idle model, free RAM 
 under 25% of the total those idle 2 min+ (`MEMORY_WATCH_*` in `constants.py`). So a model can be gone well before its
 idle timer when other processes squeeze the machine; that is the point, and the next call reloads it.
 
+**It also watches paging, because free RAM alone misses Windows' answer to a squeeze.** M3's S3 (2026-10-25) pushed
+free RAM to 3.05 GB; within 5 s Windows paged other programs out and held ~4.6 GB free, above the 4 GB critical level,
+while 10 GB of idle models stayed loaded. `memory.PagingMonitor` reads `\Memory\Pages Output/sec` through pdh.dll
+(ctypes, English counter name; 0 at idle here) or Linux's `/proc/pressure/memory`; high on two checks in a row with
+RAM under the tight level releases one model idle 30 s+ per check ("paging: N pages out/s"). Not Pages Input/sec:
+it counts memory-mapped file reads, which every model load here is.
+
 **`server_status` reports all of it** (`tools/status.py`, `MemoryManager.status()`): models loaded and what they hold,
 live free memory, heavy calls running, and the last 20 loads, releases with their reason, and refusals. It loads no
 model. Any new release or refusal path should `record()` an event, or the tool will not explain it.

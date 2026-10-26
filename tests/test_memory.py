@@ -483,3 +483,64 @@ def test_idle_timer_and_watcher_releases_are_events() -> None:
     manager, _, _ = watched(ram_gb=None, commit_gb=3 + 2)
     manager.relieve_pressure()
     assert manager.status()["recent_events"][-1]["detail"] == "commit nearly exhausted"
+
+
+# --- paging: the pressure free RAM misses ---------------------------------------------------------
+
+HIGH = memory.PagingReading(2000.0, "pages out/s", True)
+LOW = memory.PagingReading(0.0, "pages out/s", False)
+
+
+def test_sustained_paging_with_ram_under_tight_releases_one_model_per_check() -> None:
+    now = 1000.0
+    # 32 GB total: 4.6 GB free is above the 4 GB critical level but under the 8 GB tight one, as in S3.
+    manager, (old, mid, new), _ = watched(ram_gb=3 + 4.6, commit_gb=None)
+    at(old, 80, now)
+    at(mid, 40, now)
+    at(new, 10, now)
+
+    assert manager.relieve_pressure(now=now, paging=HIGH) == []  # one high check is not yet sustained
+    assert manager.relieve_pressure(now=now, paging=HIGH) == ["old"]  # one per check, not all at once
+    assert manager.relieve_pressure(now=now, paging=HIGH) == ["mid"]
+    assert manager.relieve_pressure(now=now, paging=HIGH) == []  # new was used 10 s ago
+    assert manager.status()["recent_events"][-1]["detail"] == "paging: 2000 pages out/s"
+    assert manager.status()["paging"]["high_checks_in_a_row"] == 4
+
+
+def test_paging_with_ram_to_spare_releases_nothing() -> None:
+    now = 1000.0
+    manager, caches, _ = watched(ram_gb=3 + 12, commit_gb=None)  # 12 of 32 GB free: not tight
+    for cache in caches:
+        at(cache, 600, now)
+
+    assert manager.relieve_pressure(now=now, paging=HIGH) == []
+    assert manager.relieve_pressure(now=now, paging=HIGH) == []
+
+
+def test_a_low_reading_resets_the_streak() -> None:
+    now = 1000.0
+    manager, caches, _ = watched(ram_gb=3 + 4.6, commit_gb=None)
+    for cache in caches:
+        at(cache, 90, now)  # idle past 30 s, short of the tight tier's 120 s
+
+    for reading in (HIGH, LOW, HIGH):
+        assert manager.relieve_pressure(now=now, paging=reading) == []
+
+
+def test_psi_is_read_from_proc(monkeypatch: pytest.MonkeyPatch) -> None:
+    psi = "some avg10=12.50 avg60=3.00 avg300=1.00 total=123\nfull avg10=4.00 avg60=1.00 avg300=0.50 total=45\n"
+    monkeypatch.setattr(memory, "open", lambda *_a, **_k: io.StringIO(psi), raising=False)
+
+    reading = memory.read_psi()
+
+    assert reading == memory.PagingReading(12.5, "% stalled (avg10)", True)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows performance counters")
+def test_windows_paging_counter_reads_a_rate() -> None:
+    monitor = memory.PagingMonitor()
+
+    assert monitor.read() is None  # a rate needs two samples
+    time.sleep(0.2)
+    reading = monitor.read()
+    assert reading is not None and reading.value >= 0 and reading.unit == "pages out/s"

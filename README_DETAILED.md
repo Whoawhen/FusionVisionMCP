@@ -907,7 +907,10 @@ theirs, and with nothing else running it releases idle models first or returns t
 
 Between calls, a background check every 5 seconds releases idle models early when the machine runs short, whatever
 is using the memory: any idle model once free commit drops under 4 GB, models idle 30 seconds or more under 4 GB of
-free RAM, and models idle 2 minutes or more once free RAM falls under a quarter of the total. The memory modes above
+free RAM, and models idle 2 minutes or more once free RAM falls under a quarter of the total. It also watches
+whether the system is paging other programs out to keep RAM free (Windows' Pages Output/sec, Linux's memory pressure
+stall information), which free RAM alone hides: while that lasts with RAM under a quarter free, it releases one model
+idle 30 seconds or more every 5 seconds. The memory modes above
 are therefore the longest a model stays idle, not a promise that it stays that long.
 
 `server_status` shows the current picture: which models are loaded and what each holds, live free memory, heavy
