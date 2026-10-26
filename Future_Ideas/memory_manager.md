@@ -119,7 +119,21 @@ Each step is shippable alone; M1 is the one that stops the crashes.
   the same moment will often miss. A fix would remember a burst for a while (e.g. high paging in the last 60 s + RAM
   under the tight level -> release models as they pass 30 s idle). **Built 2026-10-25 at the user's request**
   (`MEMORY_WATCH_PAGING_MEMORY_S` 60 s, set before its run); tested by S3b in `memory_stress.py`, which holds free
-  RAM above 4 GB so only the paging tier can act, and S2b measures whether S2's churn is avoidable. S2's rounds
+  RAM above 4 GB so only the paging tier can act, and S2b measures whether S2's churn is avoidable.
+- **S2 + S2b + S3b run (2026-10-26, `results/memory_stress_churn_burst.json`; only 9.75 GB free at the start, ~14.5
+  earlier, with no process holding more than 0.8 GB: likely Windows still holding pages after the evening's
+  squeezes).**
+  - **Churn is the memory limit, not overlap: no churn fix will be built.** Serial rounds took 129 s / 112 s against
+    overlapping 107 s / 88 s (serial / overlap 1.24; the rule called it avoidable at <= 0.7), with 10 releases to
+    make room serially against 9 overlapping. A caption (LFM + CLIP) followed by query_image (LFM) cannot keep both
+    in ~10 GB, so LFM and CLIP evict each other (~14 s per LFM reload).
+  - **S3b fails its rule but did not test the paging tier: the ballast took 0.0 GB.** Free RAM was already at the
+    5.0 GB target when the squeeze began (S2b's server held its models, the machine started low), so there was no
+    squeeze and no burst in the window (0 pages out/s throughout; the last burst 169 s before, during S2b, while the
+    models were loading and in use). With nothing to react to, nothing was released, which is correct. The paging
+    tier remains unit-tested, and the counter is shown to see real bursts (70,622 pages out/s in the S3 re-run), but
+    it has not yet been seen releasing a model end to end. A valid S3b needs a gate: the ballast must take at least
+    2 GB, or the run doesn't count. S2's rounds
   took 100 s / 104 s (78 / 68 s in the first run): release-and-reload churn under overlap is the bigger cost seen.
 - **M3. Stress test (the judging rule below).** VisionBench script: concurrent calls across the big models with a
   second model-loading process beside the server. Pass: no process dies, a refused load is a clear tool error, single-
