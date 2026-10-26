@@ -29,6 +29,7 @@ from fusion_vision_mcp.constants import (
     DEFAULT_MOONDREAM_MODEL,
     DEFAULT_MOONDREAM_REVISION,
     DEFAULT_SAM2_MODEL,
+    MEMORY_RESERVE_GB,
     VQA_MODELS,
 )
 from fusion_vision_mcp.idle import IdleProxy, IdleReleased
@@ -89,6 +90,7 @@ async def app_lifespan(
     caption_model: str = CAPTION_MODELS[0],
     vqa_model: str = VQA_MODELS[0],
     memory_budget_gb: float | None = None,
+    memory_reserve_gb: float = MEMORY_RESERVE_GB,
 ) -> AsyncIterator[AppContext]:
     """Context manager for the FastMCP app lifespan.
 
@@ -179,7 +181,7 @@ async def app_lifespan(
 
         return VisionReasoner(provider=reasoner_provider, model=reasoner_model)
 
-    memory = MemoryManager(budget_gb=memory_budget_gb)
+    memory = MemoryManager(budget_gb=memory_budget_gb, reserve_gb=memory_reserve_gb)
 
     def _lazy(factory: Callable[[], object], name: str) -> IdleProxy:
         # The name is also the key into `constants.MODEL_MEMORY_GB`.
@@ -288,6 +290,7 @@ def server(
     caption_model: str = CAPTION_MODELS[0],
     vqa_model: str = VQA_MODELS[0],
     memory_budget_gb: float | None = None,
+    memory_reserve_gb: float = MEMORY_RESERVE_GB,
 ) -> MCPServer:
     """Creates a new FastMCP server instance with the specified name and model ID."""
     mcp = MCPServer(
@@ -308,6 +311,7 @@ def server(
             caption_model=caption_model,
             vqa_model=vqa_model,
             memory_budget_gb=memory_budget_gb,
+            memory_reserve_gb=memory_reserve_gb,
         ),
     )
 

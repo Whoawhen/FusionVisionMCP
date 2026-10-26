@@ -15,6 +15,7 @@ from . import (
     VQA_MODELS,
     server,
 )
+from .constants import MEMORY_RESERVE_GB
 
 #: Named presets for `--memory-mode`, in minutes of inactivity before a model is
 #: released. "persistent" is 0 because a timeout of 0 never schedules a release,
@@ -174,6 +175,18 @@ def resolve_memory_mode(memory_mode: str) -> float:
     ),
 )
 @click.option(
+    "--memory-reserve",
+    type=click.FloatRange(min=0),
+    default=MEMORY_RESERVE_GB,
+    show_default=True,
+    metavar="GB",
+    help=(
+        "Free memory, in GB, every model load and heavy call must leave for everything else on the machine. "
+        "Raise it if other programs need room; a load or call that cannot leave this much free after idle "
+        "models are released is refused with a tool error."
+    ),
+)
+@click.option(
     "--device",
     default=None,
     help=(
@@ -226,6 +239,7 @@ def main(
     memory_mode: str,
     idle_timeout: float | None,
     memory_budget: float | None,
+    memory_reserve: float,
     device: str | None,
     transport: Literal["stdio", "streamable-http"],
     host: str,
@@ -254,6 +268,7 @@ def main(
         caption_model=caption_model,
         vqa_model=vqa_model,
         memory_budget_gb=memory_budget,
+        memory_reserve_gb=memory_reserve,
     )
 
     logger.info(f"Starting server with {model} + {moondream_model}@{moondream_revision} (Press CTRL+D to quit)")

@@ -863,6 +863,8 @@ task tokens this server does not expose as their own tool.
 - **--idle-timeout**: Deprecated alias for `--memory-mode` expressed in minutes; overrides it when given.
 - **--memory-budget**: Optional cap, in GB, on the total size of loaded models. See
   [Memory modes](#memory-modes) below.
+- **--memory-reserve**: Free memory, in GB, every model load and heavy call must leave for everything else on the
+  machine (default 2). Raise it if other programs need room.
 - **--transport**: `stdio` (default; each client starts its own server) or `streamable-http` (one long-lived server
   that several clients share by URL, `http://HOST:PORT/mcp`). See [docs/shared_server.md](docs/shared_server.md).
 - **--host** / **--port**: Where the `streamable-http` server listens; `127.0.0.1` and `8765` by default. Keep the
