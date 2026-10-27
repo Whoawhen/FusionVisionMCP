@@ -338,9 +338,10 @@ estimate of how many parts it contains.
 - **object_name**: Name of the object to count, e.g. `person`, `petal`, `car`.
 - **verify_silhouette**: Run the outline measurement when only one region is found. Defaults to `true`; set it
   false to keep a run off the segmenter entirely.
-- **consensus**: When `true` (default), also tally how many `dense_region_caption` labels match `object_name` as
-  an independent second opinion from a different Florence-2 head, and add a `separable` flag. Cheap — reuses the
-  already-loaded Florence-2, no new model.
+- **consensus**: When `true`, also tally how many `dense_region_caption` labels match `object_name` (a different
+  Florence-2 head). Off by default since 2026-10-27: on 644 phase 11 photo counts the tally matched the truth 13% of
+  the time, and the count was right less often when the two agreed (43%) than when they disagreed (66%). `separable`
+  is reported either way.
 - **vqa_estimate**: When `true` and the detector has collapsed overlapping instances (`separable == "no"`), also
   ask Moondream2 "how many `object_name`?" and attach its answer as `estimates.vqa` — a judgment estimate,
   clearly marked, not a tally. Defaults to `false` so a session that never asks keeps Moondream unloaded.
@@ -376,7 +377,7 @@ box that was segmented and the full `count_lobes` measurement of it.
 overrides the other: `count: 1` beside `silhouette.lobes: 8` means the detector could not separate the instances
 while the outline shows eight cores.
 
-**`consensus=true` adds `consensus: {detector_count, region_label_count, agree}` and `separable`.**
+**`separable` is always reported; `consensus=true` adds `consensus: {detector_count, region_label_count, agree}`.**
 `separable` reads `count` alongside the silhouette's two independent lobe estimators —
 `by_distance` (a distance-transform sweep) and `by_radial` (a rosette-specific angular harmonic) — rather than
 either alone: `"yes"` when the count is corroborated (`count > 1`, or a singleton both estimators agree is one
@@ -501,7 +502,7 @@ controls.
 Two measurements explain why, and together they close the case: the flower's silhouette has **solidity 0.984**,
 so its outline is very nearly a smooth disc, and its **interior contrast is 0.87**, barely above a plain textured
 blob's 0.52. There is no outline evidence and no colour evidence. Ask `query_image` for a count in that situation
-and treat the answer as an estimate. With `consensus=true` (default), this exact case now reports
+and treat the answer as an estimate. This exact case now reports
 `separable: "no"` instead of a bare, misleadingly clean `count: 1` — see above.
 
 **Everything that raises recall breaks the texture controls.** Four approaches were built and rejected —

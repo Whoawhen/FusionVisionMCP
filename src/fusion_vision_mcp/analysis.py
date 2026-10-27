@@ -480,6 +480,23 @@ def _inside_share(a: Sequence[float], b: Sequence[float]) -> float:
     return w * h / area
 
 
+def drop_nested(result: dict[str, Any]) -> dict[str, Any]:
+    """`result` without boxes that are a part or a duplicate of another counted box (`geometry.nested_indices`).
+
+    Applied to every count, both paths, before `possibly_more`; `nested_boxes_dropped` says how many went.
+    """
+    bboxes = result.get("bboxes") or []
+    drop = geometry.nested_indices(bboxes, result.get("scores"))
+    keep = [i for i in range(len(bboxes)) if i not in drop]
+    for field in ("bboxes", "points", "labels", "scores"):
+        if isinstance(result.get(field), list) and len(result[field]) == len(bboxes):
+            result[field] = [result[field][i] for i in keep]
+    if bboxes:
+        result["count"] = len(keep)
+    result["nested_boxes_dropped"] = len(drop)
+    return result
+
+
 def possibly_more(counted: Sequence[Sequence[float]], candidates: Sequence[dict[str, Any]]) -> dict[str, Any]:
     """How many more instances the boxes just under the count threshold could add, as a hedged hint.
 
@@ -848,7 +865,7 @@ def _dispatch(app: AppContext, operation: str, images: list[Image], *, question:
         # No silhouette check here: batching is the throughput path, and the check
         # would pull SAM2 in behind the caller's back once per collapsed image.
         # Same floor as the `count_objects` tool, or a batch counts differently.
-        return app.counter.detect_objects(images, object_name, threshold=COUNT_BOX_THRESHOLD)
+        return [drop_nested(r) for r in app.counter.detect_objects(images, object_name, threshold=COUNT_BOX_THRESHOLD)]
     raise ValueError(f"Unknown operation: {operation!r}")
 
 

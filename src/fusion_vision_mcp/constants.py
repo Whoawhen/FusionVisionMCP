@@ -66,6 +66,10 @@ COUNT_RANGE_VETO: Final[float] = 0.5
 #: of the count, shown on 17.5% of counts of 1-3. The 0.3 came from sprint R's tune half; change it, re-run the gate.
 CROWD_RANGE_SAM3_FLOOR: Final[float] = 0.3
 CROWD_RANGE_SHOW: Final[int] = 4
+#: SAM 3 runs for `crowd_range` only when `possibly_more.upper` is at least this (user's choice, 2026-10-27), saving
+#: ~7 s on most counts. Replayed (`count_plan_review_check.py`): round 17's crowds held the truth 85.9% -> 80.4%, and
+#: 428 of phase 11's 644 photo counts skip SAM 3; picked from four rules on seen sets, so round 26 re-checks it.
+CROWD_RANGE_RUN_UPPER: Final[int] = 3
 
 #: `caption(region=...)`: the caller's box is widened by this share of its width and height on each side, to at
 #: least `REGION_MIN_SIDE` px each way, then clipped to the image. Exactly the crop VisionBench gate R measured

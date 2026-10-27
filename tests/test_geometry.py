@@ -392,3 +392,30 @@ def test_relation_rejects_mismatched_mask_shapes() -> None:
 
     with pytest.raises(ValueError, match="share a shape"):
         geometry.relation(a, b)
+
+
+def test_nested_indices_drops_a_part_inside_its_object() -> None:
+    """One object returned as itself plus a part of it counts once; the part goes, whatever it scored."""
+    assert geometry.nested_indices([[0, 0, 100, 100], [10, 10, 40, 40]], [0.5, 0.6]) == {1}
+
+
+def test_nested_indices_keeps_separate_and_merely_overlapping_objects() -> None:
+    """Negative controls: two disjoint objects, and two that overlap at an edge, are both kept."""
+    assert geometry.nested_indices([[0, 0, 100, 100], [200, 0, 300, 100]], [0.5, 0.6]) == set()
+    assert geometry.nested_indices([[0, 0, 100, 100], [60, 0, 160, 100]], [0.5, 0.6]) == set()
+
+
+def test_nested_indices_drops_the_group_box_not_its_members() -> None:
+    """A box holding two barely-overlapping nested boxes encloses a pair, not one object."""
+    boxes = [[0, 0, 100, 100], [5, 5, 45, 95], [55, 5, 95, 95]]
+    assert geometry.nested_indices(boxes, [0.9, 0.5, 0.5]) == {0}
+
+
+def test_nested_indices_drops_the_lower_scoring_duplicate() -> None:
+    assert geometry.nested_indices([[0, 0, 100, 100], [2, 2, 100, 100]], [0.5, 0.6]) == {0}
+
+
+def test_nested_indices_without_scores_uses_output_order() -> None:
+    """Florence-2 has no scores: the first of two duplicates is kept."""
+    assert geometry.nested_indices([[0, 0, 100, 100], [2, 2, 100, 100]]) == {1}
+    assert geometry.nested_indices([[0, 0, 100, 100]]) == set()

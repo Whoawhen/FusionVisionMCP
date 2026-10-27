@@ -464,7 +464,7 @@ async def test_count_objects_can_skip_the_silhouette_check(mcp_client_session: C
 
 @pytest.mark.anyio
 async def test_count_objects_adds_consensus_and_separability(mcp_client_session: ClientSession) -> None:
-    """`consensus=true` (default) adds a second-opinion count and a separability flag.
+    """`consensus=true` (opt-in since 2026-10-27) adds a second-opinion count; `separable` is always there.
 
     sample.jpg + "petal" is the canonical collapse case: count=1, by_distance=1,
     by_radial=8, agreement=False.  The tool's own docstring names this as the
@@ -473,7 +473,7 @@ async def test_count_objects_adds_consensus_and_separability(mcp_client_session:
     """
     res = await mcp_client_session.call_tool(
         "count_objects",
-        arguments={"src": SAMPLE_IMAGE_FILEPATH, "object_name": "petal"},
+        arguments={"src": SAMPLE_IMAGE_FILEPATH, "object_name": "petal", "consensus": True},
     )
     counted = json.loads("\n".join(cast(TextContent, c).text for c in res.content))
 
@@ -505,21 +505,18 @@ async def test_count_objects_adds_consensus_and_separability(mcp_client_session:
 
 @pytest.mark.anyio
 async def test_count_objects_can_skip_consensus(mcp_client_session: ClientSession) -> None:
-    """`consensus=false` omits the second-opinion and separability fields."""
+    """The default (`consensus=false`) omits the dense-region tally but still reports `separable`."""
     res = await mcp_client_session.call_tool(
         "count_objects",
-        arguments={
-            "src": SAMPLE_IMAGE_FILEPATH,
-            "object_name": "petal",
-            "verify_silhouette": False,
-            "consensus": False,
-        },
+        arguments={"src": SAMPLE_IMAGE_FILEPATH, "object_name": "petal", "verify_silhouette": False},
     )
     counted = json.loads("\n".join(cast(TextContent, c).text for c in res.content))
 
     assert not res.is_error
     assert "consensus" not in counted
-    assert "separable" not in counted
+    assert "nested_boxes_dropped" in counted
+    # No silhouette was measured, so a single region cannot be confirmed either way.
+    assert counted["separable"] in ("yes", "unknown")
 
 
 @pytest.mark.anyio

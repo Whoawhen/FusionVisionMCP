@@ -595,6 +595,20 @@ held; phase 11 flat counts 46.6 -> 54.4% exact (MAE 1.04 -> 0.75); confirmed on 
 phase 11) tied on round 13 and was not shipped. Still wrong: touching or overlapping shapes merge into one Florence-2
 box (rings of 8 touching discs count 1), and nested shapes (concentric circles) lose the outer ones.
 
+**2026-10-27: a box that is a part or near-duplicate of another counted box is dropped, on both paths
+(counting plan Track 1A/4A, `geometry.nested_indices`, applied in `count_objects` and the batch `count`).** In score
+order (Florence-2: output order) a box IoU >= 0.55 with a kept box goes; then a box 90%+ inside a larger kept one
+(and under 0.85 of its area) goes, unless that larger box holds 2+ barely-overlapping nested boxes, which makes it
+the group box that goes instead. VisionBench `count_gate_track1.py` (six variants, rule fixed before scoring, all sets
+seen): 709 -> 782 exact of 1,243 (+5.9, CI 4.4 to 7.3), phase 11 photos 60.9 -> 65.4%, phase 11 flat 54.4 -> 68.9%,
+round 13 flat 50.8 -> 68.4%, all of it single objects; multi-object COCO -1.4, round 14 -1.0; every control and
+fixture positive held on both paths; server parity 1,297 of 1,297. A concentric exemption scored lower. The same
+day, by the user's decision: SAM 3 runs for `crowd_range` only when `possibly_more.upper >= 3`
+(`CROWD_RANGE_RUN_UPPER`; round 17 replay 85.9 -> 80.4%, 428 of 644 phase 11 photo counts skip it), and `consensus`
+is opt-in, with `separable` always reported (on phase 11 the count was right 43% when the dense-region tally agreed
+and 66% when it disagreed). Round 26 is the fresh confirmation for all three
+(`Future_Ideas/Counting_Improvement_Plan.md`, Section 0).
+
 **The honest negative result: the flower is not counted by anything here.** `tests/sample.jpg` — a paper flower
 with overlapping petals — returns 1 from *every* approach tried: Florence-2 grounding, Moondream's detect head,
 Grounding DINO (at every box threshold down to 0.10), the `count_lobes` outline measurement, SAM2 in

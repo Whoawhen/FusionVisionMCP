@@ -15,11 +15,13 @@ from fusion_vision_mcp.analysis import (
     _region_label_consensus,
     _separability,
     crowd_range,
+    drop_nested,
     possibly_more,
 )
 from fusion_vision_mcp.constants import (
     COUNT_BOX_THRESHOLD,
     COUNT_RANGE_FLOOR,
+    CROWD_RANGE_RUN_UPPER,
     DETECT_BOX_THRESHOLD,
     MASK_DECODE_RESOLUTION,
 )
@@ -155,14 +157,15 @@ def register(mcp: MCPServer) -> None:
             bool,
             Field(
                 description=(
-                    "When true (default), also tally how many `dense_region_caption` labels match "
-                    "the object name as an independent second opinion, and report a `separable` "
-                    "flag. The dense region captioner is a different Florence-2 head than Grounding "
-                    "DINO, so agreement between the two is real evidence and disagreement is a "
-                    "visible warning. Cheap -- uses the already-loaded Florence-2, no new model."
+                    "When true, also tally how many `dense_region_caption` labels match the object "
+                    "name (Florence-2's dense region head) and report it under `consensus`. Off by "
+                    "default since 2026-10-27: on 644 generalist photo counts the tally equalled the "
+                    "truth 13% of the time, and the count was right *less* often when the two agreed "
+                    "(43%) than when they disagreed (66%), so agreement is not evidence. Adds a "
+                    "Florence-2 dense-region pass (a few seconds)."
                 )
             ),
-        ] = True,
+        ] = False,
         vqa_estimate: Annotated[
             bool,
             Field(
@@ -235,7 +238,10 @@ def register(mcp: MCPServer) -> None:
         found, index-aligned and in the same pixel-space convention `detect_objects`
         uses. `scores` are per-detection confidences, so a count resting on marginal
         detections is visible rather than implied. `group_boxes_dropped` counts
-        detections that enclosed the whole arrangement rather than one instance.
+        detections that enclosed the whole arrangement rather than one instance, and
+        `nested_boxes_dropped` those that were a part or a near-duplicate of another
+        counted box (a box 90%+ inside a larger one, or IoU 0.55+ with a higher one),
+        which on a single object otherwise counts it twice.
 
         On photos (Grounding DINO) the result also carries `possibly_more:
         {upper, extra_candidates, reliability}`: boxes scoring just under the
@@ -249,26 +255,30 @@ def register(mcp: MCPServer) -> None:
         On crowds, photos also get `crowd_range: {low, high, sam3_count,
         reliability}`: Grounding DINO's count tends to run low on crowds and SAM 3's
         (the `detect_objects` model, at a stricter floor) high, so the range between
-        them brackets the truth. It appears when either count is 4 or more. On 92
-        fresh photos of 4-30 objects the true count lay inside it 85.9% of the time,
-        against 65.2% for `possibly_more`'s range, and its typical width was 0.6 of
+        them brackets the truth. SAM 3 runs only when `possibly_more.upper` is 3 or
+        more, and the range appears when either count is 4 or more. On 92
+        fresh photos of 4-30 objects the true count lay inside it 85.9% of the time
+        when SAM 3 always ran (80.4% replayed with that gate, the rest falling back to
+        `possibly_more`), against 65.2% for `possibly_more`'s range, and its typical width was 0.6 of
         the count. Prefer it to `count` for a crowd. Its appearing does not mean the
         scene is a crowd: on a generalist set where 90% of counts were one object, it
         showed on 16% of counts, nearly all of them 1-3 objects that one model
         overcounted (often screenshots and charts), and held the truth only about
         55-60% of the time. Use it when you expect many objects; when you expect one
         or a few, read its appearance as a sign `count` may be too high. Running SAM 3
-        adds about 7 s to every photo count. Absent if SAM 3 is unavailable.
+        adds about 7 s to a photo count; about two-thirds of generalist counts skip it.
+        Absent if SAM 3 is unavailable or skipped.
 
         Accuracy depends heavily on the scene. Flat images (synthetic shapes, clip art,
         vector charts, lossless UI captures) are counted by Florence-2: on shapes whose
         counts are exact by construction it is right on 5 of 10 cases and holds all 8
         single-object controls -- separated shapes count right, but touching or
         overlapping ones (a ring of 8 touching discs, a grid of 30) merge into one box.
-        On 187 fresh flat-image counts it was exact 50.8% of the time, and nested shapes
-        (concentric circles) can be undercounted. On real photographs it is reliable for
-        a few instances and weak for many: it was exact on 61.8% of 427 held-out
-        photo counts (383 of them 3 or fewer), and crowded scenes remain far less
+        On 187 flat-image counts it was exact 68.4% of the time (50.8% before nested boxes
+        were dropped), and nested shapes (concentric circles) can be undercounted. On real
+        photographs it is reliable for a few instances and weak for many: it was exact on
+        61.8% of 427 held-out photo counts (383 of them 3 or fewer), and on 65.4% of 644
+        generalist photo counts (mostly single objects), and crowded scenes remain far less
         reliable. Treat a count above a handful on a real photo as a rough estimate,
         and read `crowd_range` with it.
 
@@ -297,14 +307,13 @@ def register(mcp: MCPServer) -> None:
         means a second, independent estimator matched it; `shattered` or `clipped`
         mean the number should not be used at all.
 
-        Set `consensus=true` (the default) for two extra fields that surface
-        structural ambiguity instead of hiding it:
+        Two fields surface structural ambiguity instead of hiding it:
 
-        - `consensus`: `{detector_count, region_label_count, agree}` -- a second
-          count from Florence-2's dense region captioner (a different head), which
-          tally how many region labels contain the object name. Agreement is real
-          evidence; disagreement is a warning.
-        - `separable`: `"yes"` if the count is a real tally (the detector separated
+        - `consensus` (only with `consensus=true`): `{detector_count,
+          region_label_count, agree}` -- a tally of Florence-2 dense-region labels
+          containing the object name. On generalist photos it was not evidence either
+          way (the count was right less often when they agreed), so it is off by default.
+        - `separable` (always): `"yes"` if the count is a real tally (the detector separated
           instances, or a single region the silhouette confirms is one lobe), `"no"`
           if the detector collapsed while the outline shows several lobes (the
           overlapping-petal case: nothing local can count it honestly), `"unknown"`
@@ -350,11 +359,17 @@ def register(mcp: MCPServer) -> None:
             )
 
             for image, result in zip(images, results, strict=True):
+                drop_nested(result)
                 candidates = result.pop("candidates_below", None)
                 if candidates is not None:
                     result["possibly_more"] = possibly_more(result.get("bboxes") or [], candidates)
-                    # Gate K measured the range against the default Grounding DINO count only.
-                    if threshold == COUNT_BOX_THRESHOLD and adaptive_threshold:
+                    # Gate K measured the range against the default Grounding DINO count only; SAM 3 is skipped
+                    # unless Grounding DINO itself sees room for 3 or more (`CROWD_RANGE_RUN_UPPER`).
+                    if (
+                        threshold == COUNT_BOX_THRESHOLD
+                        and adaptive_threshold
+                        and result["possibly_more"]["upper"] >= CROWD_RANGE_RUN_UPPER
+                    ):
                         span = crowd_range(app, image, object_name, int(result.get("count") or 0))
                         if span is not None:
                             result["crowd_range"] = span
@@ -367,7 +382,7 @@ def register(mcp: MCPServer) -> None:
                         "region_label_count": region_label_count,
                         "agree": result.get("count") == region_label_count,
                     }
-                    result["separable"] = _separability(result)
+                result["separable"] = _separability(result)
 
                 # When the detector collapsed overlapping instances but the outline
                 # still carries the lobe pattern (by_radial > 1), surface that pattern

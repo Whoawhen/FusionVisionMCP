@@ -773,3 +773,55 @@ def envelope_indices(bboxes: Sequence[Sequence[float]]) -> set[int]:
 
         envelopes.add(index)
     return envelopes
+
+
+#: `nested_indices`: a box this IoU or more with a higher-ranked kept box is the same detection again.
+_NESTED_DUPLICATE_IOU: Final[float] = 0.55
+#: A box is nested in a larger one when at least this share of its area lies inside it...
+_NESTED_INSIDE: Final[float] = 0.9
+#: ...and it is under this share of the larger box's area (closer in size is a duplicate's job).
+_NESTED_SIZE_RATIO: Final[float] = 0.85
+#: A box holding two or more nested boxes that overlap each other less than this is a group box, not an object.
+_NESTED_GROUP_IOU: Final[float] = 0.1
+
+
+def nested_indices(bboxes: Sequence[Sequence[float]], scores: Sequence[float] | None = None) -> set[int]:
+    """Indices of boxes that are a part or a duplicate of another counted box, so not another instance.
+
+    Asked to count one object, a detector often returns the object and a part of it (or the same object twice), and
+    `envelope_indices` only looks at three or more boxes. In score order (Florence-2 has no scores: its own order) a
+    box IoU >= `_NESTED_DUPLICATE_IOU` with a kept box is dropped; then a box mostly inside a larger kept one is dropped,
+    unless that larger box holds two or more barely-overlapping nested boxes, when the larger box is the one dropped.
+
+    VisionBench `count_gate_track1.py` (2026-10-27, six variants, rule fixed before scoring): exact counts 709 -> 782 of
+    1,243 seen photo and flat counts (+5.9 points, CI 4.4 to 7.3), MAE 0.82 -> 0.75; phase 11 photos 60.9 -> 65.4%,
+    flat 54.4 -> 68.9%, round 13 flat 50.8 -> 68.4%, all on single objects; multi-object COCO -1.4, round 14 -1.0.
+    Every negative control and fixture positive held on both paths. A concentric-box exemption scored lower.
+    """
+    n = len(bboxes)
+    if n < 2:
+        return set()
+    order = sorted(range(n), key=lambda i: -scores[i]) if scores else list(range(n))
+    keep: list[int] = []
+    for i in order:
+        if all(box_iou(bboxes[i], bboxes[k]) < _NESTED_DUPLICATE_IOU for k in keep):
+            keep.append(i)
+
+    def nested(small: int, big: int) -> bool:
+        area = box_area(bboxes[small])
+        return (
+            area < _NESTED_SIZE_RATIO * box_area(bboxes[big])
+            and area > 0
+            and box_intersection_area(bboxes[small], bboxes[big]) / area >= _NESTED_INSIDE
+        )
+
+    groups = set()
+    for big in keep:
+        inner = [s for s in keep if s != big and nested(s, big)]
+        if len(inner) >= 2 and all(
+            box_iou(bboxes[a], bboxes[b]) < _NESTED_GROUP_IOU for x, a in enumerate(inner) for b in inner[x + 1 :]
+        ):
+            groups.add(big)
+    outer = [k for k in keep if k not in groups]
+    kept = {k for k in outer if not any(big != k and nested(k, big) for big in outer)}
+    return set(range(n)) - kept
