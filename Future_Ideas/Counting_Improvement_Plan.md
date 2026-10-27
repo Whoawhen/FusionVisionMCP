@@ -227,6 +227,24 @@ confirm_tf5}.jsonl`, `replacement_gate1_raw_sam3_{tune,confirm}.jsonl`, `count_g
   *lower* it (a bounded veto, the mirror of 2A). Not in Gate 1. It needs its own rules and, like 2A, round 26's absent
   stratum to confirm.
 
+### 0.9 Phase 3 (2026-10-28): Gate 1 fails on absent objects, Gate 1b (absent veto) passes
+
+LFM answers were cached for both gates (694 count questions, then 865 yes/no; ~3.9 s each, ~2.5 h in all).
+
+- **Gate 1 (zero rescue / promotion, VisionBench 1ec4be2): no variant eligible.** Exact counts rise a lot (shipped
+  583/953 -> 2A1 679, +10.1, CI 8.2 to 12.0; phase 11 counts 65.4 -> 79.3%; 2A+2B lifts 2–5 objects 38.6 -> 55.7% but
+  costs single objects), with no count pushed below its truth and controls 16/16. But every variant takes absent false
+  non-zero 34.6 -> 43.1%, past the +3 rule: on a plausible absent object with a weak box, LFM answers "1" about a third
+  of the time. The rule was not changed.
+- **Gate 1b (absent veto, 7fe790d): `V1w` goes to Gate 2.** When the count is 1, the top box scores under 0.6 and LFM
+  answers "no" to "Is there a X in this image?", report 0. Absent false non-zero 34.6 -> **16.0%**; count sets 61.2 ->
+  60.5% (6 true counts zeroed: seals, an infobox, a bar chart, a popup panel); pooled +5.8 (CI 4.5 to 7.1); controls 16/16.
+  The unguarded vetoes cut absent to 3.5–5.8% but fail the controls (11/16: LFM says "no" to the petal-shaped discs that
+  Grounding DINO boxes strongly), so the weak-box guard is load-bearing.
+- **Proposed Gate 1c (not started; the user's call):** Gate 1's rescue, but a rescued zero is promoted only when LFM also
+  answers "yes" to the presence question, on top of `V1w`. Baseline = shipped + `V1w` (absent 16.0%). Rules written
+  before its answers: ~300 more yes/no answers on the zero-count rows (~20 min). Round 26 confirms whatever passes.
+
 ---
 
 ## 1. Scoreboard Context, Goal & Hard Constraints
