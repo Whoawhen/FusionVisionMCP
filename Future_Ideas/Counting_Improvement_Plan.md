@@ -207,6 +207,26 @@ confirm_tf5}.jsonl`, `replacement_gate1_raw_sam3_{tune,confirm}.jsonl`, `count_g
 - **For round 26:** the multi-object dip (COCO −1.4, round 14 −1.0) is within the 2-point rule but is the thing to
   watch; round 26 should carry enough 2–5 object counts to see it (≥ 60).
 
+### 0.8 Phase 2 (2026-10-28): round 26 built, Gate 1 rules fixed
+
+- **Round 26** (VisionBench 9482e98; `build_round26_count.py`, brief `worker_handoff/ROUND26_PLAN.md`): 259 Open Images
+  V5 test pairs never used in VisionBench. Strata: 1 (60), 2 (40), 3 (30), 4–5 (30), 6–10 (15), 11–20 (15), 21–30 (9 of 10;
+  round 17 used most of that pool), and 60 *absent* pairs, classes Open Images' annotators verified are not in the
+  image (proposed by their classifier, so plausible neighbours). All 259 images downloaded. Gate 2 rules are in the
+  builder's docstring. **Flat counts are not in it:** Open Images is photos, and flat images need a worker sourcing
+  round like round 13 (S, S2, A). Round 13 was not part of 4A's look and gained +17.6, so a flat round 26b waits
+  unless the user wants it.
+- **Gate 1** (`count_gate_lfm.py`): four variants (2A1, 2A, 2A1+2B1, 2A+2B). LFM is asked only when `count <= 3` and
+  `extra_candidates >= 1`, and it promotes only Grounding DINO's own boxes. The dry run, with no LFM: seen counts
+  525/850 and round 14 58/103 shipped (matches Gate 0); controls 16/16 with 0 LFM calls; **694 LFM questions** (~1 h CPU
+  at ~5 s, plus ~8 GB for the model).
+- **Rule fixed before any answer:** the plan's "absent false non-zero ≤ 10%" was dropped. On 480 seen absent queries
+  (phase 11 plausible neighbours + COCO), **the shipped tool already returns a non-zero count 34.6% of the time**, so
+  the ceiling would have failed every candidate. It is now "at most 3 points above shipped", in Gate 1 and Gate 2.
+- **Found on the way, for later:** that 34.6% is its own gap. Asking LFM "is there any X?" when `count >= 1` could
+  *lower* it (a bounded veto, the mirror of 2A). Not in Gate 1. It needs its own rules and, like 2A, round 26's absent
+  stratum to confirm.
+
 ---
 
 ## 1. Scoreboard Context, Goal & Hard Constraints
