@@ -250,6 +250,19 @@ LFM answers were cached for both gates (694 count questions, then 865 yes/no; ~3
   (phase 11 counts 78.0%), absent false non-zero 34.6 -> 17.5%.** 2B variants were eligible too, but lost on single
   objects. Round 26 labels are in (251 kept); Gate 2 waits on the user's blind check.
 
+### 0.10 Phase 4 (2026-10-28): Gate 2 on round 26 — the LFM steps ship; 1A holds but shows no fresh gain
+
+- **Round 26 truth:** user blind check 34 of 36 counted agree with the worker (94%, after the user's follow-up on 5
+  cards). 19 entries the worker zeroed because it rejected Open Images' class name (Uzis vs rifles, olives vs tomatoes, ...)
+  were left out with the user's agreement, before any tool ran; picture-only zeros stayed. 227 pairs.
+- **LFM steps (`V1w` + `P1`) ship** (VisionBench 699824d): 1–5 exact 63.9 → 68.1% (CI 0.8 to 8.4), single objects 86.4
+  → 97.7%, 2–5 unchanged, absent false non-zero 74.5 → 69.1%, controls 16/16.
+- **Track 1A: no revert, no fresh gain** (63.9 vs 64.7% without, CI −2.5 to 0.0; 2–5 −1.4). Its seen gains were single
+  objects on phase 11 and flat images; round 26's single objects were 86.4% either way, and it has no flat images.
+- **Crowd gate:** 100% vs 100% on 16 exact crowds, too few to separate.
+- **New gap:** on hard negatives (classifier-proposed, human-verified absent) Grounding DINO counts something 74.5% of the
+  time, against 34.6% on the seen absent sets, and the veto removes only 5.4 points there.
+
 ---
 
 ## 1. Scoreboard Context, Goal & Hard Constraints
