@@ -244,6 +244,11 @@ LFM answers were cached for both gates (694 count questions, then 865 yes/no; ~3
 - **Proposed Gate 1c (not started; the user's call):** Gate 1's rescue, but a rescued zero is promoted only when LFM also
   answers "yes" to the presence question, on top of `V1w`. Baseline = shipped + `V1w` (absent 16.0%). Rules written
   before its answers: ~300 more yes/no answers on the zero-count rows (~20 min). Round 26 confirms whatever passes.
+- **Gate 1c (user approved; VisionBench f6405fb rules): `P1` goes to Gate 2.** Rescue a zero to 1 only when LFM counts
+  >= 1 *and* answers yes to the presence question, on top of `V1w`. +6.0 vs shipped + `V1w` (CI 4.7 to 7.4), controls
+  16/16. **Combined vs the shipped tool (seen data): pooled 897 -> 1,066 of 1,433 (+11.8), count sets 61.2 -> 70.3%
+  (phase 11 counts 78.0%), absent false non-zero 34.6 -> 17.5%.** 2B variants were eligible too, but lost on single
+  objects. Round 26 labels are in (251 kept); Gate 2 waits on the user's blind check.
 
 ---
 
