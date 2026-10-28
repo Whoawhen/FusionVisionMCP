@@ -24,6 +24,9 @@ from fusion_vision_mcp.constants import (
     CLASSIFY_MAX_LABELS,
     CLASSIFY_TEMPLATE,
     COUNT_BOX_THRESHOLD,
+    COUNT_CHECK_COUNT,
+    COUNT_CHECK_PRESENCE,
+    COUNT_CHECK_WEAK,
     COUNT_RANGE_VETO,
     CROWD_RANGE_SAM3_FLOOR,
     CROWD_RANGE_SHOW,
@@ -497,6 +500,20 @@ def drop_nested(result: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def distinct_candidates(
+    counted: Sequence[Sequence[float]], candidates: Sequence[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """The candidates `possibly_more` accepts, in order: each neither on (IoU) nor inside a counted or accepted box."""
+    kept = [list(b) for b in counted]
+    accepted = []
+    for c in candidates:
+        box = list(c["box"])
+        if all(geometry.box_iou(box, k) < COUNT_RANGE_VETO and _inside_share(box, k) < COUNT_RANGE_VETO for k in kept):
+            kept.append(box)
+            accepted.append(c)
+    return accepted
+
+
 def possibly_more(counted: Sequence[Sequence[float]], candidates: Sequence[dict[str, Any]]) -> dict[str, Any]:
     """How many more instances the boxes just under the count threshold could add, as a hedged hint.
 
@@ -504,13 +521,7 @@ def possibly_more(counted: Sequence[Sequence[float]], candidates: Sequence[dict[
     counted or already-accepted box at `COUNT_RANGE_VETO` or more, so a duplicate box or a part of
     an object is not read as another instance. `count` itself is never changed.
     """
-    kept = [list(b) for b in counted]
-    extra = 0
-    for c in candidates:
-        box = list(c["box"])
-        if all(geometry.box_iou(box, k) < COUNT_RANGE_VETO and _inside_share(box, k) < COUNT_RANGE_VETO for k in kept):
-            kept.append(box)
-            extra += 1
+    extra = len(distinct_candidates(counted, candidates))
     return {
         "upper": len(counted) + extra,
         "extra_candidates": extra,
@@ -548,6 +559,83 @@ def crowd_range(app: AppContext, image: Image, object_name: str, count: int) -> 
             "run low on crowds and sam3_count high"
         ),
     }
+
+
+_COUNT_WORDS: Final[dict[str, int]] = {w: i for i, w in enumerate([
+    "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve",
+    "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty",
+])}  # fmt: skip
+
+
+def _reply_count(reply: str) -> int | None:
+    """The gate's reading of a count reply: the first digits, else the first number word ("no"/"none" are 0)."""
+    match = re.search(r"\d+", reply)
+    if match:
+        return int(match.group())
+    for word in re.findall(r"[a-z]+", reply.lower()):
+        if word in _COUNT_WORDS:
+            return _COUNT_WORDS[word]
+        if word in ("no", "none"):
+            return 0
+    return None
+
+
+def _reply_word(reply: str) -> str:
+    """The first word of a yes/no reply, lower-cased with punctuation removed."""
+    words = re.sub(r"[^a-z ]", "", reply.strip().lower()).split()
+    return words[0] if words else ""
+
+
+def lfm_count_check(
+    app: AppContext, image: Image, object_name: str, result: dict[str, Any], candidates: Sequence[dict[str, Any]]
+) -> None:
+    """Let LFM2.5-VL change a photo count of 1 to 0, or 0 to 1, when both its answers say so (counting plan Gate 2).
+
+    A count of 1 whose box scores under `COUNT_CHECK_WEAK` becomes 0 when LFM answers "no" to `COUNT_CHECK_PRESENCE`
+    (the box moves to `vetoed_boxes`). A count of 0 with a distinct candidate under the threshold becomes 1 (the best
+    such candidate) when `COUNT_CHECK_COUNT` gets 1 or more *and* the presence question "yes". Nothing else is ever
+    changed. Sets `detector_count` and `count_basis`; `count_check` carries the replies, or why LFM was not asked.
+    """
+    count = int(result.get("count") or 0)
+    result["detector_count"] = count
+    result["count_basis"] = "detector"
+    scores = result.get("scores") or []
+    veto = count == 1 and len(scores) == 1 and scores[0] < COUNT_CHECK_WEAK
+    extras = distinct_candidates([], candidates) if count == 0 else []
+    if app.answerer is None or not (veto or extras):
+        return
+    answerer = app.answerer
+    replies: dict[str, str] = {}
+
+    def ask(kind: str, prompt: str) -> str:
+        replies[kind] = answerer.answer([image], [prompt.format(name=object_name)])[0]
+        return replies[kind]
+
+    try:
+        if veto:
+            if _reply_word(ask("presence", COUNT_CHECK_PRESENCE)) == "no":
+                result["vetoed_boxes"] = [{"box": result["bboxes"][0], "score": scores[0]}]
+                for field in ("bboxes", "points", "labels", "scores"):
+                    result[field] = []
+                result["count"] = 0
+                result["count_basis"] = "presence_veto"
+        else:
+            k = _reply_count(ask("count", COUNT_CHECK_COUNT))
+            if k is not None and k >= 1 and _reply_word(ask("presence", COUNT_CHECK_PRESENCE)) == "yes":
+                box, score = list(extras[0]["box"]), float(extras[0]["score"])
+                result.update(
+                    count=1,
+                    bboxes=[box],
+                    points=[[(box[0] + box[2]) / 2, (box[1] + box[3]) / 2]],
+                    labels=[object_name],
+                    scores=[score],
+                    count_basis="presence_rescue",
+                )
+    except (OSError, ImportError, MemoryError) as exc:
+        logger.warning(f"LFM2.5-VL ONNX unavailable ({exc}); count_objects keeps the detector's count")
+        result["count_check"] = {"skipped": f"LFM2.5-VL unavailable ({exc}); the detector's count stands"}
+        return
+    result["count_check"] = {"replies": replies, "model": "LFM2.5-VL-3B"}
 
 
 def clean_labels(labels: Sequence[str]) -> list[str]:

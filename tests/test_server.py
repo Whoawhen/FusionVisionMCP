@@ -1412,3 +1412,24 @@ async def test_count_objects_real_photo_routes_to_grounding_dino(mcp_client_sess
     # Grounding DINO provides per-box scores; scores list must exist and not be None
     assert counted["scores"] is not None
     assert isinstance(counted["scores"], list)
+    # The LFM presence check (default on at the default threshold) moves a count by at most one, and says so.
+    assert counted["count_basis"] in ("detector", "presence_veto", "presence_rescue")
+    assert abs(counted["count"] - counted["detector_count"]) <= 1
+    assert counted["count"] == len(counted["bboxes"])
+
+
+@pytest.mark.anyio
+async def test_count_objects_can_skip_the_lfm_check(mcp_client_session: ClientSession) -> None:
+    res = await mcp_client_session.call_tool(
+        "count_objects",
+        arguments={
+            "src": SAMPLE_IMAGE_FILEPATH,
+            "object_name": "petal",
+            "verify_silhouette": False,
+            "lfm_check": False,
+        },
+    )
+    counted = json.loads("\n".join(cast(TextContent, c).text for c in res.content))
+
+    assert not res.is_error
+    assert "detector_count" not in counted and "count_check" not in counted

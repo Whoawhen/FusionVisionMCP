@@ -609,6 +609,19 @@ is opt-in, with `separable` always reported (on phase 11 the count was right 43%
 and 66% when it disagreed). Round 26 is the fresh confirmation for all three
 (`Future_Ideas/Counting_Improvement_Plan.md`, Section 0).
 
+**2026-10-28: LFM2.5-VL may move a photo count by one step (`lfm_check`, default on; `analysis.lfm_count_check`).**
+At the default threshold only, after `possibly_more`/`crowd_range`: a count of 1 whose box scores under
+`COUNT_CHECK_WEAK` 0.6 becomes 0 when `app.answerer` answers "no" to `COUNT_CHECK_PRESENCE` (V1w); a count of 0 with a
+distinct candidate in [0.18, threshold) becomes 1 (the best candidate) when `COUNT_CHECK_COUNT` parses to 1+ *and*
+presence says "yes" (P1). Nothing else changes `count`; `detector_count`, `count_basis` and `count_check` (replies, or
+`skipped` when LFM cannot load or is refused for memory) report it. Gates 1b/1c on seen sets (counts 61.2 -> 70.3%,
+absent non-zero 34.6 -> 17.5%, controls 16/16), Gate 2 on fresh round 26 (227 photo counts; 1-5 exact 63.9 -> 68.1%,
+CI 0.8 to 8.4; hard negatives non-zero 74.5 -> 69.1%). LFM alone rescuing zeros (Gate 1) failed the absent rule
+(34.6 -> 43.1%); the presence question is what makes the rescue safe. VisionBench `count_lfm_parity.py`: the server's
+function reproduces the gates' decisions from their cached replies on 1,696 of 1,696 rows, and live replies match the caches 8 of 8. The prompts,
+0.6 and the reply parsing were fixed before the gates; changing any of them means a fresh set. Hard negatives are the
+open gap: Grounding DINO still counts a verified-absent object about 7 times in 10.
+
 **The honest negative result: the flower is not counted by anything here.** `tests/sample.jpg` — a paper flower
 with overlapping petals — returns 1 from *every* approach tried: Florence-2 grounding, Moondream's detect head,
 Grounding DINO (at every box threshold down to 0.10), the `count_lobes` outline measurement, SAM2 in

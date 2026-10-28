@@ -342,6 +342,8 @@ estimate of how many parts it contains.
   Florence-2 head). Off by default since 2026-10-27: on 644 phase 11 photo counts the tally matched the truth 13% of
   the time, and the count was right less often when the two agreed (43%) than when they disagreed (66%). `separable`
   is reported either way.
+- **lfm_check**: Let LFM2.5-VL confirm a weak single box or rescue a zero on photos at the default threshold (see
+  below). Defaults to `true`; set it false to skip the model (about 4-8 s per photo count).
 - **vqa_estimate**: When `true` and the detector has collapsed overlapping instances (`separable == "no"`), also
   ask Moondream2 "how many `object_name`?" and attach its answer as `estimates.vqa` — a judgment estimate,
   clearly marked, not a tally. Defaults to `false` so a session that never asks keeps Moondream unloaded.
@@ -422,6 +424,27 @@ The difference is +21.8 points (95% CI 13.0 to 30.4); the typical range is 0.6 o
 and on counts of 1–3 it appears 17.5% of the time. Running SAM 3 adds about 7 s to every photo count. `count` is still
 Grounding DINO's number; prefer the range for a crowd. It is left out when the caller changes `threshold` or turns off
 `adaptive_threshold` (the gate measured the defaults) and when SAM 3 cannot load.
+
+**2026-10-28: a language model may move a photo count by one (`lfm_check`, on by default).** Grounding DINO counts
+absent objects as present far too often, and misses a single object it boxes just under the threshold. So on photos at
+the default threshold LFM2.5-VL-3B (the `query_image` model, seed fixed) is asked about two cases, and only these:
+
+- a count of 1 whose box scores under 0.6: "Is there a `<name>` in this image? Answer yes or no." A "no" makes it 0;
+  the box moves to `vetoed_boxes`.
+- a count of 0 with a distinct candidate box between 0.18 and the threshold: "How many `<name>` are in this image?
+  Answer with a single number." If that is 1 or more *and* the presence question gets "yes", the best candidate is
+  counted (its score is under the threshold).
+
+`detector_count` is always Grounding DINO's own number (`possibly_more` and `crowd_range` describe it), `count_basis`
+says `detector`, `presence_veto` or `presence_rescue`, and `count_check` carries the replies. VisionBench, rules fixed
+before each run: on seen sets (`count_gate_lfm_veto.py`, `count_gate_lfm_presence.py`) counts went 61.2 -> 70.3% exact
+and absent objects counted non-zero 34.6 -> 17.5%, with all 16 negative controls held; on round 26, 227 fresh Open
+Images photo counts labelled by the worker and blind-checked by the user (`count_gate2_round26.py`), counts of 1-5 went
+63.9 -> 68.1% exact (+4.2, 95% CI 0.8 to 8.4) and hard negatives (objects a classifier proposed and a person verified
+absent) 74.5 -> 69.1% counted non-zero. That last figure is the open gap: a count of 1 is not proof the object is
+there. The model is asked on most photo counts, about 4 s per question (one or two), and loads its ~8 GB if `caption`
+or `query_image` has not. If it cannot load or is refused for memory, the detector's count stands and
+`count_check.skipped` says why. Set `lfm_check=false` to skip it. The batch `count` operation does not run it.
 
 #### Why this backend
 

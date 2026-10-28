@@ -16,6 +16,7 @@ from fusion_vision_mcp.analysis import (
     _separability,
     crowd_range,
     drop_nested,
+    lfm_count_check,
     possibly_more,
 )
 from fusion_vision_mcp.constants import (
@@ -222,6 +223,21 @@ def register(mcp: MCPServer) -> None:
                 )
             ),
         ] = False,
+        lfm_check: Annotated[
+            bool,
+            Field(
+                description=(
+                    "On photos at the default threshold, let LFM2.5-VL-3B (the `query_image` model) confirm a weak "
+                    "single box or rescue a zero: a count of 1 whose box scores under 0.6 becomes 0 if it answers "
+                    "'no' to 'Is there a <name>?', and a count of 0 with a candidate box just under the threshold "
+                    "becomes 1 if it counts 1 or more and answers 'yes'. On 227 fresh photo counts this took exact "
+                    "counts of 1-5 from 63.9% to 68.1% and absent objects counted from 74.5% to 69.1%. Asked on most "
+                    "photo counts, about 4 s per question (one or two), and loads the ~8 GB model if `caption` or "
+                    "`query_image` has not. Set false to skip it; if the model cannot load, the detector's count "
+                    "stands and `count_check.skipped` says why."
+                )
+            ),
+        ] = True,
         return_annotated: Annotated[
             bool, Field(description="If true, saves an annotated image with counting boxes and returns the file path.")
         ] = False,
@@ -268,6 +284,18 @@ def register(mcp: MCPServer) -> None:
         or a few, read its appearance as a sign `count` may be too high. Running SAM 3
         adds about 7 s to a photo count; about two-thirds of generalist counts skip it.
         Absent if SAM 3 is unavailable or skipped.
+
+        On photos at the default threshold (`lfm_check`, on by default) a language
+        model may change the count by one step, and only these two: a single box
+        scoring under 0.6 is dropped when LFM2.5-VL says the object is not there
+        (`count_basis: "presence_veto"`, the box kept under `vetoed_boxes`), and a
+        zero becomes 1 when a candidate box sits just under the threshold and LFM
+        both counts 1 or more and says it is there (`"presence_rescue"`; that box's
+        score is under the threshold). `detector_count` is always the detector's own
+        number, which `possibly_more` and `crowd_range` describe; `count_check`
+        carries the model's replies. Objects that are absent are still counted as
+        present far too often (69.1% of fresh hard negatives), so a count of 1 is not
+        proof the object is there.
 
         Accuracy depends heavily on the scene. Flat images (synthetic shapes, clip art,
         vector charts, lossless UI captures) are counted by Florence-2: on shapes whose
@@ -373,6 +401,9 @@ def register(mcp: MCPServer) -> None:
                         span = crowd_range(app, image, object_name, int(result.get("count") or 0))
                         if span is not None:
                             result["crowd_range"] = span
+                    # Gates 1b/1c/2 measured these after the detector's count, at the default threshold only.
+                    if lfm_check and threshold == COUNT_BOX_THRESHOLD and adaptive_threshold:
+                        lfm_count_check(app, image, object_name, result, candidates)
                 if verify_silhouette:
                     _add_silhouette(app, image, result)
                 if consensus:

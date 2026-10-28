@@ -263,6 +263,21 @@ LFM answers were cached for both gates (694 count questions, then 865 yes/no; ~3
 - **New gap:** on hard negatives (classifier-proposed, human-verified absent) Grounding DINO counts something 74.5% of the
   time, against 34.6% on the seen absent sets, and the veto removes only 5.4 points there.
 
+### 0.11 Phase 5 (2026-10-28): V1w + P1 shipped in `count_objects`
+
+- **Where:** `analysis.lfm_count_check`, called in `count_objects` after `possibly_more`/`crowd_range`, photos at the
+  default threshold only (what the gates measured). Prompts and the 0.6 floor are `COUNT_CHECK_*` in `constants.py`;
+  reply parsing copies the gates' (`parse`, first word "yes"/"no"). The batch `count` operation does not run it.
+- **Output:** `count` may move one step (1 → 0, 0 → 1); `detector_count` keeps Grounding DINO's number, which
+  `possibly_more` and `crowd_range` describe; `count_basis` is `detector` / `presence_veto` / `presence_rescue`;
+  `vetoed_boxes` holds a vetoed box; `count_check` holds the replies.
+- **Safeguards (user's request):** `lfm_check=false` skips it; an LFM that cannot load or is refused for memory
+  (`OSError`, `ImportError`, `MemoryError`) leaves the detector's count and says so in `count_check.skipped`.
+- **Parity** (VisionBench `count_lfm_parity.py`): the server's function, fed the gates' cached replies, matched the
+  gates' counts on **1,696 of 1,696** rows (Gates 1b/1c seen sets, controls and round 26; LFM asked on 654). Live
+  replies vs the caches: 8 of 8 round 26 rows, all 11 replies identical (real model, `VQA_SEED`).
+- **Cost:** on round 26, LFM was asked on most photo counts, one or two questions of ~4 s each.
+
 ---
 
 ## 1. Scoreboard Context, Goal & Hard Constraints

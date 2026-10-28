@@ -70,6 +70,16 @@ CROWD_RANGE_SHOW: Final[int] = 4
 #: ~7 s on most counts. Replayed (`count_plan_review_check.py`): round 17's crowds held the truth 85.9% -> 80.4%, and
 #: 428 of phase 11's 644 photo counts skip SAM 3; picked from four rules on seen sets, so round 26 re-checks it.
 CROWD_RANGE_RUN_UPPER: Final[int] = 3
+#: `count_objects`' presence checks on photos (`analysis.lfm_count_check`, counting plan Gates 1b/1c/2, 2026-10-28), asked
+#: of the LFM2.5-VL-3B ONNX answerer with VQA_SEED. A count of 1 whose box scores under COUNT_CHECK_WEAK becomes 0 when
+#: the presence question is answered "no" (V1w); a count of 0 with a distinct candidate box under the threshold becomes
+#: 1 when the count question gives 1 or more *and* the presence question "yes" (P1). VisionBench `count_gate_lfm_veto.py`
+#: and `count_gate_lfm_presence.py` on seen sets (counts 61.2 -> 70.3%, absent false non-zero 34.6 -> 17.5%, controls
+#: 16/16), then `count_gate2_round26.py` on fresh round 26: counts of 1-5 exact 63.9 -> 68.1% (CI 0.8 to 8.4), hard
+#: negatives counted non-zero 74.5 -> 69.1%. The prompts, 0.6 and the parse rules were fixed before those runs.
+COUNT_CHECK_PRESENCE: Final[str] = "Is there a {name} in this image? Answer yes or no."
+COUNT_CHECK_COUNT: Final[str] = "How many {name} are in this image? Answer with a single number."
+COUNT_CHECK_WEAK: Final[float] = 0.6
 
 #: `caption(region=...)`: the caller's box is widened by this share of its width and height on each side, to at
 #: least `REGION_MIN_SIDE` px each way, then clipped to the image. Exactly the crop VisionBench gate R measured
