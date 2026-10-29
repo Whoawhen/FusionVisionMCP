@@ -80,6 +80,11 @@ CROWD_RANGE_RUN_UPPER: Final[int] = 3
 COUNT_CHECK_PRESENCE: Final[str] = "Is there a {name} in this image? Answer yes or no."
 COUNT_CHECK_COUNT: Final[str] = "How many {name} are in this image? Answer with a single number."
 COUNT_CHECK_WEAK: Final[float] = 0.6
+#: `count_objects(vqa_estimate=true)`'s `estimates.vqa` asks LFM2.5-VL COUNT_CHECK_COUNT since 2026-10-29 (counting plan
+#: step 2D, VisionBench `count_gate_vqa_estimate.py`, non-inferiority rule fixed before any Moondream2 answer): exact on
+#: 457 seen photo counts 64.1% (Moondream2) -> 65.4%, CI -2.6 to 5.3, ~3.8 s vs ~9.1 s. This Moondream2 question is the
+#: fallback when LFM cannot load or `--vqa-model moondream` is set.
+VQA_COUNT_QUESTION: Final[str] = "How many {name}? Answer with one number."
 
 #: `caption(region=...)`: the caller's box is widened by this share of its width and height on each side, to at
 #: least `REGION_MIN_SIDE` px each way, then clipped to the image. Exactly the crop VisionBench gate R measured

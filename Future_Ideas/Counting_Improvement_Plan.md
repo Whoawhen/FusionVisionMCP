@@ -278,6 +278,75 @@ LFM answers were cached for both gates (694 count questions, then 865 yes/no; ~3
   replies vs the caches: 8 of 8 round 26 rows, all 11 replies identical (real model, `VQA_SEED`).
 - **Cost:** on round 26, LFM was asked on most photo counts, one or two questions of ~4 s each.
 
+### 0.12 Phase 6 (2026-10-28): absent objects — Gate 3 picks `V2`, round 27 built to confirm it
+
+- **Diagnosis (round 26, looked at, so it cannot confirm):** of 38 absent rows still non-zero, 16 were count 1 with LFM
+  "No." but a top box >= 0.6 (`V1w`'s guard), 2 were count 2 with "No.", 12 had LFM "Yes.", 6 were counts of 3-5.
+  **All 16 negative-control queries route to Florence-2 in the shipped tool**, so the LFM step never sees them; Gate 1b
+  had forced them through Grounding DINO. User decision: controls run on the path the tool routes them to.
+- **Gate 3** (VisionBench `count_gate_absent.py`, rules 1609806, result 3571ef1; photo-routed seen sets, 953 counts + 480
+  absent): baseline (shipped) absent non-zero 17.5%, counts 70.3%. **`V2`** (count 1 or 2 + LFM "no" -> 0, no score
+  guard): absent **5.0%**, counts 70.2% (1 true count zeroed), pooled +4.1 (CI 3.1 to 5.2). SAM 3 as a veto ("finds
+  nothing") failed: it zeroes 61-66 real objects.
+- **Round 27** (`build_round27_count.py`, 6996ca9): 300 fresh Open Images pairs (165 verified-absent, 90 one, 45 two).
+  Gate 4 rules in its docstring: `V2` ships if absent-correct rises with CI above 0 and 1-2 counts lose at most 2
+  points. Worker brief `worker_handoff/ROUND27_PLAN.md` (class-name disputes flagged `NAME:`).
+
+### 0.13 Phase 7 (2026-10-28): flat round 26b planned — Track 1A/4A's fresh flat confirmation
+
+- **Gate 2b** (VisionBench `count_gate_flat26b.py`, rules ae2a307, before any image was sourced): Florence-2 as shipped
+  on round 26b's exact counts; `shipped` (group-box + nested drop) vs `without` (group-box drop only). Goes to the user
+  to revert on the flat path if the paired 95% interval is entirely below 0 or counts of 2+ lose more than 3 points.
+  Reported only: by kind and truth band, and an absent probe (Florence-2 cannot say "not here"; sizes that gap).
+- **Round 26b:** ~100 flat images the worker sources (`worker_handoff/ROUND26B_PLAN.md`; round 13's S2 method from the
+  start, `build_extended_datasets.py flat26b` keeps only router-flat images), two thirds with an object counted 2+.
+- **Round 27 labels and blind check:** 300 of 300 labelled (291 exact); 19 of 165 "absent" pairs hold the object (kept
+  as truth), 22 counted pairs name-zeroed and left out, leaving 146 truth-0 and 113 counted pairs. The user's blind count
+  (40, seed 20261029, `round27_blind_serve.py`): first pass 69% agreement, under the 75% bar, because Claude's
+  explanation of "name doesn't fit" pushed 9 absent cards with a similar-but-different object to that flag instead of
+  0; those 9 were reset and redone with the clearer rule (bc5f6b8 keeps the first pass): **30 of 39, 76.9%**. Two-object
+  cards agree only 2 of 8, all naming calls (Table, Shellfish, Canoe, Coffee, kilts as Dress); read Gate 4's rule 2 with
+  that in mind. The user's counts replace the worker's on all 40 (`count_round27/blind_check.json`).
+- **Gate 2b result (5e02d1d; 255 fresh flat counts on 110 images, labels 69b4ccb): the 2-5 rule fired; kept by the
+  user's decision (2026-10-28).** Exact 38.0 -> 40.4% (CI -2.0 to 6.7); truth 1 62.7 -> **80.7%**; truth 2-5 32.6 ->
+  **26.1%** (-6.5, past the 3-point limit); 6+ 0 -> 0%. Nearly every change is one pattern, 2 boxes -> 1 (49 times:
+  truth 1 in 15, truth 2 in 10, truth 3+ in 24), so no rule on the box count separates the gains from the losses (not
+  dropping at 2 boxes: -5 exact). After the result, the dropped boxes on truth 2+ were matched to the worker's boxes:
+  50 of 56 lay on no instance, so most "losses" were two wrong boxes summing to the truth (the worker's y coordinates are
+  off on some tall images; median IoU with Florence-2's single boxes 0.77). **Absent probe: Florence-2 counted something
+  for 112 of 112 absent objects** — on a flat image `count_objects` never says 0.
+
+### 0.14 Phase 8 (proposed): the flat path's absent gap and its 2 -> 1 ambiguity
+
+Florence-2 has no score and no "not here", so the flat path needs a second signal, as photos got from LFM in Phase 5:
+- **Absent:** an LFM presence question (`COUNT_CHECK_PRESENCE`) on flat counts, and/or SAM 3 finding nothing (it boxed
+  the absent object on 11% of flat images in gate F, against Florence-2's 100%).
+- **2 -> 1:** when the nested drop takes 2 boxes to 1, LFM's `COUNT_CHECK_COUNT` picks 1 or 2.
+Screen on seen flat sets (phase 11 flat, round 13, round 26b), rules fixed first; confirm both on one fresh flat round from
+the worker (round 28 flat). Controls and fixture positives must hold on the flat path. Not started.
+
+### 0.15 Phase 9 (2026-10-29): Gate 4 keeps `V2` out; `estimates.vqa` moves to LFM
+
+- **Gate 4 (VisionBench `count_gate4_round27.py`, rules 2e09ab6, result 540e909; 275 photo-routed round 27 pairs): `V2`
+  fails rule 2 and is not shipped.** Truth-0 answered 0: 42.2 -> 70.1% (+27.9, CI 20.4 to 35.4; non-zero 57.8 -> 29.9%);
+  truth 1-2 exact 82.6 -> **80.0%** (95 -> 92 of 115, -2.6 against -2 allowed); controls unchanged. The four true
+  counts zeroed: convenience store (top 0.90), sofa bed (0.85), surfboard (0.66), curtain (0.63, user-counted 1). After
+  the result the user noted the curtain is a cloth over a cart, arguably not a "curtain"; leaving it out would pass
+  rule 2 (-1.8), so the gate turns on one borderline label. **User decision: keep the shipped `V1w` (under 0.6 only)
+  and the label as counted**, not override.
+- **Next for `V2`: a score-guarded version on a fresh round.** Three of the four losses had confident boxes, so a guard
+  between 0.6 and 0.85 may keep most of the absent gain; it was suggested by round 27, which is now seen and cannot
+  pick it. The guard is to be fixed on the seen sets (Gate 3's and rounds 26/27) under a rule written first, then
+  confirmed on one fresh photo round. New build rule from the curtain: names ambiguous for their image are flagged and
+  left out **before** labelling, not after. Can share the worker session with Phase 8's flat round 28. Not started.
+- **Step 2D (VisionBench `count_gate_vqa_estimate.py`, rules 2e09ab6, result 540e909): LFM replaces Moondream2 in
+  `estimates.vqa`.** Non-inferiority on 457 seen photo counts with truth >= 1: exact 64.1 -> 65.4% (CI -2.6 to 5.3,
+  above -3), no-number 0 vs 0. Better on 2-5 (45.0 -> 57.5%), worse on 1 (74.4 -> 71.2%); reported only: truth 0
+  answered 0 91.1 -> 73.6%, one LFM reply of 1285; median 9.1 -> 3.8 s. **Shipped:** `analysis.vqa_count_estimate` asks
+  `app.answerer` `COUNT_CHECK_COUNT` (Gate 1's prompt and seed), Moondream2 with `VQA_COUNT_QUESTION` without an answerer
+  or when LFM cannot load; live replies match Gate 1's cache 8 of 8. Moondream2 now stays loaded only for
+  `critique_composition`'s two questions.
+
 ---
 
 ## 1. Scoreboard Context, Goal & Hard Constraints

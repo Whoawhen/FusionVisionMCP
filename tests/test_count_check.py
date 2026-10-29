@@ -3,7 +3,8 @@
 from types import SimpleNamespace
 from typing import Any
 
-from fusion_vision_mcp.analysis import lfm_count_check
+from fusion_vision_mcp.analysis import lfm_count_check, vqa_count_estimate
+from fusion_vision_mcp.constants import COUNT_CHECK_COUNT, VQA_COUNT_QUESTION
 
 
 class _Answerer:
@@ -92,3 +93,27 @@ def test_an_unavailable_model_leaves_the_detector_count() -> None:
 def test_no_answerer_leaves_the_count_alone() -> None:
     out = _check(_one(0.5), None)
     assert out["count"] == 1 and out["detector_count"] == 1 and "count_check" not in out
+
+
+class _Moondream:
+    def __init__(self) -> None:
+        self.asked: list[str] = []
+
+    def query(self, images: list[Any], question: str) -> list[str]:
+        self.asked.append(question)
+        return ["4"]
+
+
+def test_the_vqa_estimate_asks_lfm_the_gated_question() -> None:
+    answerer, md = _Answerer(count="There are 3 cats."), _Moondream()
+    out = vqa_count_estimate(SimpleNamespace(answerer=answerer, vqa=md), None, "cat")
+    assert answerer.asked == [COUNT_CHECK_COUNT.format(name="cat")] and md.asked == []
+    assert out["value"] == 3 and out["raw"] == "There are 3 cats." and "LFM2.5-VL" in out["note"]
+
+
+def test_the_vqa_estimate_falls_back_to_moondream() -> None:
+    for answerer in (None, _Answerer(fail=OSError("gated"))):
+        md = _Moondream()
+        out = vqa_count_estimate(SimpleNamespace(answerer=answerer, vqa=md), None, "cat")
+        assert md.asked == [VQA_COUNT_QUESTION.format(name="cat")]
+        assert out["value"] == 4 and "Moondream2" in out["note"]

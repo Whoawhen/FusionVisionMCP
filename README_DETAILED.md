@@ -345,8 +345,8 @@ estimate of how many parts it contains.
 - **lfm_check**: Let LFM2.5-VL confirm a weak single box or rescue a zero on photos at the default threshold (see
   below). Defaults to `true`; set it false to skip the model (about 4-8 s per photo count).
 - **vqa_estimate**: When `true` and the detector has collapsed overlapping instances (`separable == "no"`), also
-  ask Moondream2 "how many `object_name`?" and attach its answer as `estimates.vqa` — a judgment estimate,
-  clearly marked, not a tally. Defaults to `false` so a session that never asks keeps Moondream unloaded.
+  ask LFM2.5-VL "how many `object_name` are in this image?" and attach its answer as `estimates.vqa` — a judgment
+  estimate, clearly marked, not a tally (Moondream2 answers if LFM cannot load). Defaults to `false`.
 - **threshold**: Grounding DINO's box-confidence floor. Defaults to `0.425`, tuned for exact counts on real photos
   (see [Measured accuracy](#measured-accuracy) below). A manual lever for a visually cluttered scene with distractor shapes near
   the target — measured on a scene with a target star among 18 muted-color distractors, `0.5` separated the true
@@ -395,8 +395,9 @@ but the outline still carries the lobe pattern (`silhouette.by_radial > 1`), an 
 `estimates.outline` is that outline count (a *measurement* — angular notches in the silhouette — not a
 judgment, so it stays within "measure, don't judge") with a `basis` string explaining where the number came
 from. **`count` is never overwritten** — `estimates` is added alongside it, never in place of it. With
-`vqa_estimate=true`, a Moondream2 "how many `object_name`?" judgment is added as `estimates.vqa`
-(`{value, raw, note}`), off by default so a session that never opts in keeps Moondream unloaded. Re-verified
+`vqa_estimate=true`, an LFM2.5-VL "how many `object_name` are in this image?" judgment is added as `estimates.vqa`
+(`{value, raw, note}`), off by default. It was Moondream2's until 2026-10-29: on 457 photo counts LFM was exact 65.4%
+against 64.1% (better on 2-5 objects, slightly worse on single ones) in under half the time; Moondream2 is the fallback. Re-verified
 live on the flower: `separable: "no"`, `estimates.outline: 8`, `count` still `1`. Limit: both numbers are
 estimates, not tallies — the detector could not separate the instances, so treat either accordingly.
 

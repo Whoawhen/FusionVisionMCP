@@ -278,8 +278,9 @@ load falls back to Moondream2) sends the question verbatim, except that a questi
 66.4 vs 32.3% (no-text 65.7 vs 13.3), no question type worse (yes/no +0.6 the smallest), median 4.9 vs 9.8 s per answer,
 0 errors. The server reproduced the gate's prompts and answers 8 of 8 (`lfm_onnx_vqa_parity.py`). `batch_analyze_images`'
 `query` uses the same path. **Moondream2 stays loaded for** `critique_composition`'s busy-background and subject-naming
-questions and `count_objects`' `estimates.vqa`; each needs its own gate before Moondream2 (~7.5 GB fp32, its remote-code
-pin, `pyvips`) can go. `check_consistency`'s control question now goes to LFM too: same mechanism, not re-measured.
+questions; each needs its own gate before Moondream2 (~7.5 GB fp32, its remote-code pin, `pyvips`) can go.
+`count_objects`' `estimates.vqa` moved to LFM on 2026-10-29 (`analysis.vqa_count_estimate`, `COUNT_CHECK_COUNT`; VisionBench
+`count_gate_vqa_estimate.py`, non-inferiority: 64.1 -> 65.4% exact on 457 seen counts, CI -2.6 to 5.3). `check_consistency`'s control question now goes to LFM too: same mechanism, not re-measured.
 
 **2026-10-24: the default caption starts with `Image type: <x>.`** (`image_type`, default on; `analysis.image_type_lines`,
 CLIP ViT-L/14 over `CAPTION_IMAGE_TYPES`, prompts "a/an <type>", ~0.35 s). 106 of the default's 291 misses on the 280

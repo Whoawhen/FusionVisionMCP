@@ -35,6 +35,7 @@ from fusion_vision_mcp.constants import (
     DEEP_TEXT_WORDS,
     DETECT_BOX_THRESHOLD,
     MAIN_SUBJECT_QUESTION,
+    VQA_COUNT_QUESTION,
     VQA_OCR_WORDS,
     VQA_TEXT_QUESTION,
     VQA_TEXT_SUFFIX,
@@ -636,6 +637,19 @@ def lfm_count_check(
         result["count_check"] = {"skipped": f"LFM2.5-VL unavailable ({exc}); the detector's count stands"}
         return
     result["count_check"] = {"replies": replies, "model": "LFM2.5-VL-3B"}
+
+
+def vqa_count_estimate(app: AppContext, image: Image, object_name: str) -> dict[str, Any]:
+    """`count_objects`' `estimates.vqa`: LFM2.5-VL-3B asked `COUNT_CHECK_COUNT` (counting plan step 2D); Moondream2 with
+    `VQA_COUNT_QUESTION` without an answerer or when LFM cannot load. Parsed with `_first_int`, as the gate scored it."""
+    if app.answerer is not None:
+        try:
+            reply = app.answerer.answer([image], [COUNT_CHECK_COUNT.format(name=object_name)])[0]
+            return {"value": _first_int(reply), "raw": reply, "note": "an LFM2.5-VL-3B judgment estimate, not a tally"}
+        except (OSError, ImportError, MemoryError) as exc:
+            logger.warning(f"LFM2.5-VL ONNX unavailable ({exc}); estimating with Moondream2")
+    reply = app.vqa.query([image], VQA_COUNT_QUESTION.format(name=object_name))[0]
+    return {"value": _first_int(reply), "raw": reply, "note": "a Moondream2 judgment estimate, not a tally"}
 
 
 def clean_labels(labels: Sequence[str]) -> list[str]:

@@ -11,13 +11,13 @@ from fusion_vision_mcp.ambiguity import check_semantic_ambiguity
 from fusion_vision_mcp.analysis import (
     _add_silhouette,
     _attach_annotated_images,
-    _first_int,
     _region_label_consensus,
     _separability,
     crowd_range,
     drop_nested,
     lfm_count_check,
     possibly_more,
+    vqa_count_estimate,
 )
 from fusion_vision_mcp.constants import (
     COUNT_BOX_THRESHOLD,
@@ -172,9 +172,9 @@ def register(mcp: MCPServer) -> None:
             Field(
                 description=(
                     "When true and the detector has collapsed overlapping instances (separable is "
-                    "'no'), also ask Moondream2 'how many <name>?' and attach its answer as "
-                    "estimates.vqa -- a judgment estimate, clearly marked, not a tally. Off by "
-                    "default so a session that never asks keeps Moondream unloaded."
+                    "'no'), also ask LFM2.5-VL 'how many <name> are in this image?' and attach its "
+                    "answer as estimates.vqa -- a judgment estimate, clearly marked, not a tally "
+                    "(Moondream2 answers if LFM cannot load). Off by default."
                 )
             ),
         ] = False,
@@ -354,8 +354,8 @@ def register(mcp: MCPServer) -> None:
         notches in the silhouette), not a judgment, so it stays within "measure,
         don't judge". `count` is never overwritten; `estimates.outline` is the
         number the outline supports, with a `basis` string saying so. Set
-        `vqa_estimate=true` to also ask Moondream2 "how many <name>?" and attach
-        its answer as `estimates.vqa`, marked as a judgment estimate rather than a
+        `vqa_estimate=true` to also ask LFM2.5-VL "how many <name> are in this
+        image?" and attach its answer as `estimates.vqa`, marked as a judgment estimate rather than a
         tally.
 
         Every result also reports `semantic_ambiguity` (bool) and
@@ -433,12 +433,7 @@ def register(mcp: MCPServer) -> None:
                             ),
                         }
                         if vqa_estimate:
-                            vqa_answer = app.vqa.query([image], f"How many {object_name}? Answer with one number.")[0]
-                            estimates["vqa"] = {
-                                "value": _first_int(vqa_answer),
-                                "raw": vqa_answer,
-                                "note": "a Moondream2 judgment estimate, not a tally",
-                            }
+                            estimates["vqa"] = vqa_count_estimate(app, image, object_name)
                         result["estimates"] = estimates
 
                 # Semantic ambiguity reporting (Spec 15)
