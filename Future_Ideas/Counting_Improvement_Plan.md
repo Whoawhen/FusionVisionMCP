@@ -323,7 +323,7 @@ Florence-2 has no score and no "not here", so the flat path needs a second signa
   the absent object on 11% of flat images in gate F, against Florence-2's 100%).
 - **2 -> 1:** when the nested drop takes 2 boxes to 1, LFM's `COUNT_CHECK_COUNT` picks 1 or 2.
 Screen on seen flat sets (phase 11 flat, round 13, round 26b), rules fixed first; confirm both on one fresh flat round from
-the worker (round 28 flat). Controls and fixture positives must hold on the flat path. Not started.
+the worker (round 28 flat). Controls and fixture positives must hold on the flat path. Screened 2026-10-29: see 0.16.
 
 ### 0.15 Phase 9 (2026-10-29): Gate 4 keeps `V2` out; `estimates.vqa` moves to LFM
 
@@ -346,6 +346,30 @@ the worker (round 28 flat). Controls and fixture positives must hold on the flat
   `app.answerer` `COUNT_CHECK_COUNT` (Gate 1's prompt and seed), Moondream2 with `VQA_COUNT_QUESTION` without an answerer
   or when LFM cannot load; live replies match Gate 1's cache 8 of 8. Moondream2 now stays loaded only for
   `critique_composition`'s two questions.
+
+### 0.16 Phase 10 (2026-10-29): Phase 8 screen sends `F3` to round 28; the photo guard stays seen-only
+
+- **Phase 8 screen (VisionBench `count_gate_flat_lfm.py`, rules 8f2e3a0, result 571d359, amendment c3f84bb, final
+  4b6cd1c; all seen: 545 counted flat queries, 200 absent, 18 fixtures).** Shipped flat path: absent answered 0 **0%**
+  (Florence-2 boxes something for every one). LFM presence veto, absent answered 0 / counted exact / true counts zeroed:
+  `F1` (count 1) 70.5% / 53.9% / 14, `F2` (1-2) 79.0% / 53.9% / 16, **`F3` (any count) 87.0% (CI of gain 82.0 to 91.5)
+  / 53.8% (-1.6 against -2 allowed) / 19**; truth 1 77.3 -> 74.8%. 1.25 LFM calls per query. As written no veto was
+  eligible: rule 3 failed only because the fixture negatives are asked for as "petal" (a disc, a ball, a rod), and LFM
+  truthfully says "no". **Amendment after the result, agreed with the user:** rule 3 re-run with the photo gates' literal
+  names (`replacement_gate2.LITERAL`): 18 of 18 answered "yes", no control changed under any variant, positives 8 -> 8.
+  **`F3` goes to round 28.** The tie-break `T` stays out (counted 55.4 -> 56.7% but truth 1 -2.1 against -2).
+- **Photo guard (VisionBench `count_gate_v2_guard.py`, rules 04ff3bb, result 5faa35b).** `V2g(t)`: count 1-2 + LFM "no"
+  + top score under `t` -> 0. Rule: truth >= 1 exact loses at most 1 point on each of Gate 3's sets, round 26 and round 27.
+  **Only `t` = 0.6 is eligible** (V1w extended to counts of 2): pooled truth-0 answered 0 475 -> 489, one true count lost
+  (round 26, truth 2, top 0.51). Every higher `t` zeroes two or more real objects on round 26 (134 counts, one = 0.75
+  points), trading roughly 10-15 absent catches per real object lost (0.7: 529, 0.85: 575, none: 594). **User decision:
+  no fresh photo round for it**; a gain of 2-3 points is not worth one. A higher `t` is a judgment on what a wrong zero
+  costs, for the user to make directly, not something a further gate settles.
+- **Round 28 is flat only** (VisionBench 76a56f0): `count_gate5_round28.py` holds Gate 5's rules, fixed before sourcing.
+  `F3` ships if (1) the absent gain's 95% CI is above 0, (2) counted exact loses at most 2 points, (3) the literal-name
+  fixture controls hold. The curtain's rule is in: names the worker lists in `name_doubts` are dropped before any tool
+  runs, and the user's blind check wins. Worker brief `worker_handoff/ROUND28_PLAN.md` (about 100 flat images, 1-3
+  counted objects and one near-neighbour absent object each), **not yet sent: waiting on the user's read.**
 
 ---
 
