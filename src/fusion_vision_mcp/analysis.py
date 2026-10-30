@@ -14,6 +14,7 @@ import re
 from collections.abc import Sequence
 from typing import Any, Final, cast
 
+from PIL import ImageFilter
 from PIL.Image import Image, Transpose
 
 from fusion_vision_mcp import geometry, layout, question
@@ -35,6 +36,9 @@ from fusion_vision_mcp.constants import (
     DEEP_TEXT_WORDS,
     DETECT_BOX_THRESHOLD,
     MAIN_SUBJECT_QUESTION,
+    OCR_SHARPEN_MIN_CHARS,
+    OCR_SHARPEN_PERCENT,
+    OCR_SHARPEN_RADIUS,
     VQA_COUNT_QUESTION,
     VQA_OCR_WORDS,
     VQA_TEXT_QUESTION,
@@ -869,7 +873,7 @@ def _read_upright(app: AppContext, image: Image) -> list[dict[str, Any]]:
     return best
 
 
-def ocr_pages(app: AppContext, images: Sequence[Image]) -> list[dict[str, Any]]:
+def ocr_pages(app: AppContext, images: Sequence[Image], *, sharpened: bool = True) -> list[dict[str, Any]]:
     """Transcribe each page with `app.ocr_engine`, splitting side-by-side columns first.
 
     This is the `ocr` tool's whole implementation, factored out so the other two
@@ -882,12 +886,37 @@ def ocr_pages(app: AppContext, images: Sequence[Image]) -> list[dict[str, Any]]:
 
     Returns one `{"text", "text_regions"}` dict per page. Boxes are in the
     coordinates of the page as sent, including a page read turned upright.
+
+    `sharpened=False` skips the sharpened second reading (OCR_SHARPEN_RADIUS). `caption`'s text line and
+    `query_image`'s OCR context pass it: it changes the text on ~60% of sharp photos, and their gates measured the
+    first reading alone.
     """
     pages: list[dict[str, Any]] = []
     for image in images:
         regions = _read_upright(app, image)
+        if sharpened:
+            regions += _sharpened_extra(app, image, "\n".join(r["text"] for r in regions))
         pages.append({"text": "\n".join(r["text"] for r in regions), "text_regions": regions})
     return pages
+
+
+def _alnum(text: str) -> str:
+    return re.sub(r"[^0-9a-z]+", "", text.lower())
+
+
+def _sharpened_extra(app: AppContext, image: Image, text: str) -> list[dict[str, Any]]:
+    """Spans a whole-page read of the unsharp-masked page finds that `text` lacks, top to bottom (see
+    OCR_SHARPEN_RADIUS). Only for an engine that sets `sharpened_pass` (PP-OCRv6): EasyOCR was not measured."""
+    if not getattr(app.ocr_engine, "sharpened_pass", False):
+        return []
+    sharp = image.convert("RGB").filter(ImageFilter.UnsharpMask(OCR_SHARPEN_RADIUS, OCR_SHARPEN_PERCENT, 0))
+    have = _alnum(text)
+    extra = [
+        r
+        for r in app.ocr_engine.readtext(sharp)
+        if len(key := _alnum(r["text"])) >= OCR_SHARPEN_MIN_CHARS and key not in have
+    ]
+    return sorted(extra, key=lambda r: (r["box"][1], r["box"][0]))
 
 
 def image_type_lines(app: AppContext, images: Sequence[Image]) -> list[str]:
@@ -918,7 +947,7 @@ def vqa_answers(app: AppContext, images: Sequence[Image], question: str) -> list
     if app.answerer is not None:
         try:
             if _TEXT_QUESTION_RE.search(question):
-                prompts = [lfm_vqa_prompt(question, p["text"]) for p in ocr_pages(app, images)]
+                prompts = [lfm_vqa_prompt(question, p["text"]) for p in ocr_pages(app, images, sharpened=False)]
             else:
                 prompts = [question] * len(images)
             return app.answerer.answer(list(images), prompts)

@@ -129,6 +129,23 @@ less or lost lines. The PP-OCRv5 server detector reads photos best (61%) but dro
 it to photos only reached 62% while losing on the held-out images and rendered pages and doubling photo latency,
 so it is a trade, not a gain, and was not shipped.
 
+**2026-10-30: every page is read a second time, sharpened (blur plan B2-B5).** `analysis._sharpened_extra`: after
+the normal reading, PP-OCRv6 reads the whole page after a PIL unsharp mask (`OCR_SHARPEN_RADIUS` 1.5, `_PERCENT`
+220, threshold 0) and appends, sorted top then left, the spans whose lower-case alphanumerics number 3+
+(`OCR_SHARPEN_MIN_CHARS`) and are not inside the first reading's. VisionBench `ocr_blur_b2.py` screened 12 arms
+(loose detector, larger detector input, unsharp masks, CLAHE, upscale, Richardson-Lucy; only unsharp gained on both
+blur sets); all four finalists failed the text-free check on lone letters ("A", "7", "03"), so `ocr_blur_b2b.py`
+added the 3-character rule (written after seeing that) and skipped "text-free" photos the shipped OCR reads at full
+size. `ocr_blur_b4.py`, scored once on held-out images: real-blur pool (rounds 25 v2 + 25b, 89 images) 47.9 ->
+51.9% of key phrases (+4.0, CI 2.1 to 6.2; motion +9.1, defocus +3.6, heavy / compression / low-res 0), p11_blur
+37.0 -> 45.1%, sharp lines 79.5 -> 80.5% and phrases 73.0 -> 74.8%, TextVQA 57.4 level, no text-free photo newly
+non-empty (34 photos at sharp, G2 and G3; 7 excluded as read sharp), median 1.3 -> 2.7 s per photo. Server parity 20
+of 20. Frontier on the same confirm images: Opus 5.5 96.2%, Sonnet 5.5 84.4%. **`caption`'s text line and
+`query_image`'s OCR context pass `sharpened=False`**: the pass changes the text on ~60% of sharp photos and their
+gates measured the first reading; using it there needs its own gate. EasyOCR (non-English) has no second pass
+(`sharpened_pass` is PP-OCRv6's). A B2 harness bug worth knowing: replacement_gate1 gives p11_blur, p11_text and
+lines items one id, so a cache keyed on id scored B2's sharp controls on blurred reads; B4 keys them per set.
+
 Four things about that swap are load-bearing:
 
 - **No EasyOCR setting would have closed the gap.** Magnification (1.5x, 2x), beam-search decoding and turning

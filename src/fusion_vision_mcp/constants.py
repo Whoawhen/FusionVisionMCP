@@ -146,6 +146,17 @@ DEFAULT_SAM2_MODEL: Final[str] = "facebook/sam2.1-hiera-small"
 #: Calibrated for PP-OCRv6 only: EasyOCR's scores run lower and mean something different.
 OCR_MIN_CONFIDENCE: Final[float] = 0.75
 
+#: `ocr` reads every page a second time after an unsharp mask (PIL, this radius and percent, threshold 0) and
+#: appends the spans it finds that the first reading lacks, when their lower-case alphanumerics number at least
+#: OCR_SHARPEN_MIN_CHARS and are not already in the first reading's. PP-OCRv6 only. VisionBench blur plan
+#: (`ocr_blur_b2.py`, `ocr_blur_b2b.py`, `ocr_blur_b4.py`, 2026-10-30), confirm scored once: real-blur key phrases
+#: 47.9 -> 51.9% (+4.0, CI 2.1 to 6.2; motion +9.1, defocus +3.6, heavy blur 0), Gaussian-2 photos 37.0 -> 45.1%,
+#: sharp lines 79.5 -> 80.5% and phrases 73.0 -> 74.8%, TextVQA level, no text-free photo newly non-empty;
+#: median 1.3 -> 2.7 s per photo. Without the 3-character rule it added lone letters ("A", "7") to text-free photos.
+OCR_SHARPEN_RADIUS: Final[float] = 1.5
+OCR_SHARPEN_PERCENT: Final[int] = 220
+OCR_SHARPEN_MIN_CHARS: Final[int] = 3
+
 #: `caption(read_text=true)` appends at most this many words of the `ocr` engine's text.
 #: Fixed before measuring (VisionBench `caption_text_grounding.py`, 2026-10-10); on 280
 #: held-out images it lifted the default caption's keyword recall 53.3% -> 60.9%.

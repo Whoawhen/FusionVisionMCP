@@ -50,6 +50,11 @@ def register(mcp: MCPServer) -> None:
         photo is still the weak spot. A page sent sideways is read turned upright. Servers started with non-English
         `--ocr-languages` use EasyOCR here instead.
 
+        Every page is also read a second time sharpened, and lines only that reading finds are appended after the
+        rest (top to bottom), which recovers some text from blurred photos: on 89 really blurred images key phrases
+        found went 47.9% -> 51.9% (motion blur +9, defocus +4; heavily blurred text is still not read), with sharp
+        pages a little better and text-free photos still empty. It costs about 1.4 s per page.
+
         This is the right tool for *any* text in an image: dense printed text
         and stylized, logo or low-contrast text alike. `query_image` paraphrases
         rather than transcribing, so it is not a substitute.
@@ -247,7 +252,9 @@ def register(mcp: MCPServer) -> None:
             # Moondream2's `deep` (the fallback) reads the text first: a text-heavy page keeps 12 crops (DEEP_CROPS).
             moondream_deep = deep and app.deep_captioner is None
             page_texts = (
-                [page["text"] for page in ocr_pages(app, images)] if read_text or moondream_deep else [""] * len(images)
+                [page["text"] for page in ocr_pages(app, images, sharpened=False)]
+                if read_text or moondream_deep
+                else [""] * len(images)
             )
             if deep and app.deep_captioner is not None:
                 captions = app.deep_captioner.caption(images)

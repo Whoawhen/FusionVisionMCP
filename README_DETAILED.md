@@ -150,6 +150,13 @@ confidence scores were added here.
 > transcription limit this fix doesn't touch — treat verbatim output at small text scale as approximate, not
 > confirmed, until it's been checked.
 
+> **2026-10-30: every page is also read sharpened.** After the normal reading, `ocr` reads the whole page again
+> after an unsharp mask (radius 1.5, 220%) and appends, top to bottom, the lines only that reading found (3+
+> letters or digits, not already in the text). On 89 held-out really blurred images key phrases found went 47.9%
+> -> 51.9% (CI +2.1 to +6.2; motion blur +9.1, defocus +3.6, heavy blur unchanged), Gaussian-blurred photos 37.0%
+> -> 45.1%, sharp pages 73.0% -> 74.8%, and no text-free photo gained text. About 1.4 s more per page. `caption`'s
+> `Visible text` line and `query_image`'s OCR context keep the first reading, which is what their gates measured.
+
 #### Arguments:
 
 - **src**: A file path or URL to the image file that needs to be processed.

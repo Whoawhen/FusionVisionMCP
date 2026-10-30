@@ -22,6 +22,9 @@ from fusion_vision_mcp.constants import OCR_DET_BOX_THRESHOLD, OCR_MIN_CONFIDENC
 
 
 class PPOCREngine:
+    #: `analysis.ocr_pages` adds the sharpened second reading (OCR_SHARPEN_RADIUS) for this engine.
+    sharpened_pass = True
+
     def __init__(self, min_confidence: float = OCR_MIN_CONFIDENCE) -> None:
         self.min_confidence = min_confidence
         self._engine: Any = None

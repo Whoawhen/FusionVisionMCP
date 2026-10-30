@@ -39,7 +39,8 @@ def _app(answerer: _Answerer | None) -> AppContext:
 def ocr_calls(monkeypatch: pytest.MonkeyPatch) -> list[int]:
     calls: list[int] = []
 
-    def fake_ocr(app: Any, images: Any) -> list[dict[str, Any]]:
+    def fake_ocr(app: Any, images: Any, *, sharpened: bool = True) -> list[dict[str, Any]]:
+        assert not sharpened, "query_image's OCR context is the first reading its gate measured"
         calls.append(len(images))
         return [{"text": "OPEN\n 24 HOURS \n\n"} for _ in images]
 
