@@ -320,6 +320,6 @@ def test_count_objects_tool_asks_for_the_group_box_filter(monkeypatch: pytest.Mo
         path = Path(tmp) / "flat.png"
         _clip_art().save(path)
         server.tools["count_objects"](
-            _FakeContext(_StubApp()), str(path), "petal", verify_silhouette=False, consensus=False
+            _FakeContext(_StubApp()), str(path), "petal", verify_silhouette=False, consensus=False, lfm_check=False
         )
     assert seen["drop_group_box"] is True

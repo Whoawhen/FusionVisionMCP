@@ -16,6 +16,7 @@ from fusion_vision_mcp.analysis import (
     crowd_range,
     drop_nested,
     lfm_count_check,
+    lfm_flat_check,
     possibly_more,
     vqa_count_estimate,
 )
@@ -233,7 +234,10 @@ def register(mcp: MCPServer) -> None:
                     "becomes 1 if it counts 1 or more and answers 'yes'. On 227 fresh photo counts this took exact "
                     "counts of 1-5 from 63.9% to 68.1% and absent objects counted from 74.5% to 69.1%. Asked on most "
                     "photo counts, about 4 s per question (one or two), and loads the ~8 GB model if `caption` or "
-                    "`query_image` has not. Set false to skip it; if the model cannot load, the detector's count "
+                    "`query_image` has not. On flat images (Florence-2's count) any count of 1 or more becomes 0 "
+                    "when it answers 'no': on 261 fresh flat queries absent objects answered 0 went from 1.9% to "
+                    "89.3% with exact counts of present objects unchanged (34.8%). Set false to skip it; if the "
+                    "model cannot load, the detector's count "
                     "stands and `count_check.skipped` says why."
                 )
             ),
@@ -297,13 +301,22 @@ def register(mcp: MCPServer) -> None:
         present far too often (69.1% of fresh hard negatives), so a count of 1 is not
         proof the object is there.
 
+        On flat images (Florence-2's count; `lfm_check` too) the check is one-sided:
+        any count of 1 or more becomes 0 when LFM2.5-VL says the object is not there
+        (`count_basis: "presence_veto"`, every box kept under `vetoed_boxes`), and a
+        zero is never raised. Florence-2 alone boxed an absent object on 98% of fresh
+        flat queries; with the check 10.7% still came back non-zero. On 158 present
+        objects it zeroed 3, all of them already miscounted.
+
         Accuracy depends heavily on the scene. Flat images (synthetic shapes, clip art,
         vector charts, lossless UI captures) are counted by Florence-2: on shapes whose
         counts are exact by construction it is right on 5 of 10 cases and holds all 8
         single-object controls -- separated shapes count right, but touching or
         overlapping ones (a ring of 8 touching discs, a grid of 30) merge into one box.
         On 187 flat-image counts it was exact 68.4% of the time (50.8% before nested boxes
-        were dropped), and nested shapes (concentric circles) can be undercounted. On real
+        were dropped), but on 158 fresh present objects in screenshots, game UI, charts
+        and documents only 34.8% (77% for single objects, 26% for 2-5, none of 6+), and
+        nested shapes (concentric circles) can be undercounted. On real
         photographs it is reliable for a few instances and weak for many: it was exact on
         61.8% of 427 held-out photo counts (383 of them 3 or fewer), and on 65.4% of 644
         generalist photo counts (mostly single objects), and crowded scenes remain far less
@@ -404,6 +417,9 @@ def register(mcp: MCPServer) -> None:
                     # Gates 1b/1c/2 measured these after the detector's count, at the default threshold only.
                     if lfm_check and threshold == COUNT_BOX_THRESHOLD and adaptive_threshold:
                         lfm_count_check(app, image, object_name, result, candidates)
+                elif lfm_check and result.get("detector") == "florence2":
+                    # Gate 5 (round 28): on Florence-2's count, LFM's "no" zeroes any count; nothing else changes.
+                    lfm_flat_check(app, image, object_name, result)
                 if verify_silhouette:
                     _add_silhouette(app, image, result)
                 if consensus:

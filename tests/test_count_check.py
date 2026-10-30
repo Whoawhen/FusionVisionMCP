@@ -1,9 +1,10 @@
-"""`count_objects`' LFM presence checks (`analysis.lfm_count_check`): a weak single box vetoed, a zero rescued."""
+"""`count_objects`' LFM presence checks: on photos (`analysis.lfm_count_check`) a weak single box vetoed and a zero
+rescued; on flat images (`analysis.lfm_flat_check`) any count zeroed on a "no"."""
 
 from types import SimpleNamespace
 from typing import Any
 
-from fusion_vision_mcp.analysis import lfm_count_check, vqa_count_estimate
+from fusion_vision_mcp.analysis import lfm_count_check, lfm_flat_check, vqa_count_estimate
 from fusion_vision_mcp.constants import COUNT_CHECK_COUNT, VQA_COUNT_QUESTION
 
 
@@ -93,6 +94,49 @@ def test_an_unavailable_model_leaves_the_detector_count() -> None:
 def test_no_answerer_leaves_the_count_alone() -> None:
     out = _check(_one(0.5), None)
     assert out["count"] == 1 and out["detector_count"] == 1 and "count_check" not in out
+
+
+def _flat(n: int) -> dict[str, Any]:
+    boxes = [[20 * i, 0, 20 * i + 10, 10] for i in range(n)]
+    return {
+        "count": n,
+        "bboxes": boxes,
+        "points": [[20 * i + 5, 5] for i in range(n)],
+        "labels": ["cat"] * n,
+        "scores": None,
+        "detector": "florence2",
+    }
+
+
+def test_a_flat_count_of_any_size_is_zeroed_when_the_model_says_no() -> None:
+    out = _flat(3)
+    lfm_flat_check(SimpleNamespace(answerer=_Answerer(presence="No, there is not.")), None, "cat", out)
+    assert out["count"] == 0 and out["bboxes"] == [] and out["points"] == [] and out["labels"] == []
+    assert out["detector_count"] == 3 and out["count_basis"] == "presence_veto"
+    assert out["vetoed_boxes"] == [{"box": [0, 0, 10, 10]}, {"box": [20, 0, 30, 10]}, {"box": [40, 0, 50, 10]}]
+    assert out["count_check"]["replies"] == {"presence": "No, there is not."}
+
+
+def test_a_flat_count_stays_unless_the_reply_starts_with_no() -> None:
+    for reply in ("Yes.", "There is no doubt, yes.", ""):
+        out = _flat(2)
+        lfm_flat_check(SimpleNamespace(answerer=_Answerer(presence=reply)), None, "cat", out)
+        assert out["count"] == 2 and out["count_basis"] == "detector" and "vetoed_boxes" not in out
+
+
+def test_a_flat_zero_is_never_asked_about() -> None:
+    answerer, out = _Answerer(presence="yes"), _flat(0)
+    lfm_flat_check(SimpleNamespace(answerer=answerer), None, "cat", out)
+    assert out["count"] == 0 and answerer.asked == [] and "count_check" not in out
+
+
+def test_the_flat_check_keeps_the_count_without_the_model() -> None:
+    out = _flat(1)
+    lfm_flat_check(SimpleNamespace(answerer=_Answerer(fail=OSError("gated"))), None, "cat", out)
+    assert out["count"] == 1 and "gated" in out["count_check"]["skipped"]
+    out = _flat(1)
+    lfm_flat_check(SimpleNamespace(answerer=None), None, "cat", out)
+    assert out["count"] == 1 and "count_check" not in out
 
 
 class _Moondream:

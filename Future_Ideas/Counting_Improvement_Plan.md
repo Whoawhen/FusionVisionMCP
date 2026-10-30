@@ -369,7 +369,32 @@ the worker (round 28 flat). Controls and fixture positives must hold on the flat
   `F3` ships if (1) the absent gain's 95% CI is above 0, (2) counted exact loses at most 2 points, (3) the literal-name
   fixture controls hold. The curtain's rule is in: names the worker lists in `name_doubts` are dropped before any tool
   runs, and the user's blind check wins. Worker brief `worker_handoff/ROUND28_PLAN.md` (about 100 flat images, 1-3
-  counted objects and one near-neighbour absent object each), **not yet sent: waiting on the user's read.**
+  counted objects and one near-neighbour absent object each), **not yet sent: waiting on the user's read.** Sent
+  2026-10-29; see 0.17.
+
+### 0.17 Phase 11 (2026-10-30): Gate 5 passes, `F3` ships
+
+- **Round 28 (VisionBench f470f0f).** The worker sourced 108 Commons images; the reviewer pass dropped 11 (nothing to
+  count, or near-copies of one layout) and the worker added 7 and corrected its `what_it_shows`, several of which had
+  been written from file titles. 104 labelled, 103 kept, 164 counted objects (161 exact), 103 absent objects, one
+  `name_doubts` ("lane", dropped). The labels branch was copied to main by path, not merged: it carries about 120
+  older-round files main has never held. 54 annotations lack `path`, so Gate 5 reads paths from the manifest.
+- **User blind check (2676a04).** 40 `id|name` pairs, one per image, worker counts hidden: 34 of 38 agree (89.5%),
+  absent 14 of 14, 2 `can't tell` (dropped). After scoring the user accepted the worker's window pane 3 and flag 9
+  (originals kept). Two of the remaining four disagreements are names the user counted 0 (reset button 5, view
+  button 2), so they score as absent.
+- **Gate 5 (26b55b0), 261 flat exact queries, all routed to Florence-2.** Absent answered 0 **1.9 -> 89.3%** (CI of
+  the gain 80.6 to 93.2); counted exact **34.8 -> 34.8%** (3 true counts zeroed, all already wrong: header 5 counted 1,
+  desktop icon 3 counted 2, endpoint circle 6 counted 7); literal-name controls unchanged (positives 8 -> 8). Every
+  kind's absent rate rose (75-100%). LFM median 3.8 s per question. **All three rules pass: `F3` ships.**
+- **Shipped (FusionVisionMCP, this commit):** `analysis.lfm_flat_check`, run by `count_objects` under `lfm_check` on
+  Florence-2 counts. Parity (VisionBench `count_flat_lfm_parity.py`): 1,045 of 1,045 cached decisions (Gate 5, the
+  Phase 8 screen, the literal controls), live 8 of 8. `clip_art=true` on a photo also gets the check (not measured).
+- **New open gap: the flat path's own counts.** On round 28, exact counts of present objects are **34.8%** (1: 77.1%,
+  2-5: 25.5%, 6+: 0%), against 68.4% on round 13's simpler flat images. Round 28's names are the worker's choice
+  (buttons, panes, data points in screenshots and charts), which Florence-2's grounding head handles poorly. This is a
+  detector problem the presence check cannot touch; anything aimed at it needs its own screen on seen data first (round
+  28 is now seen).
 
 ---
 

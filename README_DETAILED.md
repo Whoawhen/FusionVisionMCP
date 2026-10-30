@@ -342,8 +342,9 @@ estimate of how many parts it contains.
   Florence-2 head). Off by default since 2026-10-27: on 644 phase 11 photo counts the tally matched the truth 13% of
   the time, and the count was right less often when the two agreed (43%) than when they disagreed (66%). `separable`
   is reported either way.
-- **lfm_check**: Let LFM2.5-VL confirm a weak single box or rescue a zero on photos at the default threshold (see
-  below). Defaults to `true`; set it false to skip the model (about 4-8 s per photo count).
+- **lfm_check**: Let LFM2.5-VL confirm a weak single box or rescue a zero on photos at the default threshold, and
+  zero a flat-image count it says is not there (see below). Defaults to `true`; set it false to skip the model (about
+  4-8 s per photo count, about 4 s per non-zero flat count).
 - **vqa_estimate**: When `true` and the detector has collapsed overlapping instances (`separable == "no"`), also
   ask LFM2.5-VL "how many `object_name` are in this image?" and attach its answer as `estimates.vqa` — a judgment
   estimate, clearly marked, not a tally (Moondream2 answers if LFM cannot load). Defaults to `false`.
@@ -446,6 +447,17 @@ absent) 74.5 -> 69.1% counted non-zero. That last figure is the open gap: a coun
 there. The model is asked on most photo counts, about 4 s per question (one or two), and loads its ~8 GB if `caption`
 or `query_image` has not. If it cannot load or is refused for memory, the detector's count stands and
 `count_check.skipped` says why. Set `lfm_check=false` to skip it. The batch `count` operation does not run it.
+
+**2026-10-30: on flat images the same model can zero any count (`lfm_check`).** Florence-2's grounding head, which
+counts flat images, has no scores and boxes nearly anything it is asked for: on fresh flat images it boxed an absent
+object 98% of the time. So on that path any count of 1 or more is checked with the presence question, and a "no" makes
+it 0 (every box moves to `vetoed_boxes`, `count_basis: "presence_veto"`). It never raises a count. VisionBench, rules
+fixed before the images were sourced: screened on seen flat sets (`count_gate_flat_lfm.py`), then confirmed on round 28,
+103 fresh flat images (screenshots, game UI, charts, documents, illustrations, signage) labelled by the worker and
+blind-checked by the user (`count_gate5_round28.py`): absent objects answered 0 went 1.9 -> 89.3% (95% CI of the gain
+80.6 to 93.2), exact counts of the 158 present objects 34.8 -> 34.8% (3 zeroed, all already miscounted), the
+plain-name fixture controls unchanged. That 34.8% is the open gap on this path: 77% for single objects, 26% for 2-5,
+none of 6+. About 4 s per non-zero flat count.
 
 #### Why this backend
 

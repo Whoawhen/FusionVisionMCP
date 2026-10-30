@@ -639,6 +639,33 @@ def lfm_count_check(
     result["count_check"] = {"replies": replies, "model": "LFM2.5-VL-3B"}
 
 
+def lfm_flat_check(app: AppContext, image: Image, object_name: str, result: dict[str, Any]) -> None:
+    """Let LFM2.5-VL zero a Florence-2 (flat-image) count when it says the object is not there (counting plan Gate 5).
+
+    Any count of 1 or more becomes 0 when LFM answers "no" to `COUNT_CHECK_PRESENCE` (every box moves to
+    `vetoed_boxes`). Nothing else is ever changed: a zero is never rescued and a count is never moved by less.
+    Sets `detector_count` and `count_basis`; `count_check` carries the reply, or why LFM was not asked.
+    """
+    count = int(result.get("count") or 0)
+    result["detector_count"] = count
+    result["count_basis"] = "detector"
+    if app.answerer is None or count < 1:
+        return
+    try:
+        reply = app.answerer.answer([image], [COUNT_CHECK_PRESENCE.format(name=object_name)])[0]
+    except (OSError, ImportError, MemoryError) as exc:
+        logger.warning(f"LFM2.5-VL ONNX unavailable ({exc}); count_objects keeps the detector's count")
+        result["count_check"] = {"skipped": f"LFM2.5-VL unavailable ({exc}); the detector's count stands"}
+        return
+    if _reply_word(reply) == "no":
+        result["vetoed_boxes"] = [{"box": box} for box in result.get("bboxes") or []]
+        for field in ("bboxes", "points", "labels"):
+            result[field] = []
+        result["count"] = 0
+        result["count_basis"] = "presence_veto"
+    result["count_check"] = {"replies": {"presence": reply}, "model": "LFM2.5-VL-3B"}
+
+
 def vqa_count_estimate(app: AppContext, image: Image, object_name: str) -> dict[str, Any]:
     """`count_objects`' `estimates.vqa`: LFM2.5-VL-3B asked `COUNT_CHECK_COUNT` (counting plan step 2D); Moondream2 with
     `VQA_COUNT_QUESTION` without an answerer or when LFM cannot load. Parsed with `_first_int`, as the gate scored it."""

@@ -623,6 +623,18 @@ function reproduces the gates' decisions from their cached replies on 1,696 of 1
 0.6 and the reply parsing were fixed before the gates; changing any of them means a fresh set. Hard negatives are the
 open gap: Grounding DINO still counts a verified-absent object about 7 times in 10.
 
+**2026-10-30: on flat images LFM2.5-VL can zero any count (`lfm_check`; `analysis.lfm_flat_check`, F3).** On a
+Florence-2 count (`detector == "florence2"`, routed or `clip_art=true`), any count of 1+ becomes 0 when `app.answerer`
+answers "no" to `COUNT_CHECK_PRESENCE` (all boxes to `vetoed_boxes`); a zero is never raised. Florence-2 has no scores,
+so there is no weak-box guard to lean on. Phase 8 screen on seen flat sets (`count_gate_flat_lfm.py`: absent 0 -> 87%,
+counted 55.4 -> 53.8; its controls first failed only on "petal" names and were re-run with literal names, 18/18
+unchanged), then Gate 5 on fresh round 28 (`count_gate5_round28.py`, 103 flat images, the user's blind check 34 of 38
+agreeing): absent answered 0 1.9 -> 89.3% (CI 80.6 to 93.2), counted exact 34.8 -> 34.8%, controls unchanged. Parity
+(`count_flat_lfm_parity.py`): 1,045 of 1,045 cached decisions, live 8 of 8. **Round 28 exposed the flat path's own
+weakness: exact counts of present objects 34.8%** (77% at 1, 26% at 2-5, 0% at 6+) on screenshots, game UI and charts,
+against 68.4% on round 13's simpler flat images. `clip_art=true` on a photo also gets the check; that case was not
+measured. The guarded photo veto (V2g, t = 0.6) was not taken to a fresh round: the user chose not to (plan 0.16).
+
 **The honest negative result: the flower is not counted by anything here.** `tests/sample.jpg` — a paper flower
 with overlapping petals — returns 1 from *every* approach tried: Florence-2 grounding, Moondream's detect head,
 Grounding DINO (at every box threshold down to 0.10), the `count_lobes` outline measurement, SAM2 in
