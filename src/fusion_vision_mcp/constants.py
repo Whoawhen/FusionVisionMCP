@@ -157,6 +157,22 @@ OCR_SHARPEN_RADIUS: Final[float] = 1.5
 OCR_SHARPEN_PERCENT: Final[int] = 220
 OCR_SHARPEN_MIN_CHARS: Final[int] = 3
 
+#: `ocr(lfm_read=true)`, the default: on a page where the reading above found any text, LFM2.5-VL-3B ONNX (the default
+#: caption's model) is asked OCR_LFM_PROMPT (VQA_SEED, at most OCR_LFM_MAX_NEW_TOKENS tokens), and each reply line that
+#: does not match OCR_LFM_NO_TEXT, has OCR_LFM_MIN_CHARS+ lower-case alphanumerics and is not already in the reading's
+#: is appended. A page read empty is never sent, so a text-free photo stays empty. PP-OCRv6 only. VisionBench
+#: `ocr_blur_lfm_screen.py` (tune) then `ocr_blur_lfm_confirm.py` (2026-10-30, rules fixed before each run; confirm
+#: scored once): real-blur key phrases 51.9 -> 62.2% (+10.3, CI 6.7 to 14.3; heavy blur +8.3), Gaussian-2 photos
+#: +7.1, TextVQA 57.4 -> 68.5%, sharp lines +2.6 and phrases +3.5, no text-free image newly non-empty; median 2.7 ->
+#: 7.6 s per TextVQA photo (missing the plan's 5 s limit; the user chose it as the default anyway).
+OCR_LFM_PROMPT: Final[str] = (
+    "Transcribe all the text visible in this image exactly as written, one line of output per line of text. "
+    "Do not describe the image. If there is no text, reply: NONE"
+)
+OCR_LFM_MAX_NEW_TOKENS: Final[int] = 512
+OCR_LFM_MIN_CHARS: Final[int] = 3
+OCR_LFM_NO_TEXT: Final[str] = r"^(none|no text|there is no text|the image does not contain)"
+
 #: `caption(read_text=true)` appends at most this many words of the `ocr` engine's text.
 #: Fixed before measuring (VisionBench `caption_text_grounding.py`, 2026-10-10); on 280
 #: held-out images it lifted the default caption's keyword recall 53.3% -> 60.9%.

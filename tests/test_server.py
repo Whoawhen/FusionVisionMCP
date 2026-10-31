@@ -254,9 +254,13 @@ async def test_ocr_with_regions_returns_text_and_boxes(mcp_client_session: Clien
     page = pages[0]
     assert "text" in page and "text_regions" in page
     assert len(page["text_regions"]) > 0
-    # Every region carries a non-empty text and a 4-int box in page coordinates.
+    # Every region carries a non-empty text and a 4-int box in page coordinates, except LFM2.5-VL's
+    # appended lines (`lfm_read`), which have none.
     for region in page["text_regions"]:
         assert region["text"]
+        if region.get("source") == "lfm":
+            assert region["box"] is None and region["confidence"] is None
+            continue
         assert len(region["box"]) == 4
         assert all(isinstance(v, int) for v in region["box"])
     # The joined text is the concatenation of the per-region texts.

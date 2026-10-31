@@ -36,6 +36,10 @@ from fusion_vision_mcp.constants import (
     DEEP_TEXT_WORDS,
     DETECT_BOX_THRESHOLD,
     MAIN_SUBJECT_QUESTION,
+    OCR_LFM_MAX_NEW_TOKENS,
+    OCR_LFM_MIN_CHARS,
+    OCR_LFM_NO_TEXT,
+    OCR_LFM_PROMPT,
     OCR_SHARPEN_MIN_CHARS,
     OCR_SHARPEN_PERCENT,
     OCR_SHARPEN_RADIUS,
@@ -873,7 +877,9 @@ def _read_upright(app: AppContext, image: Image) -> list[dict[str, Any]]:
     return best
 
 
-def ocr_pages(app: AppContext, images: Sequence[Image], *, sharpened: bool = True) -> list[dict[str, Any]]:
+def ocr_pages(
+    app: AppContext, images: Sequence[Image], *, sharpened: bool = True, lfm_read: bool = True
+) -> list[dict[str, Any]]:
     """Transcribe each page with `app.ocr_engine`, splitting side-by-side columns first.
 
     This is the `ocr` tool's whole implementation, factored out so the other two
@@ -890,12 +896,16 @@ def ocr_pages(app: AppContext, images: Sequence[Image], *, sharpened: bool = Tru
     `sharpened=False` skips the sharpened second reading (OCR_SHARPEN_RADIUS). `caption`'s text line and
     `query_image`'s OCR context pass it: it changes the text on ~60% of sharp photos, and their gates measured the
     first reading alone.
+
+    `lfm_read=False` skips LFM2.5-VL's transcription (OCR_LFM_PROMPT); the same two callers pass it, for the same reason.
     """
     pages: list[dict[str, Any]] = []
     for image in images:
         regions = _read_upright(app, image)
         if sharpened:
             regions += _sharpened_extra(app, image, "\n".join(r["text"] for r in regions))
+        if lfm_read:
+            regions += _lfm_extra(app, image, "\n".join(r["text"] for r in regions))
         pages.append({"text": "\n".join(r["text"] for r in regions), "text_regions": regions})
     return pages
 
@@ -917,6 +927,32 @@ def _sharpened_extra(app: AppContext, image: Image, text: str) -> list[dict[str,
         if len(key := _alnum(r["text"])) >= OCR_SHARPEN_MIN_CHARS and key not in have
     ]
     return sorted(extra, key=lambda r: (r["box"][1], r["box"][0]))
+
+
+_LFM_NO_TEXT_RE: Final = re.compile(OCR_LFM_NO_TEXT)
+
+
+def _lfm_extra(app: AppContext, image: Image, text: str) -> list[dict[str, Any]]:
+    """Lines LFM2.5-VL's transcription of the page adds to `text`, in its order (see OCR_LFM_PROMPT). Only when `text`
+    is non-empty, for an engine that sets `sharpened_pass` (PP-OCRv6), with an answerer. The lines carry no box or
+    confidence (`box` and `confidence` are None, `source` "lfm")."""
+    answerer = getattr(app, "answerer", None)
+    if not text.strip() or answerer is None or not getattr(app.ocr_engine, "sharpened_pass", False):
+        return []
+    try:
+        reply = answerer.answer([image], [OCR_LFM_PROMPT], max_new_tokens=OCR_LFM_MAX_NEW_TOKENS)[0]
+    except (OSError, ImportError, MemoryError) as exc:
+        logger.warning(f"LFM2.5-VL ONNX unavailable ({exc}); ocr returns PP-OCRv6's reading alone")
+        return []
+    have = _alnum(text)
+    extra = []
+    for line in reply.splitlines():
+        key = re.sub(r"[^0-9a-z ]+", "", line.lower()).strip()
+        if not key or _LFM_NO_TEXT_RE.match(key):
+            continue
+        if len(norm := _alnum(line)) >= OCR_LFM_MIN_CHARS and norm not in have:
+            extra.append({"text": line.strip(), "confidence": None, "box": None, "source": "lfm"})
+    return extra
 
 
 def image_type_lines(app: AppContext, images: Sequence[Image]) -> list[str]:
@@ -947,7 +983,9 @@ def vqa_answers(app: AppContext, images: Sequence[Image], question: str) -> list
     if app.answerer is not None:
         try:
             if _TEXT_QUESTION_RE.search(question):
-                prompts = [lfm_vqa_prompt(question, p["text"]) for p in ocr_pages(app, images, sharpened=False)]
+                prompts = [
+                    lfm_vqa_prompt(question, p["text"]) for p in ocr_pages(app, images, sharpened=False, lfm_read=False)
+                ]
             else:
                 prompts = [question] * len(images)
             return app.answerer.answer(list(images), prompts)

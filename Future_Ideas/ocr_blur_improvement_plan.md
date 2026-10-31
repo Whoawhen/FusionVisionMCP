@@ -122,6 +122,14 @@ B4, once on held-out images: real blur +4.0 (CI 2.1 to 6.2), p11_blur +8.1, shar
 `query_image`'s OCR context, which keep the first reading until their own gate. Details: CLAUDE.md, the `ocr`
 section.
 
+**Beyond the plan (2026-10-30, shipped as default by the user's choice).** B3 as written (more preprocessing) was
+judged too timid once B2 showed heavy blur at +0 on every arm; PP-OCR has no language context. LFM2.5-VL-3B ONNX
+was screened as a whole-page transcriber whose new lines are appended only on pages already read non-empty
+(VisionBench `ocr_blur_lfm_screen.py`, then `ocr_blur_lfm_confirm.py`; rules fixed before each). Confirm, once: real
+blur 51.9 -> 62.2% (+10.3, CI 6.7 to 14.3), p11_blur +7.1, TextVQA +11.1, sharp controls up, text-free held; median
+2.7 -> 7.6 s per photo, past the 5 s limit, so the rules allowed opt-in only; the user made it the default
+(`ocr(lfm_read=false)` for speed). A blur-gated variant was considered and not built (needs a fresh round).
+
 ### 0.4 Order and waiting points
 
 1. B0 now (paperwork).

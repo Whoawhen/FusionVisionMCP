@@ -40,6 +40,19 @@ def register(mcp: MCPServer) -> None:
                 )
             ),
         ] = False,
+        lfm_read: Annotated[
+            bool,
+            Field(
+                description=(
+                    "Default true: on a page where text was read, LFM2.5-VL-3B also transcribes the page and lines it "
+                    'reads that the OCR missed are appended at the end (no box or confidence; `source` "lfm" '
+                    "with detail=true). It recovers blurred and hard text (real-blur key phrases 51.9% -> 62.2%, "
+                    "TextVQA photos 57.4% -> 68.5%) for about 5 s more per page with text. A page read empty is not "
+                    "sent, so a text-free image stays empty. Set false for the faster PP-OCRv6-only reading, or when "
+                    "every line must carry a box."
+                )
+            ),
+        ] = True,
     ) -> list[Any]:
         """Process an image file or URL using OCR to extract text.
 
@@ -54,6 +67,13 @@ def register(mcp: MCPServer) -> None:
         rest (top to bottom), which recovers some text from blurred photos: on 89 really blurred images key phrases
         found went 47.9% -> 51.9% (motion blur +9, defocus +4; heavily blurred text is still not read), with sharp
         pages a little better and text-free photos still empty. It costs about 1.4 s per page.
+
+        Then, on a page where any text was read, LFM2.5-VL-3B transcribes the page too, and lines it reads that the
+        OCR missed are appended after the rest (`lfm_read`, default on). That reading uses language context, so it
+        recovers words too blurred for PP-OCRv6: real-blur key phrases 51.9% -> 62.2% (heavy blur +8), TextVQA
+        photos 57.4% -> 68.5%, sharp pages slightly better, text-free images still empty; about 5 s more per page
+        with text. Those lines have no box and are a model's reading, so for one that matters, check it with
+        `caption(region=...)` or `query_image`.
 
         This is the right tool for *any* text in an image: dense printed text
         and stylized, logo or low-contrast text alike. `query_image` paraphrases
@@ -77,7 +97,7 @@ def register(mcp: MCPServer) -> None:
         """
         app = ctx.request_context.lifespan_context
         with get_images(src) as images:
-            pages = ocr_pages(app, images)
+            pages = ocr_pages(app, images, lfm_read=lfm_read)
             return pages if detail else [page["text"] for page in pages]
 
     @mcp.tool()
@@ -252,7 +272,7 @@ def register(mcp: MCPServer) -> None:
             # Moondream2's `deep` (the fallback) reads the text first: a text-heavy page keeps 12 crops (DEEP_CROPS).
             moondream_deep = deep and app.deep_captioner is None
             page_texts = (
-                [page["text"] for page in ocr_pages(app, images, sharpened=False)]
+                [page["text"] for page in ocr_pages(app, images, sharpened=False, lfm_read=False)]
                 if read_text or moondream_deep
                 else [""] * len(images)
             )

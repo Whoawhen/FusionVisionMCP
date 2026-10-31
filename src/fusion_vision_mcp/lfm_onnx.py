@@ -147,10 +147,12 @@ class LfmOnnxCaptioner:
                 res.append(self.generate(rgb_img, CAPTION_PROMPT, self.seed))
         return res
 
-    def answer(self, images: list[Image], prompts: list[str], seed: int = VQA_SEED) -> list[str]:
+    def answer(
+        self, images: list[Image], prompts: list[str], seed: int = VQA_SEED, max_new_tokens: int = VQA_MAX_NEW_TOKENS
+    ) -> list[str]:
         """`query_image`'s answers: one reply per image to its prompt (`analysis.lfm_vqa_prompt` builds them)."""
         res = []
         for img, prompt in zip(images, prompts, strict=True):
             with img.convert("RGB") as rgb_img:
-                res.append(self.generate(rgb_img, prompt, seed, VQA_MAX_NEW_TOKENS))
+                res.append(self.generate(rgb_img, prompt, seed, max_new_tokens))
         return res

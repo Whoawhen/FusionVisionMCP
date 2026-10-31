@@ -157,9 +157,20 @@ confidence scores were added here.
 > -> 45.1%, sharp pages 73.0% -> 74.8%, and no text-free photo gained text. About 1.4 s more per page. `caption`'s
 > `Visible text` line and `query_image`'s OCR context keep the first reading, which is what their gates measured.
 
+> **2026-10-30: LFM2.5-VL transcribes pages with text (`lfm_read`, default on).** On a page where any text was read,
+> the default caption's LFM2.5-VL-3B (ONNX) is asked to transcribe it, and lines it reads that are not already in the
+> text (3+ letters or digits) are appended at the end, with no box or confidence (`source: "lfm"` under
+> `detail=true`). A page read empty is never sent, so text-free images stay empty. Confirmed once on the same 89
+> real-blur images: key phrases 51.9% -> 62.2% (+10.3, CI 6.7 to 14.3; heavy blur +8.3, the first gain there),
+> Gaussian-blurred photos +7.1, TextVQA photos 57.4% -> 68.5%, sharp pages +2.6 to +3.5, no text-free image gained
+> text. Median time per TextVQA photo 2.7 -> 7.6 s; `lfm_read=false` for the fast reading. `caption` and
+> `query_image` keep the first reading. Without LFM (`--vqa-model moondream`, a failed load) and on EasyOCR it is skipped.
+
 #### Arguments:
 
 - **src**: A file path or URL to the image file that needs to be processed.
+- **lfm_read** (default `true`): append LFM2.5-VL's transcription lines the OCR missed, on pages where text was
+  read. `false` gives the PP-OCRv6-only reading (about 5 s faster per page with text; every line has a box).
 - **detail**: When `true`, return verbatim text *and* the box and confidence score for each span, instead of
   flat strings. Output becomes one `{text, text_regions}` dict per page, `text_regions` being
   `[{text, confidence, box}, ...]` in page coordinates — offset back out of any column crop, so a box indexes

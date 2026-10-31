@@ -146,6 +146,21 @@ gates measured the first reading; using it there needs its own gate. EasyOCR (no
 (`sharpened_pass` is PP-OCRv6's). A B2 harness bug worth knowing: replacement_gate1 gives p11_blur, p11_text and
 lines items one id, so a cache keyed on id scored B2's sharp controls on blurred reads; B4 keys them per set.
 
+**2026-10-30 (later): LFM2.5-VL transcribes every page with text (`lfm_read`, default on; `analysis._lfm_extra`).**
+After the sharpened pass, if the page's reading is non-empty, `app.answerer` (the default caption's ONNX LFM2.5-VL-3B)
+gets `OCR_LFM_PROMPT` (VQA_SEED, 512 tokens); each reply line not matching `OCR_LFM_NO_TEXT`, with 3+ alphanumerics
+(`OCR_LFM_MIN_CHARS`) and not inside the reading's, is appended in reply order as `{text, confidence: None, box: None,
+source: "lfm"}`. Preprocessing had plateaued (B2's twelve arms, heavy blur +0) and PP-OCR's CTC recognizer has no
+language context. VisionBench `ocr_blur_lfm_screen.py` (tune, rules fixed first): ONNX and bf16 4-tile LFM tied at
++11.1 with `append_if_text`; plain append (LFM also on pages read empty) added text to 4-5 text-free images, which
+is why an empty page is never sent. `ocr_blur_lfm_confirm.py` (controls, then the pool confirm, scored once): real-blur
+pool 51.9 -> 62.2% (+10.3, CI 6.7 to 14.3; heavy +8.3, defocus +12.3, low-res +8.3, motion +2.3, compression/mixed 0),
+p11_blur +7.1 (CI 4.9 to 9.7), TextVQA 57.4 -> 68.5%, lines 80.5 -> 83.1%, p11_text 74.8 -> 78.3%, no text-free image
+newly non-empty; median per TextVQA photo 2.66 -> 7.6 s, failing the plan's 5 s limit, which made it opt-in only under
+the rules; **the user chose it as the default**. Parity (`scratch/lfm_ocr_parity.py`): 680 of 680 cached decisions,
+live replies 8 of 8. `caption`'s text line and `query_image`'s OCR context pass `lfm_read=False` (their gates; a gate
+for them is the obvious next test, given TextVQA +11). Skipped without an answerer, on LFM load failure and on EasyOCR.
+
 Four things about that swap are load-bearing:
 
 - **No EasyOCR setting would have closed the gap.** Magnification (1.5x, 2x), beam-search decoding and turning

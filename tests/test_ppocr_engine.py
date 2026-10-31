@@ -124,9 +124,9 @@ def test_sharpened_pass_recovers_words_on_a_blurred_paragraph() -> None:
     from fusion_vision_mcp.analysis import ocr_pages
     from fusion_vision_mcp.ppocr_engine import PPOCREngine
 
-    text = ocr_pages(SimpleNamespace(ocr_engine=PPOCREngine()), [_blurred_fixture("layout_paragraph.png", 2)])[0][
-        "text"
-    ]  # type: ignore[arg-type,list-item]
+    text = ocr_pages(
+        SimpleNamespace(ocr_engine=PPOCREngine(), answerer=None), [_blurred_fixture("layout_paragraph.png", 2)]
+    )[0]["text"]  # type: ignore[arg-type,list-item]
     assert "no second column" in text
 
 
@@ -137,7 +137,9 @@ def test_sharpened_pass_keeps_a_blurred_text_free_photo_empty(sigma: int) -> Non
     from fusion_vision_mcp.analysis import ocr_pages
     from fusion_vision_mcp.ppocr_engine import PPOCREngine
 
-    page = ocr_pages(SimpleNamespace(ocr_engine=PPOCREngine()), [_blurred_fixture("sample.jpg", sigma)])[0]  # type: ignore[arg-type,list-item]
+    page = ocr_pages(SimpleNamespace(ocr_engine=PPOCREngine(), answerer=None), [_blurred_fixture("sample.jpg", sigma)])[
+        0
+    ]  # type: ignore[arg-type,list-item]
     assert page["text"] == "" and page["text_regions"] == []
 
 
@@ -150,7 +152,73 @@ def test_caption_and_vqa_reading_skips_the_sharpened_pass(monkeypatch: pytest.Mo
     from fusion_vision_mcp import analysis
 
     monkeypatch.setattr(analysis, "_read_upright", lambda app, image: [])
-    app = SimpleNamespace(ocr_engine=_FakeEngine(["Exit"]))
+    app = SimpleNamespace(ocr_engine=_FakeEngine(["Exit"]), answerer=None)
     page = Image.new("RGB", (64, 64))
     assert analysis.ocr_pages(app, [page])[0]["text"] == "Exit"  # type: ignore[arg-type]
     assert analysis.ocr_pages(app, [page], sharpened=False)[0]["text"] == ""  # type: ignore[arg-type]
+
+
+class _FakeAnswerer:
+    def __init__(self, reply: str) -> None:
+        self.reply, self.calls = reply, []
+
+    def answer(self, images: list, prompts: list[str], *, max_new_tokens: int = 128) -> list[str]:
+        self.calls.append((prompts, max_new_tokens))
+        return [self.reply] * len(images)
+
+
+def test_lfm_read_appends_only_new_lines_of_three_characters(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The screen's merge: NONE-style lines, lines under 3 alphanumerics and lines already read are dropped."""
+    from types import SimpleNamespace
+
+    from PIL import Image
+
+    from fusion_vision_mcp import analysis
+    from fusion_vision_mcp.constants import OCR_LFM_MAX_NEW_TOKENS, OCR_LFM_PROMPT
+
+    monkeypatch.setattr(analysis, "_read_upright", lambda app, image: [{"text": "OPEN 24h", "box": [0, 0, 9, 9]}])
+    lfm = _FakeAnswerer("Open 24H\nNONE\nNo text here\nA7\nFresh Bread Daily\n\nEst. 1921")
+    app = SimpleNamespace(ocr_engine=_FakeEngine([]), answerer=lfm)
+    page = analysis.ocr_pages(app, [Image.new("RGB", (64, 64))])[0]  # type: ignore[arg-type]
+    assert page["text"] == "OPEN 24h\nFresh Bread Daily\nEst. 1921"
+    assert page["text_regions"][-1] == {"text": "Est. 1921", "confidence": None, "box": None, "source": "lfm"}
+    assert lfm.calls == [([OCR_LFM_PROMPT], OCR_LFM_MAX_NEW_TOKENS)]
+
+
+def test_lfm_read_never_runs_on_a_page_read_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The screen's `append_if_text`: what keeps a text-free image empty."""
+    from types import SimpleNamespace
+
+    from PIL import Image
+
+    from fusion_vision_mcp import analysis
+
+    monkeypatch.setattr(analysis, "_read_upright", lambda app, image: [])
+    lfm = _FakeAnswerer("STOP")
+    app = SimpleNamespace(ocr_engine=_FakeEngine([]), answerer=lfm)
+    assert analysis.ocr_pages(app, [Image.new("RGB", (64, 64))])[0]["text"] == ""  # type: ignore[arg-type]
+    assert lfm.calls == []
+
+
+def test_lfm_read_is_skipped_when_off_or_lfm_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    from types import SimpleNamespace
+
+    from PIL import Image
+
+    from fusion_vision_mcp import analysis
+
+    class _Broken:
+        def answer(self, *a: object, **k: object) -> list[str]:
+            raise OSError("no weights")
+
+    monkeypatch.setattr(analysis, "_read_upright", lambda app, image: [{"text": "Exit", "box": [0, 0, 9, 9]}])
+    page = Image.new("RGB", (64, 64))
+    lfm = _FakeAnswerer("Fire door")
+    app = SimpleNamespace(ocr_engine=_FakeEngine([]), answerer=lfm)
+    assert analysis.ocr_pages(app, [page], lfm_read=False)[0]["text"] == "Exit"  # type: ignore[arg-type]
+    assert lfm.calls == []
+    broken = SimpleNamespace(ocr_engine=_FakeEngine([]), answerer=_Broken())
+    assert analysis.ocr_pages(broken, [page])[0]["text"] == "Exit"  # type: ignore[arg-type]
+    engine = _FakeEngine([])
+    engine.sharpened_pass = False  # EasyOCR (non-English) was not measured
+    assert analysis.ocr_pages(SimpleNamespace(ocr_engine=engine, answerer=lfm), [page])[0]["text"] == "Exit"  # type: ignore[arg-type]

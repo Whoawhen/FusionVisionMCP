@@ -123,8 +123,8 @@ class Captioner(Protocol):
 class Answerer(Protocol):
     """Represents a protocol for `query_image`'s answerer (LFM2.5-VL-3B ONNX), given a finished prompt per image."""
 
-    def answer(self, images: list[Image], prompts: list[str]) -> list[str]:
-        """One reply per image to its prompt."""
+    def answer(self, images: list[Image], prompts: list[str], *, max_new_tokens: int = ...) -> list[str]:
+        """One reply per image to its prompt, at most `max_new_tokens` tokens (VQA_MAX_NEW_TOKENS by default)."""
         ...
 
 
