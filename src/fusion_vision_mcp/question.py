@@ -168,31 +168,77 @@ def _strip_quotes(token: str) -> str:
 
 
 # Filler words that end a "how many <noun>" phrase; the noun is the leading chunk
-# before the first of these.
+# before the first of these. Whole words only: a bare " in" or " do" would also cut
+# "inside" or "dogs".
 _COUNT_FILLER = (
-    " are",
-    " is",
-    " there",
-    " do",
-    " does",
-    " can",
-    " will",
-    " would",
-    " should",
-    " in",
-    " on",
-    " at",
-    " with",
-    " of",
-    " and",
-    " that",
-    " you",
-    " we",
-    " they",
-    " visible",
-    " shown",
-    " present",
+    "are",
+    "is",
+    "there",
+    "do",
+    "does",
+    "can",
+    "will",
+    "would",
+    "should",
+    "in",
+    "on",
+    "at",
+    "with",
+    "of",
+    "and",
+    "that",
+    "you",
+    "we",
+    "they",
+    "visible",
+    "shown",
+    "displayed",
+    "present",
+    # Finite verbs: "matching pink vases stand on the mantelpiece".
+    "stand",
+    "stands",
+    "appear",
+    "appears",
+    "lead",
+    "leads",
+    "flank",
+    "flanks",
+    "represent",
+    "represents",
+    "make",
+    "makes",
+    "surround",
+    "surrounds",
+    "remain",
+    "remains",
+    "rest",
+    "rests",
+    "sit",
+    "sits",
+    "lie",
+    "lies",
+    "hang",
+    "hangs",
+    "hold",
+    "holds",
+    "wear",
+    "wears",
+    "carry",
+    "carries",
+    "form",
+    "forms",
+    "touch",
+    "touches",
+    "cross",
+    "crosses",
+    "overlap",
+    "overlaps",
+    "border",
+    "borders",
 )
+_COUNT_FILLER_RE: re.Pattern[str] = re.compile(r"\s(?:" + "|".join(_COUNT_FILLER) + r")\b")
+# Stopwords that name the picture rather than its contents; "image panels" is a noun phrase, "image" alone is not.
+_PICTURE_WORDS = frozenset({"image", "picture", "photo", "photograph"})
 
 
 def _trim_count_noun(phrase: str) -> str:
@@ -200,12 +246,18 @@ def _trim_count_noun(phrase: str) -> str:
     noun = phrase.lower()
     for article in ("the ", "a ", "an "):
         noun = noun.removeprefix(article)
-    cut = len(noun)
-    for filler in _COUNT_FILLER:
-        idx = noun.find(filler)
-        if idx != -1 and idx < cut:
-            cut = idx
-    return noun[:cut].strip()
+    match = _COUNT_FILLER_RE.search(noun)
+    return (noun[: match.start()] if match else noun).strip()
+
+
+def _is_object_name(noun: str) -> bool:
+    """True when `noun` names something: not a stopword, and a leading picture word is followed by a real noun."""
+    if not noun or noun in _STOPWORDS:
+        return False
+    words = noun.split()
+    if words[0] in _PICTURE_WORDS and len(words) > 1:
+        return words[-1] not in _STOPWORDS
+    return words[0] not in _STOPWORDS
 
 
 def names_for(category: str, question: str) -> list[str] | None:
@@ -236,7 +288,7 @@ def names_for(category: str, question: str) -> list[str] | None:
         match = _COUNT_PATTERN.search(question)
         if match:
             noun = _strip_quotes(_trim_count_noun(match.group(1)))
-            if noun and noun not in _STOPWORDS and noun.split()[0] not in _STOPWORDS:
+            if _is_object_name(noun):
                 return [noun]
         names = _raw_names(question)
         return names[:1] if names else None
@@ -245,7 +297,7 @@ def names_for(category: str, question: str) -> list[str] | None:
         match = _SIZE_PATTERN_1.search(question) or _SIZE_PATTERN_2.search(question)
         if match:
             noun = _strip_quotes(_trim_count_noun(match.group(1)))
-            if noun and noun not in _STOPWORDS and noun.split()[0] not in _STOPWORDS:
+            if _is_object_name(noun):
                 return [noun]
         names = _raw_names(question)
         return names[:1] if names else None

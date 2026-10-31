@@ -5,6 +5,8 @@ question wordings the cross-check routes to a measurement, plus the negative
 controls (no category, or a category whose names can't be parsed -> None).
 """
 
+import pytest
+
 from fusion_vision_mcp.question import COUNT, OCR, SPATIAL, classify, names_for
 
 
@@ -58,3 +60,25 @@ class TestNamesFor:
 
     def test_no_category_returns_none(self) -> None:
         assert names_for("nonexistent", "anything") is None
+
+
+class TestCountNouns:
+    @pytest.mark.parametrize(
+        ("question", "names"),
+        [
+            ("How many matching pink vases stand on the mantelpiece?", ["matching pink vases"]),
+            ("How many heraldic figures appear inside the top shield?", ["heraldic figures"]),
+            ("How many image panels are shown side by side?", ["image panels"]),
+            ("How many photo thumbnails are displayed along the right edge?", ["photo thumbnails"]),
+            ("How many standing figures are there?", ["standing figures"]),
+            ("How many inside doors are visible?", ["inside doors"]),
+            ("How many red dogs are in this image?", ["red dogs"]),
+        ],
+    )
+    def test_names(self, question: str, names: list[str]) -> None:
+        assert names_for(COUNT, question) == names
+
+    def test_picture_word_alone_is_not_a_name(self) -> None:
+        assert names_for(COUNT, "How many are in this image?") is None
+        assert names_for(COUNT, "How many images are there?") is not None
+        assert names_for(COUNT, "How many image are shown?") is None
