@@ -420,6 +420,8 @@ counted; rounds 13, 26b and 28 absent; the 18 literal-name fixtures), so **nothi
   (positives 8 -> 6 under `L1`, 5 under `L2`, 9 under `L3`). Unlike Phase 8's "petal" failure, these are real
   miscounts under the literal names, not a naming artefact. By the rule fixed beforehand nothing goes to round 29, and
   the flat count is closed with these models. A guarded `L1` designed now would be fitted to these 18 fixtures.
+- **Decision (2026-10-31): the user chose to stay with what ships.** No guarded `L1`, no round 29. The counting plan is
+  closed; `count_objects` stays as of 3cc5b8d.
 
 ## 1. Scoreboard Context, Goal & Hard Constraints
 
