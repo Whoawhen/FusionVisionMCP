@@ -6,11 +6,13 @@ against stub apps, so a regression shows up in milliseconds rather than in a ben
 """
 
 from types import SimpleNamespace
+from typing import Any
 
 import numpy as np
 import pytest
 from PIL import Image
 
+from fusion_vision_mcp import analysis
 from fusion_vision_mcp.analysis import (
     _COMPARE_TIE,
     _add_silhouette,
@@ -70,6 +72,15 @@ _SMALL, _MEDIUM, _BIG = [0, 0, 10, 10], [0, 0, 20, 20], [0, 0, 50, 50]
 
 
 class TestSizeMeasurement:
+    @pytest.fixture(autouse=True)
+    def _stub_detection(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # `_size_measurement` mirrors `detect_objects`; the stub counter stands in for execute_detection's output.
+        def fake(app: Any, images: list, object_name: str, **kwargs: Any) -> list[dict]:
+            assert kwargs["locate"] and kwargs["backend_preference"] == "auto" and not kwargs["adaptive_threshold"]
+            return app.counter.detect_objects(images, object_name)
+
+        monkeypatch.setattr(analysis, "execute_detection", fake)
+
     def test_nothing_detected_returns_none(self) -> None:
         """The "never guess" rule: no detections means no cross-check at all."""
         assert _size_measurement(_SizeApp(_StubCounter([])), _IMAGE, "sword", "which sword is largest?") is None

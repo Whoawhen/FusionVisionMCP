@@ -21,6 +21,7 @@ SPATIAL_TOUCH_SEPARATE_FILEPATH = str(TEST_DIR / "spatial_touch_separate.png")
 SPATIAL_CONTAINMENT_FILEPATH = str(TEST_DIR / "spatial_containment.png")
 LAYOUT_TWO_COLUMN_FILEPATH = str(TEST_DIR / "layout_two_column.png")
 DETECT_BLANK_CANVAS_FILEPATH = str(TEST_DIR / "detect_blank_canvas.png")
+SIZE_THREE_CIRCLES_FILEPATH = str(TEST_DIR / "size_three_circles.png")
 COUNT_CLUTTERED_TARGET_FILEPATH = str(TEST_DIR / "count_cluttered_target.png")
 
 SERVER_PARAMS = StdioServerParameters(
@@ -1437,3 +1438,23 @@ async def test_count_objects_can_skip_the_lfm_check(mcp_client_session: ClientSe
 
     assert not res.is_error
     assert "detector_count" not in counted and "count_check" not in counted
+
+
+@pytest.mark.anyio
+async def test_size_cross_check_picks_the_extreme_circle_from_detect_objects_boxes(
+    mcp_client_session: ClientSession,
+) -> None:
+    """`query_image`'s size cross-check takes max/min box area over `detect_objects`' detection (SAM 3 on this flat
+    image). Three red circles of radius 40, 70 and 120 (x centres 90, 260, 500): the extremes must be the right ones."""
+    res = await mcp_client_session.call_tool(
+        "detect_objects", arguments={"src": SIZE_THREE_CIRCLES_FILEPATH, "object_name": "circle"}
+    )
+    data = json.loads(chr(10).join(cast(TextContent, c).text for c in res.content))
+    assert not res.is_error and len(data["bboxes"]) >= 3, data
+
+    def area(b: list[float]) -> float:
+        return (b[2] - b[0]) * (b[3] - b[1])
+
+    largest, smallest = max(data["bboxes"], key=area), min(data["bboxes"], key=area)
+    assert (largest[0] + largest[2]) / 2 == pytest.approx(500, abs=25)
+    assert (smallest[0] + smallest[2]) / 2 == pytest.approx(90, abs=25)

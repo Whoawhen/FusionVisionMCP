@@ -300,7 +300,16 @@ def _size_measurement(app: AppContext, image: Image, object_name: str, question_
     area -- a measurement, not a guess. Returns None (omit the cross-check) when
     nothing was detected, the same "never guess" rule the other categories follow.
     """
-    detected = app.counter.detect_objects([image], object_name)[0]
+    # Mirrors `detect_objects`: SAM 3 on photos, at its threshold.
+    detected = execute_detection(
+        app,
+        [image],
+        object_name,
+        backend_preference="auto",
+        threshold=DETECT_BOX_THRESHOLD,
+        adaptive_threshold=False,
+        locate=True,
+    )[0]
     bboxes = detected.get("bboxes") or []
     if not bboxes:
         return None
