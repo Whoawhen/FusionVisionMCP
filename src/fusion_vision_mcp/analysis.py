@@ -28,7 +28,9 @@ from fusion_vision_mcp.constants import (
     COUNT_CHECK_COUNT,
     COUNT_CHECK_PRESENCE,
     COUNT_CHECK_WEAK,
+    COUNT_RANGE_FLOOR,
     COUNT_RANGE_VETO,
+    CROWD_RANGE_RUN_UPPER,
     CROWD_RANGE_SAM3_FLOOR,
     CROWD_RANGE_SHOW,
     DEEP_CROPS,
@@ -272,7 +274,7 @@ def _vqa_cross_check(app: AppContext, image: Image, question_text: str) -> dict[
     if category == question.SPATIAL:
         return _spatial_measurement(app, image, cast(list[str], names))
     if category == question.COUNT:
-        result = app.counter.detect_objects([image], names[0])[0]
+        result = count_image(app, image, names[0])
         return {
             "tool": "count_objects",
             "object": names[0],
@@ -672,6 +674,54 @@ def lfm_flat_check(app: AppContext, image: Image, object_name: str, result: dict
         result["count"] = 0
         result["count_basis"] = "presence_veto"
     result["count_check"] = {"replies": {"presence": reply}, "model": "LFM2.5-VL-3B"}
+
+
+def finish_count(
+    app: AppContext,
+    image: Image,
+    object_name: str,
+    result: dict[str, Any],
+    *,
+    threshold: float,
+    adaptive_threshold: bool,
+    lfm_check: bool = True,
+) -> None:
+    """`count_objects`' per-image steps after detection, in place: nested boxes dropped, `possibly_more`, `crowd_range`
+    and the LFM2.5-VL check. `result` came from `execute_detection(..., candidates_floor=COUNT_RANGE_FLOOR,
+    drop_group_box=True)`. The crowd range and LFM check apply at the default threshold only (what their gates measured)."""
+    default = threshold == COUNT_BOX_THRESHOLD and adaptive_threshold
+    drop_nested(result)
+    candidates = result.pop("candidates_below", None)
+    if candidates is not None:
+        result["possibly_more"] = possibly_more(result.get("bboxes") or [], candidates)
+        # Gate K measured the range against the default Grounding DINO count only; SAM 3 is skipped
+        # unless Grounding DINO itself sees room for 3 or more (`CROWD_RANGE_RUN_UPPER`).
+        if default and result["possibly_more"]["upper"] >= CROWD_RANGE_RUN_UPPER:
+            span = crowd_range(app, image, object_name, int(result.get("count") or 0))
+            if span is not None:
+                result["crowd_range"] = span
+        # Gates 1b/1c/2 measured these after the detector's count, at the default threshold only.
+        if lfm_check and default:
+            lfm_count_check(app, image, object_name, result, candidates)
+    elif lfm_check and result.get("detector") == "florence2":
+        # Gate 5 (round 28): on Florence-2's count, LFM's "no" zeroes any count; nothing else changes.
+        lfm_flat_check(app, image, object_name, result)
+
+
+def count_image(app: AppContext, image: Image, object_name: str) -> dict[str, Any]:
+    """One image counted exactly as `count_objects` does with its defaults (no silhouette, no consensus)."""
+    result = execute_detection(
+        app,
+        [image],
+        object_name,
+        backend_preference="auto",
+        threshold=COUNT_BOX_THRESHOLD,
+        adaptive_threshold=True,
+        candidates_floor=COUNT_RANGE_FLOOR,
+        drop_group_box=True,
+    )[0]
+    finish_count(app, image, object_name, result, threshold=COUNT_BOX_THRESHOLD, adaptive_threshold=True)
+    return result
 
 
 def vqa_count_estimate(app: AppContext, image: Image, object_name: str) -> dict[str, Any]:

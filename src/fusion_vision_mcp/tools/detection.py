@@ -13,17 +13,12 @@ from fusion_vision_mcp.analysis import (
     _attach_annotated_images,
     _region_label_consensus,
     _separability,
-    crowd_range,
-    drop_nested,
-    lfm_count_check,
-    lfm_flat_check,
-    possibly_more,
+    finish_count,
     vqa_count_estimate,
 )
 from fusion_vision_mcp.constants import (
     COUNT_BOX_THRESHOLD,
     COUNT_RANGE_FLOOR,
-    CROWD_RANGE_RUN_UPPER,
     DETECT_BOX_THRESHOLD,
     MASK_DECODE_RESOLUTION,
 )
@@ -400,26 +395,15 @@ def register(mcp: MCPServer) -> None:
             )
 
             for image, result in zip(images, results, strict=True):
-                drop_nested(result)
-                candidates = result.pop("candidates_below", None)
-                if candidates is not None:
-                    result["possibly_more"] = possibly_more(result.get("bboxes") or [], candidates)
-                    # Gate K measured the range against the default Grounding DINO count only; SAM 3 is skipped
-                    # unless Grounding DINO itself sees room for 3 or more (`CROWD_RANGE_RUN_UPPER`).
-                    if (
-                        threshold == COUNT_BOX_THRESHOLD
-                        and adaptive_threshold
-                        and result["possibly_more"]["upper"] >= CROWD_RANGE_RUN_UPPER
-                    ):
-                        span = crowd_range(app, image, object_name, int(result.get("count") or 0))
-                        if span is not None:
-                            result["crowd_range"] = span
-                    # Gates 1b/1c/2 measured these after the detector's count, at the default threshold only.
-                    if lfm_check and threshold == COUNT_BOX_THRESHOLD and adaptive_threshold:
-                        lfm_count_check(app, image, object_name, result, candidates)
-                elif lfm_check and result.get("detector") == "florence2":
-                    # Gate 5 (round 28): on Florence-2's count, LFM's "no" zeroes any count; nothing else changes.
-                    lfm_flat_check(app, image, object_name, result)
+                finish_count(
+                    app,
+                    image,
+                    object_name,
+                    result,
+                    threshold=threshold,
+                    adaptive_threshold=adaptive_threshold,
+                    lfm_check=lfm_check,
+                )
                 if verify_silhouette:
                     _add_silhouette(app, image, result)
                 if consensus:

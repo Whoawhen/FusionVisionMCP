@@ -5,7 +5,10 @@ pin the execution -- `_vqa_cross_check` / `_spatial_measurement` -- against stub
 app objects and synthetic masks, so no model has to download to run them.
 """
 
+from typing import Any
+
 import numpy as np
+import pytest
 from PIL import Image
 
 from fusion_vision_mcp.analysis import _dispatch, _vqa_cross_check, ocr_pages
@@ -47,6 +50,7 @@ class _StubOcrSpecialist:
 class _StubApp:
     def __init__(self, counter, segmenter=None, florence2=None, ocr_text="") -> None:
         self.counter = counter
+        self.answerer = None
         self.segmenter = segmenter
         self.florence2 = florence2
         self.ocr_engine = _StubOcrSpecialist(ocr_text)
@@ -56,15 +60,78 @@ def _image() -> Image.Image:
     return Image.new("RGB", (20, 20))
 
 
+def _raw(count: int, boxes: list, scores: list, detector: str, candidates: list | None = None) -> dict:
+    raw = {
+        "count": count,
+        "bboxes": boxes,
+        "points": [[0, 0]] * len(boxes),
+        "labels": ["dog"] * len(boxes),
+        "scores": scores,
+        "detector": detector,
+    }
+    if candidates is not None:
+        raw["candidates_below"] = candidates
+    return raw
+
+
+def _count_objects_tool(app) -> Any:
+    from types import SimpleNamespace
+
+    from fusion_vision_mcp.tools import detection
+
+    tools: dict[str, Any] = {}
+
+    class _Mcp:
+        def tool(self, *a: Any, **k: Any) -> Any:
+            return lambda fn: tools.setdefault(fn.__name__, fn)
+
+    detection.register(_Mcp())  # type: ignore[arg-type]
+    ctx = SimpleNamespace(request_context=SimpleNamespace(lifespan_context=app))
+    return lambda src, name: tools["count_objects"](ctx, src, name, verify_silhouette=False)
+
+
 class TestVqaCrossCheckCount:
-    def test_count_route_returns_count_and_separable(self) -> None:
-        app = _StubApp(counter=_StubCounter({"count": 3, "bboxes": [[1, 1, 5, 5]], "scores": [0.9]}))
-        cross = _vqa_cross_check(app, _image(), "How many dogs are in this image?")
+    def test_count_route_returns_count_and_separable(self, monkeypatch) -> None:
+        from fusion_vision_mcp import analysis
+
+        raw = _raw(3, [[1, 1, 5, 5], [10, 10, 15, 15], [20, 20, 25, 25]], [0.9, 0.8, 0.7], "grounding_dino", [])
+        monkeypatch.setattr(analysis, "execute_detection", lambda *a, **k: [dict(raw, candidates_below=[])])
+        cross = _vqa_cross_check(_StubApp(counter=None), _image(), "How many dogs are in this image?")
         assert cross is not None
         assert cross["tool"] == "count_objects"
         assert cross["object"] == "dogs"
         assert cross["count"] == 3
         assert cross["separable"] == "yes"  # count > 1 -> yes
+
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            # A nested box (a part of the first) is dropped by both.
+            _raw(2, [[0, 0, 100, 100], [10, 10, 40, 40]], [0.9, 0.8], "grounding_dino", []),
+            _raw(2, [[0, 0, 10, 10], [50, 50, 60, 60]], [0.9, 0.8], "grounding_dino", []),
+            # Flat image: Florence-2, no scores, no candidates.
+            _raw(2, [[0, 0, 100, 100], [10, 10, 40, 40]], [], "florence2"),
+            _raw(0, [], [], "florence2"),
+        ],
+    )
+    def test_cross_check_count_equals_count_objects(self, monkeypatch, tmp_path, raw) -> None:
+        import copy
+
+        from fusion_vision_mcp import analysis
+        from fusion_vision_mcp.tools import detection
+
+        def fake(*a, **k):
+            return [copy.deepcopy(raw)]
+
+        monkeypatch.setattr(analysis, "execute_detection", fake)
+        monkeypatch.setattr(detection, "execute_detection", fake)
+        app = _StubApp(counter=None)
+        path = tmp_path / "dogs.png"
+        _image().save(path)
+        expected = _count_objects_tool(app)(str(path), "dog")
+        cross = _vqa_cross_check(app, _image(), "How many dogs are in this image?")
+        assert cross is not None and cross["count"] == expected[0]["count"]
+        assert cross["separable"] == analysis._separability(expected[0])
 
 
 class TestVqaCrossCheckOcr:
