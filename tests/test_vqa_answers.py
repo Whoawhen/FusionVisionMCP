@@ -111,3 +111,67 @@ def test_image_type_lines_name_clips_top_label() -> None:
     assert lines == [f"Image type: {CAPTION_IMAGE_TYPES[0]}.", f"Image type: {CAPTION_IMAGE_TYPES[-1]}."]
     # The prompts the gate measured: "a"/"an" + the label.
     assert clip.prompts[0] == "a photograph" and "an oil painting" in clip.prompts
+
+
+def test_memory_refusal_falls_back_to_moondream(ocr_calls: list[int]) -> None:
+    from fusion_vision_mcp.memory import ModelMemoryError
+
+    out = vqa_answers(
+        _app(_Answerer(fail=ModelMemoryError("no commit"))), [Image.new("RGB", (8, 8))], "What colour is the car?"
+    )
+    assert out == ["moondream:What colour is the car?"]
+
+
+def test_given_readings_replace_the_ocr_call(ocr_calls: list[int]) -> None:
+    ans = _Answerer()
+    vqa_answers(_app(ans), [Image.new("RGB", (8, 8))], "What does the sign say?", ocr_readings=[{"text": "STOP"}])
+    assert ocr_calls == []
+    assert ans.prompts == [lfm_vqa_prompt("What does the sign say?", "STOP")]
+
+
+def _query_image_tool(app: Any, monkeypatch: pytest.MonkeyPatch) -> Any:
+    from fusion_vision_mcp.tools import vqa
+
+    # The cross-check's own OCR (the full `ocr` reading) is a different path, not under test here.
+    monkeypatch.setattr(vqa, "_vqa_cross_check", lambda *a, **k: None)
+
+    tools: dict[str, Any] = {}
+
+    class _Mcp:
+        def tool(self, *a: Any, **k: Any) -> Any:
+            return lambda fn: tools.setdefault(fn.__name__, fn)
+
+    vqa.register(cast(Any, _Mcp()))
+    ctx = SimpleNamespace(request_context=SimpleNamespace(lifespan_context=app))
+    return lambda src, question, **kw: tools["query_image"](ctx, src, question, **kw)
+
+
+def _png(tmp_path: Any) -> str:
+    path = tmp_path / "x.png"
+    Image.new("RGB", (8, 8)).save(path)
+    return str(path)
+
+
+def test_consistency_shares_one_ocr_reading(
+    ocr_calls: list[int], tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ans = _Answerer()
+    query = _query_image_tool(_app(ans), monkeypatch)
+    question = "What does the sign say?"
+    query(_png(tmp_path), question, check_consistency=True, structured_analysis=False)
+    assert ocr_calls == [1]
+    reading = "OPEN\n 24 HOURS"
+    assert ans.prompts == [
+        lfm_vqa_prompt(question, reading),
+        lfm_vqa_prompt(f"Looking carefully at this image, answer precisely: {question}", reading),
+    ]
+
+
+def test_unrouted_question_makes_no_ocr_call_under_consistency(
+    ocr_calls: list[int], tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ans = _Answerer()
+    query = _query_image_tool(_app(ans), monkeypatch)
+    query(_png(tmp_path), "What colour is the car?", check_consistency=True, structured_analysis=False)
+    assert ocr_calls == []
+    assert ans.prompts[0] == "What colour is the car?"

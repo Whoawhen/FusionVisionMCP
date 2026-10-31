@@ -977,19 +977,37 @@ def lfm_vqa_prompt(question: str, ocr_text: str) -> str:
     )
 
 
-def vqa_answers(app: AppContext, images: Sequence[Image], question: str) -> list[str]:
+def text_question_readings(app: AppContext, images: Sequence[Image], *questions: str) -> list[dict[str, Any]] | None:
+    """The one `ocr` reading `vqa_answers` would run for any of `questions`, or None when none is routed to it (or no
+    answerer carries it). A failed read returns None so `vqa_answers` retries it inside its own fallback."""
+    if app.answerer is None or not any(_TEXT_QUESTION_RE.search(q) for q in questions):
+        return None
+    try:
+        return ocr_pages(app, images, sharpened=False, lfm_read=False)
+    except (OSError, ImportError, MemoryError):
+        return None
+
+
+def vqa_answers(
+    app: AppContext,
+    images: Sequence[Image],
+    question: str,
+    *,
+    ocr_readings: Sequence[dict[str, Any]] | None = None,
+) -> list[str]:
     """`query_image`'s answers: LFM2.5-VL-3B ONNX (`app.answerer`), a text question carrying the `ocr` reading; Moondream2
-    (`app.vqa`) without an answerer or when LFM cannot load."""
+    (`app.vqa`) without an answerer or when LFM cannot load or is refused for memory. `ocr_readings`, one per image,
+    stands in for the reading a text question would otherwise run."""
     if app.answerer is not None:
         try:
             if _TEXT_QUESTION_RE.search(question):
-                prompts = [
-                    lfm_vqa_prompt(question, p["text"]) for p in ocr_pages(app, images, sharpened=False, lfm_read=False)
-                ]
+                if ocr_readings is None:
+                    ocr_readings = ocr_pages(app, images, sharpened=False, lfm_read=False)
+                prompts = [lfm_vqa_prompt(question, p["text"]) for p in ocr_readings]
             else:
                 prompts = [question] * len(images)
             return app.answerer.answer(list(images), prompts)
-        except (OSError, ImportError) as exc:
+        except (OSError, ImportError, MemoryError) as exc:
             logger.warning(f"LFM2.5-VL ONNX unavailable ({exc}); answering with Moondream2")
     return app.vqa.query(list(images), question)
 

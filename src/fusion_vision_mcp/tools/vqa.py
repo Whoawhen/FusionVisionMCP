@@ -13,6 +13,7 @@ from fusion_vision_mcp.analysis import (
     _vqa_cross_check,
     classify_pages,
     clean_labels,
+    text_question_readings,
     vqa_answers,
 )
 from fusion_vision_mcp.forensics import analyze_metadata_anomalies
@@ -116,7 +117,10 @@ def register(mcp: MCPServer) -> None:
         """
         app = ctx.request_context.lifespan_context
         with get_images(src) as images:
-            answers = vqa_answers(app, images, question)
+            # With check_consistency the control question asks the same thing, so both calls share one reading.
+            control_question = f"Looking carefully at this image, answer precisely: {question}"
+            readings = text_question_readings(app, images, question, *([control_question] if check_consistency else []))
+            answers = vqa_answers(app, images, question, ocr_readings=readings)
 
             if structured_analysis:
                 results = []
@@ -171,8 +175,7 @@ def register(mcp: MCPServer) -> None:
 
             # A rephrasing a genuinely-looking model answers with the same substance,
             # but a model defaulting to a flat answer returns the same short default to.
-            control_question = f"Looking carefully at this image, answer precisely: {question}"
-            control_answers = vqa_answers(app, images, control_question)
+            control_answers = vqa_answers(app, images, control_question, ocr_readings=readings)
 
             results = []
             for image, answer, control_answer in zip(images, answers, control_answers, strict=True):
