@@ -410,8 +410,16 @@ counted; rounds 13, 26b and 28 absent; the 18 literal-name fixtures), so **nothi
   are unchanged (positives exact not fewer). Most counted exact wins; ties go to L3, then L2, then L1.
 - **If none is eligible, the flat count is closed with these models**, and the counting plan with it unless the user
   names another target.
-
----
+- **Result (2026-10-31): no variant is eligible; every one fails rule 4 only.** 703 counted, 303 absent, 0 unparsed
+  replies, LFM median 3.7 s. Pooled counted exact: base 49.5%, `L3` 58.5 (+9.0, CI 6.0 to 12.1), `L2` 60.0 (+10.5, CI
+  7.7 to 13.4), **`L1` 68.7 (+19.2, CI 14.9 to 23.6)**; truth 1 base 75.1 vs 73.9 / 89.4 / 76.8; absent 87.8% in all (the
+  veto decides it). `L1` by band: 2-5 27.1 -> 66.8%, 6+ 0 -> 23.5%; round 28 34.8 -> 66.5% (every kind up, e.g. charts
+  21.7 -> 56.5, game UI 20.5 -> 43.6), round 26b 40.0 -> 71.4, round 13 64.7 -> 69.0, phase 11 flat 68.0 -> 65.0.
+  **The controls fail the way the spotted ball always has:** LFM counts `neg_spotted_ball` as 23 balls and
+  `neg_multicolour_logo` as 4 shapes (`L1`, `L3`), and says 9 for the two 8-disc rings and 5 for the clipped row of 4
+  (positives 8 -> 6 under `L1`, 5 under `L2`, 9 under `L3`). Unlike Phase 8's "petal" failure, these are real
+  miscounts under the literal names, not a naming artefact. By the rule fixed beforehand nothing goes to round 29, and
+  the flat count is closed with these models. A guarded `L1` designed now would be fitted to these 18 fixtures.
 
 ## 1. Scoreboard Context, Goal & Hard Constraints
 
