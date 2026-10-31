@@ -396,6 +396,21 @@ the worker (round 28 flat). Controls and fixture positives must hold on the flat
   detector problem the presence check cannot touch; anything aimed at it needs its own screen on seen data first (round
   28 is now seen).
 
+### 0.18 Phase 12 (2026-10-31): screen LFM2.5-VL's own count on the flat path
+
+The user chose to try the flat gap once, cheaply, before closing counting. LFM2.5-VL's `COUNT_CHECK_COUNT` answer backs
+`estimates.vqa` and the photo zero rescue but has never been tried as the flat count. VisionBench
+`count_flat_lfm_count.py`, rules fixed before any new LFM count answer existed (191 cached by Phase 8, only where the
+nested drop changed the count, plus 3 smoke-test calls). All sets are seen (phase 11 flat, rounds 13, 26b and 28
+counted; rounds 13, 26b and 28 absent; the 18 literal-name fixtures), so **nothing ships from it**.
+- Variants, each followed by `F3` as shipped: `base` (Florence-2), `L1` LFM's count always, `L2` only when Florence-2
+  says 2+, `L3` only when they differ by 2+.
+- **A variant goes to round 29 if** (paired bootstrap, seed 20261031): pooled counted exact gains with a 95% interval
+  above 0; truth-1 exact loses at most 2 points; absent answered 0 loses at most 2 points; the literal-name controls
+  are unchanged (positives exact not fewer). Most counted exact wins; ties go to L3, then L2, then L1.
+- **If none is eligible, the flat count is closed with these models**, and the counting plan with it unless the user
+  names another target.
+
 ---
 
 ## 1. Scoreboard Context, Goal & Hard Constraints
