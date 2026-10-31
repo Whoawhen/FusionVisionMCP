@@ -183,7 +183,9 @@ def _associate(part_boxes: list[list[float]], person_boxes: list[list[float]]) -
     return tallies, unassociated
 
 
-def _check_anatomy(app: AppContext, image: Image.Image) -> tuple[list[Observation], list[Anomaly]]:
+def _check_anatomy(
+    app: AppContext, image: Image.Image, detected: dict[str, dict[str, Any]] | None = None
+) -> tuple[list[Observation], list[Anomaly]]:
     """Count body parts against the person each one belongs to, and note anyone carrying too many.
 
     **Since 2026-10-06 this raises no anomalies; an over-count is an observation only.** Measured on
@@ -240,10 +242,14 @@ def _check_anatomy(app: AppContext, image: Image.Image) -> tuple[list[Observatio
 
     The containment and dedup constants below were swept against the per-part behaviour, so
     switching would invalidate that tuning as well as the tallies. Measured 2026-09-16.
+
+    `detected`, when given, is filled with each part's raw detection so `_check_defect_probe` can reuse the `hand` one.
     """
     detections = {}
     for part in _PARTS:
         result = app.counter.detect_objects([image], part, adaptive_threshold=True)[0]
+        if detected is not None:
+            detected[part] = result
         detections[part] = (
             [[float(v) for v in box] for box in result.get("bboxes", [])],
             [float(s) for s in result.get("scores", [])],
@@ -339,17 +345,25 @@ def _probe_features(app: AppContext, probe: dict[str, Any], crops: list[Image.Im
     raise ValueError(f"defect probe names an unknown backbone: {backbone!r}")
 
 
-def _check_defect_probe(app: AppContext, image: Image.Image) -> tuple[list[Observation], list[Anomaly]]:
+def _check_defect_probe(
+    app: AppContext, image: Image.Image, detected: dict[str, dict[str, Any]] | None = None
+) -> tuple[list[Observation], list[Anomaly]]:
     """Score every detected hand and face crop with the learned defect probe (see `defect_probe`).
 
     Unlike the part count, this reads the crop itself, so it can see a fused, melted or
     misshapen hand. It is a learned score, not a measurement: `corroborated` stays False, and the
     evidence carries every crop's score so a caller can see how close the call was.
+
+    A part already in `detected` (the `hand` detection `_check_anatomy` made with the same arguments) is not
+    detected again.
     """
     probe = defect_probe.load_probe()
     crops: list[tuple[str, list[float], Image.Image]] = []
     for part in probe["parts"]:
-        for box in app.counter.detect_objects([image], part, adaptive_threshold=True)[0].get("bboxes", []):
+        result = (detected or {}).get(part)
+        if result is None:
+            result = app.counter.detect_objects([image], part, adaptive_threshold=True)[0]
+        for box in result.get("bboxes", []):
             region = defect_probe.padded_box(box, image.width, image.height, probe["crop_pad_px"])
             crops.append((part, [round(float(v)) for v in box], image.crop(region)))
     if not crops:
@@ -396,8 +410,9 @@ def analyze_inspection(
     app: AppContext, image: Image.Image, vqa_answers: list[str]
 ) -> tuple[list[Observation], list[Anomaly]]:
     """Perform a structured visual inspection for anomalies (like AI artifacts)."""
-    observations, anomalies = _check_anatomy(app, image)
-    probe_observations, probe_anomalies = _check_defect_probe(app, image)
+    detected: dict[str, dict[str, Any]] = {}
+    observations, anomalies = _check_anatomy(app, image, detected)
+    probe_observations, probe_anomalies = _check_defect_probe(app, image, detected)
     observations += probe_observations
     anomalies += probe_anomalies
 

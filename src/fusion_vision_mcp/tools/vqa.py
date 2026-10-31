@@ -110,9 +110,12 @@ def register(mcp: MCPServer) -> None:
         contact/containment question, `count_objects` for "how many", `ocr` for a
         text-reading question, `detect_objects` for "which is largest/smallest")
         and attaches it as `cross_check`. The "largest/smallest" case detects every
-        instance of the named object and picks the extremum by bounding-box area,
-        returning its box -- so "which circle is biggest" resolves to coordinates,
-        not a repeated guess. The cross-check is omitted when no measurement
+        instance of the named object (as `detect_objects` does, SAM 3 on photos)
+        and picks the extremum by bounding-box area, returning its box -- so
+        "which circle is biggest" resolves to coordinates, not a repeated guess.
+        The `count_objects` route counts as `count_objects` does at its defaults
+        (nested boxes dropped, the LFM2.5-VL presence check), so its count matches
+        that tool's. The cross-check is omitted when no measurement
         applies or the names can't be parsed -- it never guesses.
         """
         app = ctx.request_context.lifespan_context

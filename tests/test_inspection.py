@@ -337,3 +337,39 @@ def test_probe_features_follow_the_probe_files_backbone():
 def test_padded_box_clips_to_the_image():
     assert defect_probe.padded_box([5.0, 5.0, 390.0, 290.0], 400, 300, 20) == (0, 0, 400, 300)
     assert defect_probe.padded_box([100.0, 100.0, 150.0, 150.0], 400, 300, 20) == (80, 80, 170, 170)
+
+
+class _RecordingDetector(_StubDetector):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.parts: list[str] = []
+
+    def detect_objects(self, images: list, object_name: str, **kwargs) -> list[dict]:
+        self.parts.append(object_name)
+        return super().detect_objects(images, object_name, **kwargs)
+
+
+def test_structured_analysis_detects_hand_once_and_changes_nothing_else():
+    from fusion_vision_mcp.inspection import _check_anatomy, _check_defect_probe
+
+    boxes = {
+        "person": [PERSON],
+        "arm": _inside(2),
+        "hand": _inside(3),
+        "face": [[10.0, 10.0, 40.0, 40.0]],
+        "finger": _outside(2),
+    }
+    detector = _RecordingDetector(boxes)
+    obs, anomalies = analyze_inspection(_StubApp(detector), _image(), ["A person."])
+    # Seven passes: the six anatomy parts, then only `face` for the probe.
+    assert detector.parts == ["person", "arm", "leg", "hand", "head", "finger", "face"]
+
+    # The unshared path (what `analyze_inspection` did before): each check detects for itself, eight passes.
+    old_detector = _RecordingDetector(boxes)
+    old_app = _StubApp(old_detector)
+    old_obs, old_anomalies = _check_anatomy(old_app, _image())
+    probe_obs, probe_anomalies = _check_defect_probe(old_app, _image())
+    assert old_detector.parts.count("hand") == 2 and len(old_detector.parts) == 8
+    old_obs = old_obs + probe_obs + [o for o in obs if o.source == "vqa"]
+    assert [o.as_dict() for o in obs] == [o.as_dict() for o in old_obs]
+    assert [a.as_dict() for a in anomalies] == [a.as_dict() for a in old_anomalies + probe_anomalies]

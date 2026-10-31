@@ -345,6 +345,26 @@ call, but documents dipped on both sets (tune 72.5 -> 67.5%, confirm 79.3 -> 77.
 first, sampled tune run failed its loop guard (13 -> 15 looping captions); the greedy re-test's paired sign test
 did not (p = 0.12, then 0.25).
 
+## `query_image` Track 1 fixes (2026-10-31)
+
+Five bug fixes from `Future_Ideas/Query_Image_Improvement_Plan.md`, checked by unit tests rather than a benchmark gate;
+no default prompt and no healthy `query_image(src, question)` answer changed.
+
+- `vqa_answers` falls back to Moondream2 on `MemoryError` (a refused load) as well as `OSError`/`ImportError`.
+- With `check_consistency=true` the answer and the control question share one `ocr` reading
+  (`analysis.text_question_readings`, `ocr_readings=`); the prompts are byte-identical. `_vqa_cross_check`'s own `ocr`
+  stays the full reading, as a second opinion.
+- `question.py` count nouns: fillers match whole words (`" in"` no longer cuts "inside", `" do"` no longer cuts "dogs"),
+  finite verbs end the noun ("vases stand on" -> "vases"), and a leading "image"/"photo" stays when a noun follows
+  ("image panels").
+- The cross-check's count now runs `analysis.count_image`, the same steps as `count_objects` at its defaults
+  (`finish_count`: nested boxes, `possibly_more`, `crowd_range`, the LFM presence check), where it was raw Grounding DINO at
+  0.15. Its size route detects as `detect_objects` does (SAM 3 on photos). `tests/test_server.py` pins the extreme circle on
+  `tests/size_three_circles.png`. VisionBench's `count_lfm_parity.py` and `count_flat_lfm_parity.py` call `lfm_count_check`,
+  `lfm_flat_check` and `drop_nested` directly, so they do not exercise `finish_count`.
+- `structured_analysis` reuses `_check_anatomy`'s `hand` detection in the defect probe: 7 Grounding DINO passes, not 8, same
+  observations and anomalies (`tests/test_inspection.py`).
+
 ## `classify_image` is CLIP zero-shot over the caller's labels (2026-10-16)
 
 `classify_image(src, labels)` puts each label in `CLASSIFY_TEMPLATE` ("a photo of {}") and ranks them with
