@@ -226,6 +226,24 @@ h. **Track 4's tiling has no server path.** `processor_for("tiles4")` belongs to
   accuracy 84.4% (+4.2), error ratio 3.23x; the shipped rule on the same pairs 36.0 / 66.0 / 44.0 / +2.5 / 1.40x. Weak
   spot: on `no_object` the rule's flags carry no signal (ratio 0.84x). Next: the user's go, then the server change
   (both), parity 8 of 8, unit tests, tool description and CLAUDE.md.
+- **Shipped 2026-11-02** (364f933): both, with parity 1,834 of 1,834 prompts and agreement decisions and 8 of 8 live
+  answers (VisionBench `vqa_v5_parity.py`). Pre-V5 code frozen in VisionBench `vqa_shipped_20261024.py`.
+- **Track 6 done 2026-11-02** (VisionBench 448afc8): of 3,982 cached answers the three grader fixes flipped 32; the
+  user's blind review applied single-letter (2 of 2) and adjective forms (3 of 3); "not"/"cannot" refusals failed
+  (22 of 26: "cannot identify the car" accepts the car).
+- **Track 8 (new, 2026-11-02): presence check before an unrouted Wh question.** The largest gap left: round 29's
+  unrouted What/Which/Who/Where `no_object` questions, 30 of 68 right. V2A's suffix fixed those and broke real
+  objects, so here it (or a fixed "none" reply) applies only when LFM first says the thing asked about is not in the
+  image. Gate V6 screen on the three seen sets (VisionBench `benchmarks/vqa_gate_v6.py`, rules in its docstring:
+  changed `no_object` +8.0, other changed questions -1.0 at most, each set -0.3, no type -3.0); a pass goes to a
+  fresh round 30 (Gate V7). ~1,500 short check calls + up to 300 answers, ~1.5 h CPU.
+- **Gate V6 ran 2026-11-02: `A_suffix` picked** (VisionBench f3ad8ff, `results/vqa_gate_v6.json`; 0 errors). Check A
+  ("Is the thing this question asks about in the image? ... Answer yes or no.") said no to 94.8% of the 116 changed
+  premise questions and 4.3% of the 633 others. Changed `no_object` 63 -> 105 of 115 (+36.5), other changed questions
+  542 -> 540 (-0.3), pooled 83.3 -> 84.65% (+1.36, CI 0.93 to 1.83): round 23 +1.4, phase 11 0.0, round 29 +3.1;
+  worst type colour -1.7 (round 23). `B_suffix` tied (+1.40) and lost the tie to A by order. Both fixed-reply arms
+  failed (other changed -2.7 / -1.4, colour -5.9 / -5.1): when the check is wrong the suffix still lets the model
+  answer. Adds ~3.9 s to every unrouted Wh question. Seen sets only; next is round 30 (fresh images) and Gate V7.
 
 ### R.5 Kept from the plan
 
