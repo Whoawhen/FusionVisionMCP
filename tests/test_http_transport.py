@@ -71,7 +71,8 @@ async def _call(url: str, tool: str, arguments: dict[str, object]) -> str:
 
 @pytest.mark.anyio
 async def test_two_clients_share_one_loaded_model(http_server: str) -> None:
-    text = await _call(http_server, "ocr", {"src": FIXTURE})
+    # lfm_read=False: LFM's ~8 GB load can make the memory manager release the idle PP-OCRv6 this test looks for.
+    text = await _call(http_server, "ocr", {"src": FIXTURE, "lfm_read": False})
     assert "Attendee" in text
 
     # A second, separate session sees the model the first one loaded: one process, one copy.

@@ -1,8 +1,9 @@
 # `query_image` Frontier-Grade Improvement Plan
 
 **Status:** Drafted 2026-10-30. **Reviewed 2026-10-30: the Review section below supersedes the rest where they
-disagree.** R.4 steps 1-3 done (see "Progress" below the review); step 4's control answers are cached. Next: Track 5
-rule design (R.4 step 4), then round 29.
+disagree.** R.4 steps 1-4 done (see "Progress" below the review). Round 29 briefed 2026-11-01 (VisionBench
+`worker_handoff/ROUND29_PLAN.md`, `ROUND29B_PLAN.md`; Gate V5 rules in `benchmarks/vqa_gate_v5.py`). **Gate V5 ran
+2026-11-02: the routing and the Track 5 rule both pass** (Progress, step 6). Next: the user's go to ship them.
 **Target tool:** `query_image` (`src/fusion_vision_mcp/tools/vqa.py:29–191`) and its supporting pipeline in `src/fusion_vision_mcp/analysis.py`, `src/fusion_vision_mcp/constants.py`, `src/fusion_vision_mcp/question.py`, and `src/fusion_vision_mcp/inspection.py`.
 **Current scoreboard standing (`Future_Ideas/frontier_capability_gaps.md` row 100):**
 - **VisionBench Phase 11 screen (`benchmarks/results/vqa_premise.json`, 1,200 questions across 400 generalist images):** **82.4%** (`ocr_text` arm, `989/1200`) vs. Moondream2 **78.8%** (`+3.6 pts`), median `4.62 s` (excluding `~1.8 s` OCR on routed questions).
@@ -189,8 +190,9 @@ h. **Track 4's tiling has no server path.** `processor_for("tiles4")` belongs to
 
 ### Progress (2026-10-31)
 
-- **Step 1, Track 1: done.** Commits `6b46119..63bbf7f`, pushed. Open: noun-like verbs in `_COUNT_FILLER` (cross,
-  form, border, rest, lead, touch, hold, make, lie) cut compounds ("red cross symbols" -> "red").
+- **Step 1, Track 1: done.** Commits `6b46119..63bbf7f`, pushed. The noun-like verbs (cross, form, border, rest, lead,
+  touch, hold, make, lie) that cut compounds ("red cross symbols" -> "red") were fixed 2026-11-01: `_COUNT_VERBS` end
+  the noun only before a preposition, article or quantifier (`_AFTER_VERB`) or the question's end.
 - **Control answers cached** for step 4: VisionBench `benchmarks/vqa_control_cache.py`, 892 rows in
   `results/vqa_round23_control_rows.jsonl`.
 - **Step 2, Gate V1: done** (VisionBench `benchmarks/vqa_gate_v1.py`, `results/vqa_gate_v1.json`; seen sets). All
@@ -203,6 +205,27 @@ h. **Track 4's tiling has no server path.** `processor_for("tiles4")` belongs to
   `object` -6.3 on round 23, and -5.5 on phase 11. `wh_premise` also failed phase 11 overall (-0.8; limit -0.5).
   Pooled: -0.24 (CI -0.91 to 0.38) and +0.19 (CI -0.38 to 0.81). The suffix catches false premises, but it makes
   the model doubt objects that are there. **V5 tests `route_item_suffix_verbatim` alone.**
+- **Step 4, Track 5 rule: designed and fixed** (VisionBench `benchmarks/vqa_consistency_rule.py`, `300dfc2`;
+  `results/vqa_consistency_rule.json`; round 23 seen, no model run). The shipped `_vqa_consistency` carries almost no
+  signal on LFM: it flags 42.2%, stays quiet on 58.9% of right answers, error ratio 1.16x. The control answers in a
+  word or two, so exact match and containment fail, and "agreed defaults" are LFM's most accurate answers. The new
+  rule compares by question kind: polarity, number, absent vs present, else half of the shorter answer's content
+  words in the longer. Round 23: flagged 11.8%, quiet on right 93.9%, catches wrong 32.3%, unflagged accuracy +5.0,
+  error ratio 3.57x (image halves 3.20x / 4.05x). Ceiling: when the primary is wrong, the control is right only 28 of
+  192 times. **Gate V5's Track 5 bars** (round 29, once): quiet on right >= 90%, catches wrong >= 25%, error ratio
+  >= 2.5x, unflagged accuracy >= overall + 3.0. The server change waits on that.
+- **Step 5, round 29: built and checked** (2026-11-01). Slice a: Gemini 3.8 Flash, 191 images; slice b: Gemini 4
+  Argon, 39 images (round 24's kept images; VisionBench `benchmarks/mixed_round24/round29_slices.json`). The user's
+  check (`round29_check_serve.py`, 40 cards, 10 from slice b): premise 19 of 20 false, ordinary 18 of 20 right; the
+  3 questions marked b dropped, 917 left.
+- **Step 6, Gate V5: both pass** (VisionBench `benchmarks/vqa_gate_v5.py`, `results/vqa_gate_v5.json`, 2,537 live
+  answers, 0 errors). **Routing:** `route_item_suffix_verbatim` 80.2 vs shipped 76.8% (+3.4, CI 1.6 to 5.1; 50 gained,
+  19 lost); premise 59.4 -> 71.2% (`no_object` 46.1 -> 60.9, `no_text` 72.8 -> 81.6); text +2.5; worst type
+  position -2.2 (n 46); slice a +3.7, slice b +1.9; routed 30.4 -> 43.2%; median 6.1 -> 6.4 s per answer, OCR
+  included. **Track 5** (candidate's pairs): flagged 12.1%, quiet on right 92.5%, catches wrong 30.8%, unflagged
+  accuracy 84.4% (+4.2), error ratio 3.23x; the shipped rule on the same pairs 36.0 / 66.0 / 44.0 / +2.5 / 1.40x. Weak
+  spot: on `no_object` the rule's flags carry no signal (ratio 0.84x). Next: the user's go, then the server change
+  (both), parity 8 of 8, unit tests, tool description and CLAUDE.md.
 
 ### R.5 Kept from the plan
 

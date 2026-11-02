@@ -194,7 +194,10 @@ _COUNT_FILLER = (
     "shown",
     "displayed",
     "present",
-    # Finite verbs: "matching pink vases stand on the mantelpiece".
+)
+# Finite verbs: "matching pink vases stand on the mantelpiece". Many are nouns too ("red cross symbols", "stand
+# mixers"), so one ends the noun only before a word that follows a verb (_AFTER_VERB) or the end of the question.
+_COUNT_VERBS = (
     "stand",
     "stands",
     "appear",
@@ -236,7 +239,15 @@ _COUNT_FILLER = (
     "border",
     "borders",
 )
-_COUNT_FILLER_RE: re.Pattern[str] = re.compile(r"\s(?:" + "|".join(_COUNT_FILLER) + r")\b")
+_AFTER_VERB = (
+    "the|a|an|this|that|these|those|its|their|his|her|each|one|another|other|"
+    "on|in|at|near|over|under|above|below|beside|behind|around|along|across|against|inside|outside|"
+    "through|between|into|onto|up|down|out|off|together|next|by|from|to|within|beneath|underneath|atop"
+)
+_COUNT_FILLER_RE: re.Pattern[str] = re.compile(
+    r"\s(?:" + "|".join(_COUNT_FILLER) + r")\b"
+    r"|\s(?:" + "|".join(_COUNT_VERBS) + r")(?=\s+(?:" + _AFTER_VERB + r")\b|\s*[?.!,;:]|\s*$)"
+)
 # Stopwords that name the picture rather than its contents; "image panels" is a noun phrase, "image" alone is not.
 _PICTURE_WORDS = frozenset({"image", "picture", "photo", "photograph"})
 

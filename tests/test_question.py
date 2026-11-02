@@ -73,6 +73,15 @@ class TestCountNouns:
             ("How many standing figures are there?", ["standing figures"]),
             ("How many inside doors are visible?", ["inside doors"]),
             ("How many red dogs are in this image?", ["red dogs"]),
+            # Verbs that are also nouns end the noun only where a verb would.
+            ("How many red cross symbols are on the flag?", ["red cross symbols"]),
+            ("How many stand mixers are on the counter?", ["stand mixers"]),
+            ("How many rest stops are listed on the sign?", ["rest stops"]),
+            ("How many lines cross the river?", ["lines"]),
+            ("How many stones form a circle?", ["stones"]),
+            ("How many hedges border the garden?", ["hedges"]),
+            ("How many pencils lie together?", ["pencils"]),
+            ("How many people sit?", ["people"]),
         ],
     )
     def test_names(self, question: str, names: list[str]) -> None:
