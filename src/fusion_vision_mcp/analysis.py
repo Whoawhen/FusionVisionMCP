@@ -45,7 +45,9 @@ from fusion_vision_mcp.constants import (
     OCR_SHARPEN_MIN_CHARS,
     OCR_SHARPEN_PERCENT,
     OCR_SHARPEN_RADIUS,
+    VQA_AGREE_COVER,
     VQA_COUNT_QUESTION,
+    VQA_OCR_PREFIX,
     VQA_OCR_WORDS,
     VQA_TEXT_QUESTION,
     VQA_TEXT_SUFFIX,
@@ -178,66 +180,103 @@ def _separability(result: dict[str, Any]) -> str:
     return "unknown"
 
 
-# Short answers Moondream2 emits as a flat default regardless of the image -- the
-# documented failure mode where it answers "None" to "describe anything wrong" on
-# images that all had real visible defects. Seeing one of these agreed upon by two
-# differently-phrased questions is the signature of a default, not an observation.
-_DEFAULT_ANSWERS: Final[frozenset[str]] = frozenset(
-    {"none", "nothing", "yes", "no", "n/a", "na", "i don't know", "unknown", "not sure", ""}
+# `_vqa_consistency`'s agreement rule (since 2026-11-02; VisionBench `vqa_consistency_rule.agree`, fitted on round 23's
+# LFM control answers and confirmed once on round 29, Gate V5). The old rule (exact match or containment, and "both
+# answers a default token" as low) flagged 36% of LFM's answers with almost no signal: the control replies in a word
+# or two, and agreed defaults ("Yes" / "Yes", "None" / "None") are LFM's most accurate answers.
+_JUDGMENT_Q: Final = re.compile(
+    r"\b(?:anything|something)\s+(?:wrong|off|unusual)\b|\bwhat\s+is\s+wrong\b|"
+    r"\bany\s+(?:defects?|errors?|anomal\w*|artifacts?|problems?|issues?|mistakes?)\b",
+    re.IGNORECASE,
 )
+_POLAR_Q: Final = re.compile(
+    r"^\s*(?:is|are|was|were|do|does|did|has|have|had|can|could|will|would|should)\b", re.IGNORECASE
+)
+_HOW_MANY_Q: Final = re.compile(r"^\s*how\s+many\b", re.IGNORECASE)
+_ABSENT: Final = re.compile(
+    r"\b(?:none|nothing|no\s+(?:visible\s+)?(?:text|\w+\s+)?(?:is|are)\s+(?:visible|shown|present)|"
+    r"there\s+(?:is|are)\s+no|i\s+(?:do\s+not|don't|cannot|can't)\s+see|not\s+(?:visible|present|shown|depicted|mentioned|"
+    r"present|apparent|readable|legible)|(?:does|do)\s*n[o']t\s+(?:appear|show|contain|depict|include)|no\s+such|"
+    r"cannot\s+be\s+(?:seen|determined|read)|isn't\s+any|aren't\s+any|no\s+\w+\s+(?:in|on)\s+(?:the|this)\s+image)\b",
+    re.IGNORECASE,
+)
+_NUMBER_WORDS: Final = {
+    w: i
+    for i, w in enumerate(
+        ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]
+    )
+}
+_AGREE_STOP: Final = frozenset(
+    ["a", "an", "the", "is", "are", "was", "were", "of", "in", "on", "to", "and", "it", "this", "image", "picture",
+     "photo", "there", "that", "with", "at", "its", "be", "by", "as", "for", "from", "shown", "visible", "appears",
+     "appear", "seems", "can", "see"]
+)  # fmt: skip
 
 
-def _vqa_consistency(answer: str, control_answer: str) -> dict[str, Any]:
-    """Compares an answer to its control-question answer and flags unreliable responses.
+def _content_words(text: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z0-9]+", text.lower()) if w not in _AGREE_STOP}
 
-    `consistent` is true when the two answers agree -- exact (case/punctuation-stripped)
-    match for short answers, or one containing the other for longer ones.
 
-    `confidence` is `"low"` in two failure modes:
+def _polarity(text: str) -> str | None:
+    """ "yes" or "no" when exactly one of them is in the first three words."""
+    head = re.findall(r"[a-z]+", text.lower())[:3]
+    yes, no = "yes" in head, "no" in head
+    return "yes" if yes and not no else "no" if no and not yes else None
 
-    1. *Agreed flat default* -- both answers reduce to a known default token ("none",
-       "yes", "nothing", ...) and they agree: the model produced the same short answer
-       to two differently-phrased questions without looking at the image. This is the
-       documented signature from the six-image probe where Moondream answered "None"
-       to "describe anything wrong" on images with real visible defects.
 
-    2. *Self-contradiction* -- the two answers substantively disagree. One says
-       something's wrong, the other says nothing's wrong, or they give opposite
-       factual claims about the same image. A model contradicting itself across two
-       rephrased questions is weaker evidence than either answer taken alone.
-       (The documented "pette" probe: one answer said "missing a centerpiece" and the
-       control said "Nothing is wrong" -- both substantive, both contradicting.)
+def _answer_number(text: str) -> int | None:
+    for w in re.findall(r"[a-z]+|\d+", text.lower()):
+        if w.isdigit():
+            return int(w)
+        if w in _NUMBER_WORDS:
+            return _NUMBER_WORDS[w]
+    return None
 
-    ``"normal"`` only when the answers are substantive AND not flat defaults AND
-    they agree: real observations the consistency layer can confirm.
+
+def _answers_agree(question: str, answer: str, control: str) -> bool:
+    """Whether two answers to the same question agree, compared by the question's kind; the first rule that applies
+    decides. An open-ended judgment question both answer with "none" is Moondream2's flat-default trap and counts as
+    disagreement."""
+    absent_a, absent_c = bool(_ABSENT.search(answer)), bool(_ABSENT.search(control))
+    if _JUDGMENT_Q.search(question) and absent_a and absent_c:
+        return False
+    if _POLAR_Q.search(question):
+        pa, pc = _polarity(answer), _polarity(control)
+        if pa and pc:
+            return pa == pc
+    if _HOW_MANY_Q.search(question):
+        na, nc = _answer_number(answer), _answer_number(control)
+        if (absent_a and nc in (None, 0)) or (absent_c and na in (None, 0)):
+            na, nc = na or 0, nc or 0
+        if na is not None and nc is not None:
+            return na == nc
+    if absent_a != absent_c:
+        return False
+    if absent_a:
+        return True
+    wa, wc = _content_words(answer), _content_words(control)
+    short, long_ = (wa, wc) if len(wa) <= len(wc) else (wc, wa)
+    if not short:
+        return True
+    return len(short & long_) / len(short) >= VQA_AGREE_COVER
+
+
+def _vqa_consistency(answer: str, control_answer: str, question: str = "") -> dict[str, Any]:
+    """Compares an answer to its control-question answer; `confidence` is `"low"` when they disagree.
+
+    Agreement is judged by the question's kind (`_answers_agree`): a yes/no question by the answers' polarity, a
+    "how many" by their numbers, one answer saying the thing is absent and the other not as disagreement, otherwise
+    by shared content words (VQA_AGREE_COVER). On round 29 (Gate V5) it flagged 12.1% of answers, stayed quiet on
+    92.5% of right ones and caught 30.8% of wrong ones; a flagged answer was wrong 3.2x as often as an unflagged one.
+    On a question about an object that is not there its flag carried no signal (0.84x).
     """
-    a = _normalize_answer(answer)
-    c = _normalize_answer(control_answer)
-
-    if a and c:
-        consistent = a == c or a in c or c in a
-    else:
-        consistent = a == c
-
-    both_default = a in _DEFAULT_ANSWERS and c in _DEFAULT_ANSWERS
-
-    # "normal" only when the answers are substantive AND they agree.
-    # Everything else is signal for a caller to distrust:
-    #   - agreed flat defaults (both_default and consistent)  →  model is not looking
-    #   - disagreement  (not consistent)                      →  model is contradicting itself
-    confidence = "normal" if (consistent and not both_default) else "low"
-
+    consistent = _answers_agree(question, answer, control_answer)
     return {
         "answer": answer,
         "control_answer": control_answer,
         "consistent": consistent,
-        "confidence": confidence,
+        "confidence": "normal" if consistent else "low",
     }
-
-
-def _normalize_answer(text: str) -> str:
-    """Lowercases, strips punctuation/whitespace, for default-token comparison."""
-    return text.strip().lower().rstrip(".?!,;:")
 
 
 def _first_int(text: str) -> int | None:
@@ -1026,14 +1065,12 @@ _TEXT_QUESTION_RE: Final = re.compile(VQA_TEXT_QUESTION, re.IGNORECASE)
 
 def lfm_vqa_prompt(question: str, ocr_text: str) -> str:
     """The prompt LFM gets for a text question: the `ocr` reading in front, VQA_TEXT_SUFFIX after (VisionBench
-    `vqa_premise.ocr_prompt`, which the gate measured, byte for byte)."""
+    `vqa_gate_v1.ocr_prompt` with VERBATIM_PREFIX / VERBATIM_SUFFIX, which Gate V5 measured, byte for byte)."""
     words = " / ".join(line.strip() for line in ocr_text.splitlines() if line.strip()).split()
     if not words:
         return "An OCR pass found no readable text in this image.\n" + question + VQA_TEXT_SUFFIX
     quoted = " ".join(words[:VQA_OCR_WORDS])
-    return (
-        f'Text read from the image by OCR (it may be incomplete or misread): "{quoted}"\n' + question + VQA_TEXT_SUFFIX
-    )
+    return f'{VQA_OCR_PREFIX}"{quoted}"\n' + question + VQA_TEXT_SUFFIX
 
 
 def text_question_readings(app: AppContext, images: Sequence[Image], *questions: str) -> list[dict[str, Any]] | None:

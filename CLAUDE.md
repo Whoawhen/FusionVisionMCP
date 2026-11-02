@@ -312,7 +312,7 @@ load falls back to Moondream2) sends the question verbatim, except that a questi
 `query` uses the same path. **Moondream2 stays loaded for** `critique_composition`'s busy-background and subject-naming
 questions; each needs its own gate before Moondream2 (~7.5 GB fp32, its remote-code pin, `pyvips`) can go.
 `count_objects`' `estimates.vqa` moved to LFM on 2026-10-29 (`analysis.vqa_count_estimate`, `COUNT_CHECK_COUNT`; VisionBench
-`count_gate_vqa_estimate.py`, non-inferiority: 64.1 -> 65.4% exact on 457 seen counts, CI -2.6 to 5.3). `check_consistency`'s control question now goes to LFM too: same mechanism, not re-measured.
+`count_gate_vqa_estimate.py`, non-inferiority: 64.1 -> 65.4% exact on 457 seen counts, CI -2.6 to 5.3). `check_consistency`'s control question now goes to LFM too; its rule was re-fitted and measured on 2026-11-02 (below).
 
 **2026-10-24: the default caption starts with `Image type: <x>.`** (`image_type`, default on; `analysis.image_type_lines`,
 CLIP ViT-L/14 over `CAPTION_IMAGE_TYPES`, prompts "a/an <type>", ~0.35 s). 106 of the default's 291 misses on the 280
@@ -356,7 +356,8 @@ no default prompt and no healthy `query_image(src, question)` answer changed.
   stays the full reading, as a second opinion.
 - `question.py` count nouns: fillers match whole words (`" in"` no longer cuts "inside", `" do"` no longer cuts "dogs"),
   finite verbs end the noun ("vases stand on" -> "vases"), and a leading "image"/"photo" stays when a noun follows
-  ("image panels").
+  ("image panels"). 2026-11-01: a verb that is also a noun ("cross", "form", "rest", ...) ends it only before a
+  preposition, article, quantifier or the question's end (`_AFTER_VERB`), so "red cross symbols" stays whole.
 - The cross-check's count now runs `analysis.count_image`, the same steps as `count_objects` at its defaults
   (`finish_count`: nested boxes, `possibly_more`, `crowd_range`, the LFM presence check), where it was raw Grounding DINO at
   0.15. Its size route detects as `detect_objects` does (SAM 3 on photos). `tests/test_server.py` pins the extreme circle on
@@ -364,6 +365,33 @@ no default prompt and no healthy `query_image(src, question)` answer changed.
   `lfm_flat_check` and `drop_nested` directly, so they do not exercise `finish_count`.
 - `structured_analysis` reuses `_check_anatomy`'s `hand` detection in the defect probe: 7 Grounding DINO passes, not 8, same
   observations and anomalies (`tests/test_inspection.py`).
+
+## `query_image` routes text lookups and checks consistency by question kind (Gate V5, 2026-11-02)
+
+Two changes, both confirmed once on round 29 (917 fresh questions on round 24's images: slice a by Gemini 3.8 Flash,
+slice b by Gemini 4 Argon as a phrasing check; the user's check 19 of 20 premises false, 18 of 20 answers right, 3
+questions dropped; rules fixed in VisionBench `vqa_gate_v5.py` before the questions existed).
+
+- **Routing and prompt** (`constants.VQA_TEXT_QUESTION`, `VQA_OCR_PREFIX`, `VQA_TEXT_SUFFIX`; Gate V1's pick
+  `route_item_suffix_verbatim`, screened on round 23 and phase 11): the regex adds more text words and a second branch,
+  a What/Which/Who/Where question (not "what colour") naming a name, number, price, sign, logo, UI element and so on;
+  the prompt drops "it may be incomplete or misread", asks for the OCR text's exact spelling, and covers an absent item
+  as well as absent text. Round 29: 76.8 -> **80.2%** (+3.4, CI 1.6 to 5.1; 50 gained, 19 lost), premise questions
+  59.4 -> 71.2% (`no_object` 46.1 -> 60.9, `no_text` 72.8 -> 81.6), worst type position -2.2 (n 46), slice b +1.9,
+  screenshots 62.6 -> 71.7, routed 30 -> 43%, median 6.1 -> 6.4 s per answer with OCR, 0 errors.
+- **`check_consistency`'s agreement rule** (`analysis._answers_agree`, `VQA_AGREE_COVER`; VisionBench
+  `vqa_consistency_rule.py`, fitted on round 23's real LFM control answers): typed by question -- polar answers by
+  polarity, "how many" by number, absent vs present, else half the shorter answer's content words in the longer;
+  "none" twice to an open-ended judgment question stays low. On the new routing's round 29 pairs: flagged 12.1%, quiet
+  on right 92.5%, catches wrong 30.8%, unflagged accuracy 84.4% (+4.2), error ratio 3.23x, against the old rule's
+  36.0 / 66.0 / 44.0 / +2.5 / 1.40x. No signal on `no_object` (0.84x). Ceiling: most wrong answers are repeated by the
+  control (on round 23 the control was right on only 28 of 192 wrong primaries).
+
+What did not ship: a Wh-question premise suffix (Gate V2A: `no_object` +11.1 but the model doubted objects that are
+there, object -5.5 to -6.3). Parity (VisionBench `vqa_v5_parity.py`): server prompts equal the gate's on 1,834 of
+1,834 questions and controls, agreement decisions 1,834 of 1,834, live answers 8 of 8. The old regex, prompt and rule
+are frozen in VisionBench `vqa_shipped_20261024.py`, which the earlier gates import so they still measure their own
+baseline.
 
 ## `classify_image` is CLIP zero-shot over the caller's labels (2026-10-16)
 

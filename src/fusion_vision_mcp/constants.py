@@ -256,11 +256,43 @@ CAPTION_IMAGE_TYPES: Final[tuple[str, ...]] = (
 #: 78.5% vs 66.5% (+12.0), false-premise questions 66.4% vs 32.3% (text that is not there 65.7 vs 13.3%), no question
 #: type worse, median 4.9 s vs 9.8 s per answer. The regex was fixed before phase 11's labels were looked at; changing
 #: it or the prompts means re-running the gate. Moondream2 keeps critique_composition's hints and count_objects' estimate.
-VQA_TEXT_QUESTION: Final[str] = (
-    r"\b(text|written|writing|say|says|said|read|reads|title|headline|label|labell?ed|word|words|printed|print|"
-    r"inscription|inscribed|caption|slogan|lettering|letters|spelled|brand name)\b"
+#:
+#: 2026-11-02, Gate V5 (VisionBench `vqa_gate_v5.py`, Gate V1's pick `route_item_suffix_verbatim`): the regex has two
+#: branches -- more text words anywhere, or a What/Which/Who/Where question (not "what colour") naming a name, number,
+#: price, date, sign, logo, UI element and so on -- and the prompt trusts the OCR spelling (VQA_OCR_PREFIX) and covers an
+#: absent item as well as absent text (VQA_TEXT_SUFFIX). On round 29 (917 fresh questions, rules fixed before they
+#: existed) 80.2% vs 76.8% (+3.4, CI 1.6 to 5.1), false-premise questions 59.4 -> 71.2%, no type with 30+ questions
+#: down more than 2.2 (position), routed 30 -> 43%, median 6.4 vs 6.1 s per answer with the OCR call. The old regex
+#: and prompt are frozen in VisionBench `vqa_shipped_20261024.py`.
+_VQA_TEXT_WORDS = (
+    r"\b(text|written|writing|say|says|said|read|reads|title|titled|headline|subheading|subtitle|"
+    r"label|labels|labell?ed|word|words|printed|print|inscription|inscribed|caption|slogan|"
+    r"lettering|letters|spelled|spelt|brand\s+name|surname|username|filename|"
+    r"numerals?|digits?|initials?|signature|signed|publisher|author|"
+    r"stamped|engraved|stencill?ed|embroidered|handwritten|typed|underlined|"
+    r"email|url|website|telephone|p-value|phrase|sentence|quote|quoted|leaderboard)\b"
 )
-VQA_TEXT_SUFFIX: Final[str] = "\nIf the question asks about text that is not in the image, answer that there is none."
+_VQA_TEXT_LOOKUP = (
+    r"^\s*(?:what|which|who|where)\b(?!\s+colou?rs?\b).*\b("
+    r"brand|name|named|names|number|numbers|numbered|credit|"
+    r"date|dated|year|time|price|priced|cost|rate|salary|amount|percentage|percent|value|score|version|"
+    r"code|address|handle|phone|currency|symbol|temperature|"
+    r"sign|banner|plaque|sticker|tags?|badge|logo|make|model|"
+    r"menu|option|tab|button|heading|header|footer|legend|"
+    r"affixed|listed|displayed|indicated|specified|mentioned|recorded|highlighted|"
+    r"message|notice|warning|definition|suggestion)\b"
+)
+VQA_TEXT_QUESTION: Final[str] = _VQA_TEXT_WORDS + "|" + _VQA_TEXT_LOOKUP
+VQA_OCR_PREFIX: Final[str] = "Text read from the image by OCR: "
+#: `query_image(check_consistency=true)`'s agreement rule (`analysis._vqa_consistency`) since 2026-11-02: when no typed
+#: comparison (polar, count, absent) decides, at least this share of the shorter answer's content words must be in the
+#: longer one. Fitted on round 23's control answers (VisionBench `vqa_consistency_rule.py`; the midpoint of a 0.34-1.0
+#: sweep), then confirmed once on round 29 (Gate V5).
+VQA_AGREE_COVER: Final[float] = 0.5
+VQA_TEXT_SUFFIX: Final[str] = (
+    "\nUse the exact spelling and full name from the OCR text when it answers the question. "
+    "If the question asks about text or an item that is not in the image, answer that there is none."
+)
 VQA_OCR_WORDS: Final[int] = 160
 VQA_MAX_NEW_TOKENS: Final[int] = 128
 VQA_SEED: Final[int] = 0

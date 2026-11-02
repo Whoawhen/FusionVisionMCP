@@ -1251,46 +1251,42 @@ class TestSeparability:
 
 
 class TestVqaConsistency:
-    """Pins _vqa_consistency against the documented failure modes."""
+    """Pins _vqa_consistency's typed agreement rule (Gate V5, 2026-11-02) branch by branch."""
 
-    def test_agreed_flat_default_returns_low(self) -> None:
-        """ "None"/"None" — same default token on two phrasings → low confidence."""
-        r = _vqa_consistency("None", "None")
-        assert r["consistent"] is True
-        assert r["confidence"] == "low"
+    @pytest.mark.parametrize(
+        ("question", "answer", "control", "consistent"),
+        [
+            # Polar: the polarity of the first three words decides; agreed "Yes" is not a default trap any more.
+            ("Is the vendor wearing a cap?", "Yes", "Yes, the vendor is wearing a cap.", True),
+            ("Is the vendor wearing a cap?", "Yes", "No.", False),
+            # Count: numbers, number words, and an absent answer as 0.
+            ("How many shrimp are on the noodles?", "There are three shrimp on top.", "3", True),
+            ("How many shrimp are on the noodles?", "3", "4", False),
+            ("How many dogs are there?", "There are no dogs in the image.", "0", True),
+            # One says absent, the other does not.
+            ("What colour is the dog?", "There is no dog in the image.", "Brown", False),
+            ("What brand is the laptop?", "None", "There is no laptop.", True),
+            # Otherwise half of the shorter answer's content words must be in the longer.
+            ("What colour are the tongs?", "black", "The tongs are black.", True),
+            ("What is written on the shirt?", "PATRIOTS", "GIANTS", False),
+            # The pette probe: a defect named against "nothing is wrong".
+            (
+                "Describe anything wrong in this image.",
+                "The image is missing a centerpiece and there is no visible stem or base",
+                "Nothing is wrong with this image; it is a beautiful, symmetrical flower arrangement",
+                False,
+            ),
+        ],
+    )
+    def test_typed_agreement(self, question: str, answer: str, control: str, consistent: bool) -> None:
+        r = _vqa_consistency(answer, control, question)
+        assert r["consistent"] is consistent
+        assert r["confidence"] == ("normal" if consistent else "low")
 
-    def test_different_flat_defaults_returns_low(self) -> None:
-        """ "None"/"Nothing" — both are defaults but they disagree → low confidence."""
-        r = _vqa_consistency("None", "Nothing")
-        assert r["consistent"] is False
-        assert r["confidence"] == "low"
-
-    def test_contradictory_substantive_answers_returns_low(self) -> None:
-        """The documented "pette" probe case: one answer says something's wrong,
-        the control says nothing's wrong. Both substantive, both contradict.
-        Confidence must be "low" — the model is contradicting itself.
-        """
-        r = _vqa_consistency(
-            "The image is missing a centerpiece and there is no visible stem or base",
-            "Nothing is wrong with this image; it is a beautiful, symmetrical flower arrangement",
-        )
-        assert r["consistent"] is False
-        assert r["confidence"] == "low"
-
-    def test_agreed_substantive_answer_returns_normal(self) -> None:
-        """Substantive answers that genuinely agree → normal confidence."""
-        r = _vqa_consistency(
-            "a red car",
-            "I see a red car in the image",
-        )
-        assert r["consistent"] is True
-        assert r["confidence"] == "normal"
-
-    def test_agreed_semantic_opposite_defaults_returns_low(self) -> None:
-        """ "Yes"/"No" are both flat defaults, and they disagree → low confidence."""
-        r = _vqa_consistency("Yes", "No")
-        assert r["consistent"] is False
-        assert r["confidence"] == "low"
+    def test_judgment_question_answered_none_twice_stays_low(self) -> None:
+        """Moondream2's flat-default trap: "None" / "Nothing" to "anything wrong" is not evidence of no defect."""
+        assert _vqa_consistency("None", "Nothing", "Is there anything wrong with this image?")["confidence"] == "low"
+        assert _vqa_consistency("None", "Nothing", "What colour is the dog?")["confidence"] == "normal"
 
 
 # ---------------------------------------------------------------------------

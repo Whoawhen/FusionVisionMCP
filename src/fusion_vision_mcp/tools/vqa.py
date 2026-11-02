@@ -36,13 +36,14 @@ def register(mcp: MCPServer) -> None:
             Field(
                 description=(
                     "When true, also ask a rephrased control question and report whether the "
-                    "two answers agree. `confidence` is 'low' in two cases: the answers agree "
-                    "on a short default-looking token ('None', 'Yes', 'No', 'Nothing', ...), "
-                    "or they substantively contradict each other. Small VLMs answer open-ended "
-                    "judgment questions ('describe anything wrong') with a flat default (Moondream2, "
-                    "the answerer before 2026-10-24, said 'None' on images that all had real visible "
-                    "defects) -- this layer makes that visible instead of presenting it as reliable. "
-                    "It has not been re-measured with LFM2.5-VL, today's answerer. "
+                    "two answers agree; `confidence` is 'low' when they disagree, compared by the "
+                    "question's kind (yes/no by polarity, 'how many' by number, absent vs present, "
+                    "else shared words). On 917 fresh questions it flagged 12% of answers, stayed "
+                    "quiet on 92.5% of right ones and caught 31% of wrong ones; a flagged answer was "
+                    "wrong 3.2x as often as an unflagged one. A quiet answer is not a checked one: most "
+                    "wrong answers are repeated by the control. On a question about an object that is "
+                    "not there the flag carries no signal. An open-ended judgment question ('anything "
+                    "wrong?') answered 'none' twice is also 'low'. "
                     "On a low-confidence answer it also routes to the measurement that actually "
                     "answers the question when one applies (spatial_relations for a "
                     "contact/containment question, count_objects for 'how many', ocr for a "
@@ -84,25 +85,25 @@ def register(mcp: MCPServer) -> None:
         Answered by LFM2.5-VL-3B (Liquid AI) on ONNX Runtime since 2026-10-24, the model behind
         `caption`'s default, replacing Moondream2: on 892 fresh questions it answered 78.5% right
         against Moondream2's 66.5%, ahead or level on every kind (text, colour, object, count, yes/no),
-        in a median 4.9 s against 9.8 s. A question that mentions text (written, says, label, brand
-        name, ...) gets the `ocr` engine's reading of the image as context. It is also much less
-        prone to going along with a false premise: asked about text or an object that is not there,
-        it said so 66% of the time against Moondream2's 32% -- which still means it invents an answer
-        about a third of the time. An answer is not a measurement: for "how many" use
-        `count_objects`, for touching/inside `spatial_relations`.
+        in a median 4.9 s against 9.8 s. A question that mentions text (written, says, label, ...), or
+        a What/Which/Who/Where question asking for a name, number, price, date, sign, logo, menu item
+        and so on (not a colour), gets the `ocr` engine's reading of the image as context, told to keep
+        its exact spelling and to say "none" when the text or item is not there. Since 2026-11-02 that
+        wider routing answers 80.2% of 917 fresh questions against 76.8% before. Asked about text or an
+        object that is not there it says so 71% of the time (61% for an absent object) -- which still
+        means it invents an answer more than a quarter of the time. An answer is not a measurement:
+        for "how many" use `count_objects`, for touching/inside `spatial_relations`.
 
-        Small VLMs also answer open-ended judgment questions ("describe anything wrong in this
-        image") with a flat default; Moondream2 said "None" on images that all had real visible
-        defects. Set `check_consistency=true` to make that visible: the tool also
+        Set `check_consistency=true` for a reliability flag: the tool also
         asks a rephrased control question and returns, per image,
         `{answer, control_answer, consistent, confidence}`. `confidence` is `"low"`
-        in either of two failure modes: the two answers agree on a short
-        default-looking token ("None", "Yes", "Nothing", ...), which is the
-        signature of a flat default rather than a genuine observation; or they
-        substantively contradict each other, which makes either answer weaker
-        evidence than it looks alone. `"normal"` requires substantive answers that
-        agree. A `low` result on a judgment question means you should not trust the
-        answer without independent confirmation. When the answer is
+        when the two answers disagree, judged by the question's kind (see the
+        parameter). Small VLMs answer open-ended judgment questions ("describe
+        anything wrong in this image") with a flat default -- Moondream2, the
+        answerer before 2026-10-24, said "None" on images that all had real visible
+        defects -- so "none" given twice to such a question is `"low"` too. A `low`
+        result means you should not trust the answer without independent
+        confirmation; a `"normal"` one is not a confirmation. When the answer is
         low-confidence, the tool also tries to route to the measurement that
         actually answers the question: it classifies the question's wording and,
         if a measurable category applies and the object names parse from the
@@ -182,7 +183,7 @@ def register(mcp: MCPServer) -> None:
 
             results = []
             for image, answer, control_answer in zip(images, answers, control_answers, strict=True):
-                entry = _vqa_consistency(answer, control_answer)
+                entry = _vqa_consistency(answer, control_answer, question)
                 # When the VQA judgment is unreliable, route to the measurement that
                 # actually answers the question (measure, don't judge): classify the
                 # question's wording and, if a measurable category applies and the

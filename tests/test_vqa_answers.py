@@ -1,5 +1,5 @@
 """`query_image`'s answering path (`analysis.vqa_answers`), checked without models: which questions carry the `ocr`
-reading, the exact prompt the round 23 gate measured, and the fall back to Moondream2."""
+reading, the exact prompt Gate V5 measured on round 29, and the fall back to Moondream2."""
 
 from types import SimpleNamespace
 from typing import Any, cast
@@ -11,7 +11,10 @@ from fusion_vision_mcp import analysis
 from fusion_vision_mcp.analysis import lfm_vqa_prompt, vqa_answers
 from fusion_vision_mcp.protocols import AppContext
 
-SUFFIX = "\nIf the question asks about text that is not in the image, answer that there is none."
+SUFFIX = (
+    "\nUse the exact spelling and full name from the OCR text when it answers the question. "
+    "If the question asks about text or an item that is not in the image, answer that there is none."
+)
 
 
 class _Answerer:
@@ -49,14 +52,28 @@ def ocr_calls(monkeypatch: pytest.MonkeyPatch) -> list[int]:
 
 
 def test_prompt_matches_the_gate_byte_for_byte() -> None:
-    # VisionBench vqa_premise.ocr_prompt, the arm round 23 confirmed.
+    # VisionBench vqa_gate_v1.ocr_prompt with VERBATIM_PREFIX / VERBATIM_SUFFIX, the arm Gate V5 confirmed.
     assert lfm_vqa_prompt("What does the sign say?", "OPEN\n 24 HOURS \n") == (
-        'Text read from the image by OCR (it may be incomplete or misread): "OPEN / 24 HOURS"\nWhat does the sign say?'
-        + SUFFIX
+        'Text read from the image by OCR: "OPEN / 24 HOURS"\nWhat does the sign say?' + SUFFIX
     )
     assert lfm_vqa_prompt("What brand name is printed on it?", " \n") == (
         "An OCR pass found no readable text in this image.\nWhat brand name is printed on it?" + SUFFIX
     )
+
+
+@pytest.mark.parametrize(
+    ("question", "routed"),
+    [
+        ("What brand of laptop is resting near the flower stems?", True),  # the lookup branch: What ... brand
+        ("Which button is highlighted at the top?", True),
+        ("Who is the author of the book?", True),  # the text-word branch
+        ("What colour is the sign?", False),  # "what colour" is a visual question, never routed
+        ("Is the price tag visible?", False),  # the lookup branch needs a Wh-word first
+        ("How many people are there?", False),
+    ],
+)
+def test_routing_takes_text_lookups_too(question: str, routed: bool) -> None:
+    assert bool(analysis._TEXT_QUESTION_RE.search(question)) is routed
 
 
 def test_prompt_keeps_at_most_160_words() -> None:
