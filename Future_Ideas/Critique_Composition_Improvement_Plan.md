@@ -1,6 +1,6 @@
 # `critique_composition` Frontier Improvement Plan (Opus 5.5 Implementation Spec)
 
-> **Status:** Reviewed 2026-11-02 (see **Review** below, which supersedes the body). Q1–Q4 answered 2026-11-02; next is R3 step 0 (cache-only checks).
+> **Status:** Reviewed 2026-11-02 (see **Review** below, which supersedes the body). Q1–Q4 answered 2026-11-02. **All three K3 model gates failed 2026-11-03 (R8): Moondream2 keeps every question.**
 > **Target Tool:** [`critique_composition`](file:///c:/AI/MCP/FusionVisionMCP/src/fusion_vision_mcp/tools/aesthetics.py#L129-L265) (`src/fusion_vision_mcp/tools/aesthetics.py:129`, `src/fusion_vision_mcp/analysis.py:815-912`, `src/fusion_vision_mcp/geometry.py:639-672`)
 > **Scoreboard Reference:** [`Future_Ideas/frontier_capability_gaps.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/frontier_capability_gaps.md#L103) (Row 103: `🔻 weaker: about −7 points` on prose critique; Section *"Where Things Still Fall Short — Composition prose critique"* at lines 155–160)
 > **Model Origin Policy:** Strictly Western / non-Chinese models (`LiquidAI/LFM2.5-VL-3B` — US; `microsoft/Florence-2-large-ft` — US; `facebook/sam3` & `facebook/sam2.1-hiera-large` — US; `openai/clip-vit-base-patch32` — US).
@@ -205,6 +205,39 @@ per card, the whole photo shown.
 
 **Run order once the CPU is free:** prose tune → subject → busy screen. Each needs the CPU to itself, since all three
 are timed.
+
+### R8. Results (2026-11-03): all three gates failed, Moondream2 stays
+
+Run once each on a free CPU, rules as fixed in R6 and the script headers. Raw output in VisionBench
+`benchmarks/results/composition_{prose_k3_tune,subject_k3,busy_k3_screen}.json`.
+
+**K3-4 prose (tune, 50 photos): no arm passes, so confirm is not run.**
+
+| Arm | Raw F1 | Matched | Gap | Contradiction | Seconds |
+|---|---|---|---|---|---|
+| md (Moondream2) | 18.5 | 18.5 | 9.3 | 10% | 11.2 |
+| P1 (LFM, same question) | 17.6 | 17.5 | 7.5 | 18% | 6.2 |
+| P2 (LFM, structured question) | 17.8 | 18.1 | 8.9 | 8% | 7.0 |
+| P3 (P2 + detector facts) | 16.9 | 16.7 | 7.7 | 14% | 7.4 |
+
+Every LFM arm fails the matched-length guard (it must be at least Moondream2's). P1 also fails contradiction. P2
+came closest: −0.5 matched, CI [−2.5, +1.6], better on contradiction. The detector hint (P3) made the prose worse.
+Moondream2 re-run matched the K2 cache on 41 of 50 (sampling differences).
+
+**K3-1 subject (confirm + box2 pooled).**
+- Decision A: `pick` vs `first` is −0.5 points, CI [−2.7, +1.1], 1 fixed, 2 broken. **`first` stays.**
+  Grounding returned more than one box on 26.4% of photos, but choosing among them didn't help.
+- Decision B: LFM's name scores −7.0 points against Moondream2's, CI [−12.4, −1.6], 7 fixed, 20 broken. It fails the
+  −5 margin. LFM is faster (3.5 s vs 9.4 s), and the two models gave the same name on only 16.4% of photos.
+  The Moondream2 cache held on 60 of 60 re-runs. **Moondream2 keeps naming.**
+
+**K3-2 busy screen (77 seen user calls): stop.** LFM 54.7% balanced vs Moondream2 75.2%, −20.5, CI [−29.9, −10.1].
+LFM said "yes, busy" on only 5.2% of photos, against 43 of 77 the user called busy, so it is close to always
+saying "no". **No box2 labels are collected.**
+
+**What this leaves.** None of the model swaps ship, so Moondream2 stays loaded for all three critique questions.
+R3 step 4 shrinks to the deterministic geometry fields that step 0 cleared (R2/R5: fill bins, horizontal bins,
+vertical zone), which need no model run. A prose gain would need a different approach than prompting the 3B model.
 
 ---
 
