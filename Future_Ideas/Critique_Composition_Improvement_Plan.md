@@ -183,6 +183,29 @@ If no arm passes, stop: nothing ships and confirm is not run.
 
 Then phase 7 runs once and is recorded, not gated. The user's blind preference check (20 photos) follows, reported only.
 
+### R7. Harnesses written (2026-11-02); every model run waits for a free CPU
+
+All three are in VisionBench `benchmarks/`, with the rules in each header, fixed before any run:
+
+| Script | Commit | What it decides | Runtime (estimated) |
+|---|---|---|---|
+| `composition_prose_k3.py` | e6a6c51 | K3-4 prose: tune picks one of P1-P3, then confirm once | tune ~30 min |
+| `composition_subject_k3.py` | 15af760 | K3-1: decision A (`first` vs `pick` box), then decision B (LFM namer), on confirm + box2 pooled; Florence-2 re-run in bf16 for both arms; Moondream2 re-timed on 20 photos per set | 270 photos, ~1.5 h |
+| `composition_busy_k3.py` | 15af760 | K3-2: the screen on the 77 seen user calls (stop if LFM is 10+ points below), then the box2 held-out test (paired CI > −5) | screen ~20 min |
+
+**Smoke tests on cached data:**
+- The prose scorer reproduces step 0: 18.8 F1, gap 9.5, 50 of 50 matching the K2 cache.
+- The subject scorer reproduces box2's 84.4% exactly. Tune and confirm gain the two photos the 95% whole-frame
+  fallback is documented to gain.
+- The busy scorer gives Moondream2's K1 answers 75.2% balanced on the 77.
+
+**Still to build, and only if the busy screen passes:** the card page for the user's box2 busy labels. It writes
+`VisionBench-labels/worker_handoff/composition_busy_box2_user.json` and follows the crops_serve style: one question
+per card, the whole photo shown.
+
+**Run order once the CPU is free:** prose tune → subject → busy screen. Each needs the CPU to itself, since all three
+are timed.
+
 ---
 
 ## 1. Executive Summary & Why `critique_composition` Is Next
