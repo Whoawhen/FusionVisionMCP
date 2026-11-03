@@ -84,7 +84,7 @@ def resolve_memory_mode(memory_mode: str) -> float:
     help=(
         "Answerer behind `query_image`: 'lfm-onnx' (the same LFM2.5-VL-3B ONNX model as the default caption, one "
         "loaded copy; ~5 s, more answers right) or 'moondream' (Moondream2, ~10 s). Moondream2 still backs "
-        "critique_composition's hints and count_objects' estimate either way."
+        "measure_framing's hints and count_objects' estimate either way."
     ),
 )
 @click.option(
@@ -109,7 +109,7 @@ def resolve_memory_mode(memory_mode: str) -> float:
     "--aesthetic-model",
     default=DEFAULT_AESTHETIC_MODEL,
     show_default=True,
-    help="Specifies the CLIP model used for the score_aesthetics and critique_composition tools.",
+    help="Specifies the CLIP model used for the score_aesthetics and measure_framing tools.",
 )
 @click.option(
     "--grounding-dino-model",

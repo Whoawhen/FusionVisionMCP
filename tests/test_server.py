@@ -77,7 +77,7 @@ async def test_list_tools(mcp_client_session: ClientSession) -> None:
         "process",
         "spatial_relations",
         "score_aesthetics",
-        "critique_composition",
+        "measure_framing",
         "server_status",
     }
 
@@ -885,10 +885,10 @@ async def test_query_image_structured_analysis_returns_anomalies(
 
 
 @pytest.mark.anyio
-async def test_critique_composition(mcp_client_session: ClientSession) -> None:
+async def test_measure_framing(mcp_client_session: ClientSession) -> None:
     res = await mcp_client_session.call_tool(
-        "critique_composition",
-        arguments={"src": SAMPLE_IMAGE_FILEPATH, "target_subject": "person"},
+        "measure_framing",
+        arguments={"src": SAMPLE_IMAGE_FILEPATH, "target_subject": "person", "check_background": True},
     )
     result = json.loads("\n".join(cast(TextContent, c).text for c in res.content))
 
@@ -901,10 +901,10 @@ async def test_critique_composition(mcp_client_session: ClientSession) -> None:
 
 
 @pytest.mark.anyio
-async def test_critique_composition_check_background_false_omits_it(mcp_client_session: ClientSession) -> None:
+async def test_measure_framing_omits_background_by_default(mcp_client_session: ClientSession) -> None:
     res = await mcp_client_session.call_tool(
-        "critique_composition",
-        arguments={"src": SAMPLE_IMAGE_FILEPATH, "target_subject": "person", "check_background": False},
+        "measure_framing",
+        arguments={"src": SAMPLE_IMAGE_FILEPATH, "target_subject": "person"},
     )
     result = json.loads("\n".join(cast(TextContent, c).text for c in res.content))
 
@@ -913,9 +913,9 @@ async def test_critique_composition_check_background_false_omits_it(mcp_client_s
 
 
 @pytest.mark.anyio
-async def test_critique_composition_auto_detects_subject(mcp_client_session: ClientSession) -> None:
+async def test_measure_framing_auto_detects_subject(mcp_client_session: ClientSession) -> None:
     res = await mcp_client_session.call_tool(
-        "critique_composition",
+        "measure_framing",
         arguments={"src": SAMPLE_IMAGE_FILEPATH},
     )
     result = json.loads("\n".join(cast(TextContent, c).text for c in res.content))
@@ -927,7 +927,7 @@ async def test_critique_composition_auto_detects_subject(mcp_client_session: Cli
 
 
 @pytest.mark.anyio
-async def test_critique_composition_reports_note_when_subject_not_found(
+async def test_measure_framing_reports_note_when_subject_not_found(
     mcp_client_session: ClientSession, tmp_path: Path
 ) -> None:
     """Florence-2's grounding is generous even for a nonsense phrase (it still finds *something*
@@ -938,7 +938,7 @@ async def test_critique_composition_reports_note_when_subject_not_found(
     Image.new("RGB", (64, 64), color=(128, 128, 128)).save(blank_filepath)
 
     res = await mcp_client_session.call_tool(
-        "critique_composition",
+        "measure_framing",
         arguments={"src": str(blank_filepath)},
     )
     result = json.loads("\n".join(cast(TextContent, c).text for c in res.content))
@@ -1164,12 +1164,12 @@ async def test_score_aesthetics_compare_with_returns_relative_shape(
 
 
 @pytest.mark.anyio
-async def test_critique_composition_compare_with_returns_both(
+async def test_measure_framing_compare_with_returns_both(
     mcp_client_session: ClientSession,
 ) -> None:
-    """critique_composition compare_with critiques both and reports delta + preferred."""
+    """measure_framing compare_with critiques both and reports delta + preferred."""
     res = await mcp_client_session.call_tool(
-        "critique_composition",
+        "measure_framing",
         arguments={"src": SAMPLE_IMAGE_FILEPATH, "compare_with": SAMPLE_IMAGE_FILEPATH},
     )
     data = json.loads("\n".join(cast(TextContent, c).text for c in res.content))

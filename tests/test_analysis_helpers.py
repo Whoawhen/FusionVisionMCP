@@ -1,7 +1,7 @@
 """Unit tests for the decision helpers in analysis.py (no models).
 
 `_pick_primary_subject`, `_size_measurement` and `_aesthetic_comparison` are the logic
-behind `critique_composition`, size questions and `compare_with`. They are pinned here
+behind `measure_framing`, size questions and `compare_with`. They are pinned here
 against stub apps, so a regression shows up in milliseconds rather than in a benchmark run.
 """
 

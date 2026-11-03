@@ -214,7 +214,7 @@ class Aesthetic:
         Encodes a fixed palette of style prompts ("a photograph", "an oil painting", ...)
         and ranks them by cosine similarity to each image's embedding. No new weights —
         this is the CLIP zero-shot classification the backbone already supports, kept on
-        the same `Aesthetic` instance so a `score_aesthetics`/`critique_composition`
+        the same `Aesthetic` instance so a `score_aesthetics`/`measure_framing`
         call that also asks for style context pays for one backbone load, not two.
 
         Returns one dict per image: `{style, distribution}` where `distribution` is a

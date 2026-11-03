@@ -1,6 +1,6 @@
 # `critique_composition` Frontier Improvement Plan (Opus 5.5 Implementation Spec)
 
-> **Status:** Reviewed 2026-11-02 (see **Review** below, which supersedes the body). Q1–Q4 answered 2026-11-02. **All three K3 model gates failed 2026-11-03 (R8): Moondream2 keeps every question. The geometry fields shipped the same day; the plan is done.**
+> **Status:** Reviewed 2026-11-02 (see **Review** below, which supersedes the body). Q1–Q4 answered 2026-11-02. **All three K3 model gates failed 2026-11-03 (R8): Moondream2 keeps every question. The geometry fields shipped the same day; the plan is done. The tool was then renamed `measure_framing`, with `check_background` off by default.**
 > **Target Tool:** [`critique_composition`](file:///c:/AI/MCP/FusionVisionMCP/src/fusion_vision_mcp/tools/aesthetics.py#L129-L265) (`src/fusion_vision_mcp/tools/aesthetics.py:129`, `src/fusion_vision_mcp/analysis.py:815-912`, `src/fusion_vision_mcp/geometry.py:639-672`)
 > **Scoreboard Reference:** [`Future_Ideas/frontier_capability_gaps.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/frontier_capability_gaps.md#L103) (Row 103: `🔻 weaker: about −7 points` on prose critique; Section *"Where Things Still Fall Short — Composition prose critique"* at lines 155–160)
 > **Model Origin Policy:** Strictly Western / non-Chinese models (`LiquidAI/LFM2.5-VL-3B` — US; `microsoft/Florence-2-large-ft` — US; `facebook/sam3` & `facebook/sam2.1-hiera-large` — US; `openai/clip-vit-base-patch32` — US).

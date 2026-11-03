@@ -191,7 +191,7 @@ Live plan: [Future_Ideas/Query_Image_Improvement_Plan.md](Future_Ideas/Query_Ima
 - Changing a routing regex, prompt, suffix or agreement rule means a fresh round. The prompts each gate measured are
   frozen in VisionBench (`vqa_shipped_20261024.py` for the pre-V5 ones), so older gates still measure their own
   baseline.
-- Moondream2 stays loaded only for `critique_composition`'s two questions.
+- Moondream2 stays loaded only for `measure_framing`'s two questions.
 
 ### `classify_image`
 
@@ -200,10 +200,12 @@ CLIP zero-shot over the caller's labels (`CLASSIFY_TEMPLATE` "a photo of {}", `A
 the realistic estimate. It always picks one of the labels. Routing `query_image` questions that list options to it
 would need its own gate.
 
-### `critique_composition`
+### `measure_framing`
 
-Live plan: [Future_Ideas/Critique_Composition_Improvement_Plan.md](Future_Ideas/Critique_Composition_Improvement_Plan.md).
-`background: {busy, reliability}` is Moondream2's answer to `BUSY_BACKGROUND_QUESTION`, a hedged hint (69% agreement
+Named `critique_composition` until 2026-11-03: it measures framing, it does not judge it, and every history entry and
+VisionBench script before then uses the old name. Plan (done):
+[Future_Ideas/Critique_Composition_Improvement_Plan.md](Future_Ideas/Critique_Composition_Improvement_Plan.md).
+`background: {busy, reliability}` (`check_background`, off by default since 2026-11-03) is Moondream2's answer to `BUSY_BACKGROUND_QUESTION`, a hedged hint (69% agreement
 with the user's blind calls). Without `target_subject`, Moondream2 names the subject (`MAIN_SUBJECT_QUESTION`) and
 Florence-2 boxes it; a box covering 95%+ of the frame (`_WHOLE_FRAME`) defers to the largest central dense region.
 Background blur, subject focus and awkward crops are not shipped: nothing measured matched the user's calls.

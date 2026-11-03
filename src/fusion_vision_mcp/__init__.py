@@ -201,7 +201,7 @@ async def app_lifespan(
         _lazy(_make_sam2, "SAM2"),
     )
     # Same rationale as SAM2: always idle-wrapped regardless of idle_timeout, since only
-    # score_aesthetics/critique_composition pay for the CLIP backbone, and most sessions
+    # score_aesthetics/measure_framing pay for the CLIP backbone, and most sessions
     # never call either.
     aesthetic = cast(
         AestheticScorer,

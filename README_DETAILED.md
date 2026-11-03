@@ -24,12 +24,12 @@ count is not a tally), a CLIP/LAION aesthetic scorer (`score_aesthetics`), a bat
 (`batch_analyze_images`), and configurable memory release. Two tools aren't just a new model wired in: no model
 here answers "does this actually touch that" on its own, so `spatial_relations` is built from Florence-2 boxes,
 SAM2 masks, and a from-scratch geometry module; and no model combines localization, framing, and a quality
-judgment into one answer, so `critique_composition` combines Florence-2, a rule-of-thirds geometry function, the
+score into one answer, so `measure_framing` combines Florence-2, a rule-of-thirds geometry function, the
 aesthetic predictor, and (for low-scoring images) Moondream2. See the tags on each tool below.
 
 **Legend:** 🔼 inherited from `mcp-florence2` · ➕ added here (wraps a model already in the
 stack) · ✦ novel (new capability — see [spatial_relations](#spatial_relations-) and
-[critique_composition](#critique_composition-)).
+[measure_framing](#measure_framing-)).
 
 You can process images or PDF files stored on a local or web server to extract text using OCR (Optical Character
 Recognition), generate descriptive captions summarizing the content of the images, locate named objects and
@@ -259,7 +259,7 @@ the first download) falls back to it. The weights are under the LFM Open License
   why it is not the default captioner. Its weights are under Liquid AI's LFM Open License v1.0, not Apache: free for
   personal, research and commercial use, except commercial use by an organisation with $10M or more in annual
   revenue; downloaded from Hugging Face on first use, not redistributed here.
-  Moondream2 stays for `critique_composition` (and `query_image` with `--vqa-model moondream`); without the LFM captioner (a hand-built context)
+  Moondream2 stays for `measure_framing` (and `query_image` with `--vqa-model moondream`); without the LFM captioner (a hand-built context)
   `deep` falls back to Moondream2's long caption, at 6 crops on pages under 30 OCR words and 12 above (plan
   step 1C-b).
 - **image_type** (default `true`, since 2026-10-24): start the default caption with `Image type: <x>.`, CLIP
@@ -805,7 +805,7 @@ beautifully lit one can score comparatively higher.
 
 *New in v0.8.0*: This tool now surfaces `photographic_aesthetic` and uses domain routing to determine if that score is meaningful (`photographic_aesthetic_applicable`). If the optional `[iqa]` extra is installed, it also executes a MUSIQ model for `technical_quality`. If a reasoner is configured (`--reasoner-provider ollama`), it synthesizes an `artistic_judgment`.
 
-Note that `score_aesthetics` is the only tool besides `critique_composition` that loads the CLIP
+Note that `score_aesthetics` is the only tool besides `measure_framing` that loads the CLIP
 backbone (~1.7GB), and it loads it on first use — a server that is only ever asked for captions or
 OCR never pays for it.
 
@@ -831,11 +831,12 @@ OCR never pays for it.
 > recalibrate the absolute score — an oil painting still lands around 5.8 on its own — the relative delta is
 > the actionable output, and only within a shared medium.
 
-### critique_composition ✦
+### measure_framing ✦
 
-Critiques an image's composition: locates the main subject, checks its framing against the rule of
-thirds, and — only for low-scoring images — asks Moondream2 to explain what specifically looks
-unbalanced. Florence-2 locates the subject, a from-scratch geometry function measures its framing,
+Measures how an image frames its main subject (named `critique_composition` until 2026-11-03): locates the
+subject, says where it sits and how much of the frame it fills, checks it against the rule of thirds, and —
+only for low-scoring images — asks Moondream2 to explain what looks off. It measures framing rather than
+judging it: the prose trails frontier critiques by about 7 points of word overlap. Florence-2 locates the subject, a from-scratch geometry function measures its framing,
 `score_aesthetics`'s CLIP/LAION predictor scores the shot, and Moondream2 is consulted only when the
 score is low enough to need an explanation.
 
@@ -845,13 +846,16 @@ model in the stack combines localization, framing, and a quality judgment into o
 #### Arguments:
 
 - **src**: A file path or URL to the image file that needs to be processed.
-- **target_subject**: Name of the main subject, e.g. `"the dog"`. Optional — omit it to auto-detect
-  the most prominent region via `dense_region_caption` (scored by area weighted toward the image
-  center).
+- **target_subject**: Name of the main subject, e.g. `"the dog"`. Optional — omit it and Moondream2
+  names the subject (returned as `subject`) and Florence-2 boxes that name; with no single subject, the
+  most prominent dense region (area weighted toward the centre) is used.
 - **low_score_threshold**: Aesthetic score below which Moondream2 is asked to explain why. Defaults
   to `5.0`.
 - **style_context**: Same as `score_aesthetics`'s argument of the same name — adds `style` and
   `style_distribution` to the result. Defaults to `false`.
+- **check_background**: Adds `background: {busy, reliability}`, Moondream2's yes/no on whether the
+  background competes with the subject (agreed with a person's blind calls on 69% of 52 held-out photos;
+  about 10 s). Defaults to `false`.
 - **compare_with**: Path or URL of a reference image. When set, both the image and the reference are
   critiqued and the result becomes `{image, reference, delta, preferred}` (plus `cross_medium_warning` when
   `style_context=true` and the media differ) — same like-with-like framing as `score_aesthetics`'
@@ -864,7 +868,9 @@ model in the stack combines localization, framing, and a quality judgment into o
 `centroid`, `thirds_offset` (distance from the nearest rule-of-thirds gridline intersection, near 0
 for a well-composed shot), `center_offset` (distance from dead-centre, for comparison), and
 `nearest_gridpoint` — both offsets normalized by the frame's diagonal, so they are comparable across
-image sizes. When the aesthetic score is below `low_score_threshold`, a `critique` field carries
+image sizes — plus `horizontal` (left, left_third, center, right_third, right) and `vertical` (top,
+upper_third, middle, lower_third, bottom), the fifth of the frame the box centre falls in, and `size`
+(small < 0.10 of the frame, medium < 0.40, large < 0.75, else fills) with the exact `area_share`. When the aesthetic score is below `low_score_threshold`, a `critique` field carries
 Moondream2's plain-language explanation.
 
 If no subject can be located (an empty or genuinely featureless image), returns a soft-failure shape
@@ -910,7 +916,7 @@ task tokens this server does not expose as their own tool.
 - **--grounding-dino-model**: The Grounding DINO model backing `count_objects`. Defaults to
   `IDEA-Research/grounding-dino-tiny` (~690MB); `grounding-dino-base` roughly triples the download for a
   marginal gain on the short noun phrases this server sends.
-- **--aesthetic-model**: The CLIP model backing `score_aesthetics` and `critique_composition`. Defaults to
+- **--aesthetic-model**: The CLIP model backing `score_aesthetics` and `measure_framing`. Defaults to
   `openai/clip-vit-large-patch14`, the checkpoint the LAION aesthetic head was trained against — swapping this
   invalidates the head's weights, so change it only alongside a matching head.
 - **--memory-mode**: How long each model stays in memory after its last use. See

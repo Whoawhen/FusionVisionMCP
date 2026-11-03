@@ -840,7 +840,7 @@ _WHOLE_FRAME: Final[float] = 0.95
 def name_main_subject(app: AppContext, image: Image) -> str:
     """Moondream2's short name for the photo's main subject, or "" when it says there is none.
 
-    `critique_composition` boxes this name with Florence-2 when the caller gives no
+    `measure_framing` boxes this name with Florence-2 when the caller gives no
     `target_subject`. VisionBench `composition_critique.py`, against a labeller's boxes: IoU >= 0.5
     on 79.5% / 82.0% / 84.4% of three photo sets (50, 89, 96 photos) where Florence-2's largest,
     most central dense region managed 64.1% / 66.3% / 75.0%.
@@ -849,17 +849,17 @@ def name_main_subject(app: AppContext, image: Image) -> str:
     return "" if name.lower().startswith("none") else name
 
 
-def _critique_one(
+def _framing_one(
     app: AppContext,
     image: Image,
     target_subject: str,
     low_score_threshold: float,
     style_context: bool,
-    check_background: bool = True,
+    check_background: bool = False,
 ) -> dict[str, Any]:
-    """Single-image composition critique -- the body of `critique_composition`.
+    """Single-image framing measurement -- the body of `measure_framing`.
 
-    Extracted so `critique_composition`'s relative mode can run it for both the
+    Extracted so `measure_framing`'s relative mode can run it for both the
     image and the reference. See that tool's docstring for the return shape.
     """
     subject = target_subject or name_main_subject(app, image)

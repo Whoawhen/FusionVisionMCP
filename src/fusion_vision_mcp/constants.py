@@ -255,7 +255,7 @@ CAPTION_IMAGE_TYPES: Final[tuple[str, ...]] = (
 #: vs Moondream2's 78.8%) and `vqa_round23.py` (rule fixed before round 23's questions existed): on 892 fresh questions
 #: 78.5% vs 66.5% (+12.0), false-premise questions 66.4% vs 32.3% (text that is not there 65.7 vs 13.3%), no question
 #: type worse, median 4.9 s vs 9.8 s per answer. The regex was fixed before phase 11's labels were looked at; changing
-#: it or the prompts means re-running the gate. Moondream2 keeps critique_composition's hints and count_objects' estimate.
+#: it or the prompts means re-running the gate. Moondream2 keeps measure_framing's hints and count_objects' estimate.
 #:
 #: 2026-11-02, Gate V5 (VisionBench `vqa_gate_v5.py`, Gate V1's pick `route_item_suffix_verbatim`): the regex has two
 #: branches -- more text words anywhere, or a What/Which/Who/Where question (not "what colour") naming a name, number,
@@ -331,14 +331,14 @@ DEEP_TEXT_WORDS: Final[int] = 30
 #: 0 images worse. On a fresh encode it cost ~13 s; on the reused one ~2 s (`caption_c4_1.py`).
 THEME_PROMPT: Final[str] = "In one sentence, what idea, theme or message does this image convey?"
 
-#: Without a `target_subject`, `critique_composition` asks Moondream2 this and boxes the answer with
+#: Without a `target_subject`, `measure_framing` asks Moondream2 this and boxes the answer with
 #: Florence-2. Fixed before measuring (VisionBench `composition_critique.py`, 2026-10-11).
 MAIN_SUBJECT_QUESTION: Final[str] = (
     "What is the main subject of this photo? Answer with a short noun phrase, "
     "or 'none' if there is no single main subject."
 )
 
-#: `critique_composition(check_background=true)` asks Moondream2 this, word for word. Fixed before
+#: `measure_framing(check_background=true)` asks Moondream2 this, word for word. Fixed before
 #: measuring (VisionBench `composition_critique.py`, 2026-10-11): against a person's blind calls it
 #: agreed 88.1% (balanced) on 25 tune photos and 69.2% on 52 held-out ones.
 BUSY_BACKGROUND_QUESTION: Final[str] = (

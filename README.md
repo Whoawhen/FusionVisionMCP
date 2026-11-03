@@ -78,7 +78,7 @@ root-caused against the exact fixture that exposed it, not patched at the sympto
 | `count_objects` | Grounding DINO (photos), Florence-2 (flat images) | Count how many instances of a named object an image contains. Use this, not `detect_objects`, for "how many" questions. Flat images (clip art, vector charts, synthetic shapes) count less reliably: touching shapes can merge into one. On a collapse, adds an actionable outline estimate. On photos, `possibly_more: {upper, extra_candidates, reliability}` flags a count that may be too low, and on crowds `crowd_range: {low, high}` (Grounding DINO and SAM 3 together) holds the true count 86% of the time. A weak single box the `query_image` model says is not there becomes 0, and a zero it confirms becomes 1 (`detector_count` keeps the detector's number; `lfm_check=false` skips it). On flat images, any count becomes 0 when that model says the object is not there. |
 | `spatial_relations` | Grounding DINO + SAM2 | Measure contact, gaps, containment depth and shape between two named objects. |
 | `score_aesthetics` | CLIP + LAION | Rate how aesthetically pleasing an image looks on a 1-10 scale. `compare_with` switches to a calibrated like-with-like comparison against a reference image. |
-| `critique_composition` | Florence-2 + CLIP/LAION + Moondream2 | Check framing against the rule of thirds; for low-scoring shots, explain what looks off. Also supports `compare_with`. |
+| `measure_framing` | Florence-2 + CLIP/LAION + Moondream2 | Find the main subject and measure its framing: where it sits, how much of the frame it fills, rule-of-thirds offsets, and the aesthetic score; for low-scoring shots, a short note on what looks off. Also supports `compare_with`. |
 | `batch_analyze_images` | (routes to any tool above) | Run one operation across many images in a single call, isolating failures per image. |
 | `process` | Florence-2 | Run a raw Florence-2 task token for tasks the named tools don't cover. |
 | `server_status` | (no model) | Report what the server holds in memory: models loaded, live free RAM, heavy calls running, and recent loads, releases and refusals with their reasons. For when a call was slow or refused. |
@@ -108,10 +108,10 @@ stack answers these on its own:
 - **`spatial_relations`** combines Grounding DINO boxes, SAM2 masks, and a from-scratch geometry module to measure
   whether two objects actually touch, contain, or overlap — a bounding box alone can't answer that, since boxes
   overlap the instant one object is merely in front of another.
-- **`critique_composition`** combines Florence-2 localization, a from-scratch rule-of-thirds check, the CLIP/LAION
-  aesthetic score, and — only for low-scoring images — a Moondream2 explanation, into one composition critique.
-  Since 2026-10-11 it also reports `background: {busy, reliability}` by default (`check_background`), Moondream2's
-  yes/no on whether the background competes with the subject: a hint, agreeing with a person's blind calls on 69%
+- **`measure_framing`** (named `critique_composition` until 2026-11-03) combines Florence-2 localization, a
+  from-scratch rule-of-thirds check, the CLIP/LAION aesthetic score, and — only for low-scoring images — a Moondream2
+  explanation. It measures framing; it does not judge it. `check_background=true` adds
+  `background: {busy, reliability}` (off by default since 2026-11-03, ~10 s), Moondream2's yes/no on whether the background competes with the subject: a hint, agreeing with a person's blind calls on 69%
   of 52 held-out photos. Without a `target_subject`, Moondream2 now names the subject and Florence-2 boxes it
   (84.4% of boxes overlapping a labeller's on 96 fresh photos, against 75.0% for the old region pick). Since
   2026-11-03 `framing` also names the subject's place and size in words (`horizontal`, `vertical`, `size`,
@@ -227,7 +227,7 @@ a session that only captions never loads the segmentation or aesthetic models at
 The main models, each loaded on demand and released on its own idle timer:
 
 - **Florence-2** (Microsoft) — OCR with regions, object detection/grounding, dense region captioning (and `caption` with `--caption-model florence2`)
-- **Moondream2** (Vikhyat) — `critique_composition`'s busy-background and subject hints (and `query_image` with `--vqa-model moondream`)
+- **Moondream2** (Vikhyat) — `measure_framing`'s busy-background and subject hints (and `query_image` with `--vqa-model moondream`)
 - **LFM2.5-VL-3B** (Liquid AI) — `caption`: ONNX Runtime for the default caption, bf16 for `deep=true` (weights under the LFM Open License v1.0)
 - **SAM2** (Meta) — segmentation masks, the basis for `spatial_relations`
 - **Grounding DINO** (IDEA-Research) — open-vocabulary detection backing `count_objects`

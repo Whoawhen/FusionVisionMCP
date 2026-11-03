@@ -57,6 +57,11 @@ figures below are its held-out results, and CLAUDE.md has the detail.
 - `spatial_relations` reports how much of one object lies within the other's outline
   (containment 67.6% -> 83.8%).
 - `detect_objects`' description says to trust the first box (right 71-73% of the time).
+- **`critique_composition` is renamed `measure_framing`**, since it measures framing rather than judging
+  it, and its `framing` names the subject's place and size in words (`horizontal`, `vertical`, `size`,
+  `area_share`; the same fifth as a labeller's box on 80-90% of held-out photos). The busy-background
+  hint is off by default now (`check_background=true` restores it). Moving its three Moondream2
+  questions to LFM2.5-VL failed every gate, so Moondream2 stays.
 
 ### Memory
 

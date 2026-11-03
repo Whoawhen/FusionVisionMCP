@@ -1,4 +1,4 @@
-"""Aesthetic tools: `score_aesthetics` and `critique_composition`."""
+"""Aesthetic tools: `score_aesthetics` and `measure_framing`."""
 
 import os
 from collections.abc import Sequence
@@ -10,8 +10,8 @@ from pydantic import Field
 from fusion_vision_mcp.analysis import (
     _COMPARE_TIE,
     _aesthetic_comparison,
-    _critique_one,
     _enrich_aesthetics,
+    _framing_one,
 )
 from fusion_vision_mcp.images import get_images
 from fusion_vision_mcp.params import ImagePath
@@ -126,7 +126,7 @@ def register(mcp: MCPServer) -> None:
                 return _aesthetic_comparison(app, images, ref_images, style_context)
 
     @mcp.tool()
-    def critique_composition(
+    def measure_framing(
         ctx: Context[AppContext],
         src: ImagePath,
         target_subject: Annotated[
@@ -157,13 +157,13 @@ def register(mcp: MCPServer) -> None:
             bool,
             Field(
                 description=(
-                    "When true (default), ask Moondream2 whether the background competes with the "
+                    "When true, ask Moondream2 whether the background competes with the "
                     "subject and add `background: {busy, reliability}`. A hint, not a measurement: "
                     "it agreed with a person's blind calls on 69% of 52 held-out photos. About 10 s "
-                    "per image; pass false to skip it."
+                    "per image, so it is off by default."
                 )
             ),
-        ] = True,
+        ] = False,
         compare_with: Annotated[
             os.PathLike[str] | str | None,
             Field(
@@ -177,14 +177,14 @@ def register(mcp: MCPServer) -> None:
             ),
         ] = None,
     ) -> dict[str, Any]:
-        """Critique an image's composition: framing, and, for low-scoring images, why it looks off.
+        """Measure how an image frames its main subject: where it sits, how much of the frame it fills.
 
-        Combines `score_aesthetics` (numeric quality), a rule-of-thirds/centeredness
-        check on the main subject's bounding box, and — only when the aesthetic
-        score is below `low_score_threshold` — a Moondream2 VQA explanation of what
-        specifically looks unbalanced. Use it over `score_aesthetics` alone when you
-        need to know *why* a shot is weak and where its subject sits in the frame,
-        rather than just how it scores.
+        Finds the main subject's box, then reports its place and size in the frame in
+        words and numbers, a rule-of-thirds/centeredness check, and the `score_aesthetics`
+        score. These are measurements, not a judgement of whether the shot works. Only
+        when the score is below `low_score_threshold` does it add a short Moondream2
+        explanation of what looks off; treat that prose as a weak opinion (it trails
+        frontier models' critiques by about 7 points of word overlap).
 
         Returns `image_size`, `subject_box`, `aesthetics`, and `framing` (with
         `thirds_offset` near 0 meaning the subject sits on a rule-of-thirds power
@@ -210,7 +210,7 @@ def register(mcp: MCPServer) -> None:
         soft-failure shape (image size, aesthetic score, and a "note") rather than
         raising. Only the first page of a PDF is assessed.
 
-        By default the result also carries `background: {busy, reliability}`, Moondream2's
+        With `check_background=true` the result also carries `background: {busy, reliability}`, Moondream2's
         yes/no on whether the background competes with the subject. Read it as a hint:
         against a person's blind calls it agreed on 88% of 25 tune photos and 69% of 52
         held-out ones (VisionBench `composition_critique.py`, 2026-10-11). Whether the
@@ -233,7 +233,7 @@ def register(mcp: MCPServer) -> None:
         with get_images(src) as images:
             image = images[0]
             if compare_with is None:
-                return _critique_one(app, image, target_subject, low_score_threshold, style_context, check_background)
+                return _framing_one(app, image, target_subject, low_score_threshold, style_context, check_background)
 
             # Relative mode: critique both the image and the reference, then report
             # the per-image critiques, the aesthetic delta, and which is preferred --
@@ -242,10 +242,10 @@ def register(mcp: MCPServer) -> None:
             # comparison runs inside the reference's context manager.
             with get_images(compare_with) as ref_images:
                 ref = ref_images[0]
-                img_result = _critique_one(
+                img_result = _framing_one(
                     app, image, target_subject, low_score_threshold, style_context, check_background
                 )
-                ref_result = _critique_one(app, ref, "", low_score_threshold, style_context, check_background)
+                ref_result = _framing_one(app, ref, "", low_score_threshold, style_context, check_background)
                 img_score = img_result.get("aesthetics", {}).get("score")
                 ref_score = ref_result.get("aesthetics", {}).get("score")
                 delta: float | None = None
