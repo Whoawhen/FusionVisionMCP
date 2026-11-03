@@ -2,7 +2,7 @@
 
 **Model:** Sonnet 5.5, in a new session. Opus 5.5 fixed these rules, and the label list, on 2026-10-18 before
 anything ran; don't change them. If one can't be followed, stop and report.
-**Plan:** `Future_Ideas/caption_sprint_c4_plan.md`: "Rules carried over", C4-0b's miss list (27 of 111 groups both
+**Plan:** `Future_Ideas/archive/caption_sprint_c4_plan.md`: "Rules carried over", C4-0b's miss list (27 of 111 groups both
 slots miss are image type or genre), and the C4-2b, C4-2a and C4-3b results. Read them first.
 **When:** steps 1-2 take minutes and can run any time nothing is timing; step 4 (round 11 captions, ~3 CPU hours)
 must not overlap the phase 11 scoreboard run or any other benchmark.

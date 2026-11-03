@@ -30,7 +30,7 @@ Every step was checked against the live code (`florence2.py`, `moondream.py`, th
 ### 0.2 Corrections of fact
 
 - **Moondream crops.** `select_tiling` gives a 1024x1024 image **3x3 = 9 local crops + 1 global = 10 passes**, not 12 + 1. 12 local crops occur only on 3:4-ish aspects. `max_crops` 6 and 4 both give **2x2** on 1024x1024 and 768x1024 (which is why their timings match: 20.47 s vs 20.27 s); they differ only on wide images (1080x1920: 1x3 vs 1x2). 2x2 means each crop covers about half the image squeezed into 378 px, against roughly native resolution at 3x3, so this is a real resolution cut on dense text, not a free saving. `max_crops` 2 and 1 are identical (1x1).
-- **Moondream dtype.** Verified at runtime: all 592 parameters are already `bfloat16` on CPU, so there is no Moondream precision lever. The plan was right about this and about Florence-2 being fp32 ([`florence2.py:30`](../src/fusion_vision_mcp/florence2.py#L30)).
+- **Moondream dtype.** Verified at runtime: all 592 parameters are already `bfloat16` on CPU, so there is no Moondream precision lever. The plan was right about this and about Florence-2 being fp32 ([`florence2.py:30`](../../src/fusion_vision_mcp/florence2.py#L30)).
 - **OCR engine.** The scoreboard row and Section 3.5 say `RapidOCR (PP-OCRv4)`. It is **PP-OCRv6 English** via `ppocr_engine.py`.
 - **CHAIR synonyms.** `chair` maps to `["chair", "stool"]`; `armchair` is not a synonym. `scissors`, `book`, `clock`, `vase` and `couch` **are** COCO classes and Florence's region captions name them often.
 - **Scorer claim verified.** `keyword_group_hit` tries `word`, `word+s`, `word+es` only, so a plural-only group (`candles`) misses `candle`, and `methodology` misses `methodologies`. The +5 / +4 hit counts were not re-derived here.
@@ -181,7 +181,7 @@ Then a phase 11 express run of the affected tools (`--tools caption,count_object
 
 ### 1.1 Current Scoreboard Status
 
-From [`Future_Ideas/frontier_capability_gaps.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/frontier_capability_gaps.md) and [`Future_Ideas/caption_sprint_c4_plan.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/caption_sprint_c4_plan.md):
+From [`Future_Ideas/frontier_capability_gaps.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/frontier_capability_gaps.md) and [`Future_Ideas/archive/caption_sprint_c4_plan.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/archive/caption_sprint_c4_plan.md):
 
 | Metric / Slot | Current Shipping Architecture | Confirm (280) | Tune (120) | Combined 400 / Phase 11 | Frontier Ceiling | Gap to Ceiling | CPU Median Latency (Cap) |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -206,7 +206,7 @@ From [`Future_Ideas/frontier_capability_gaps.md`](file:///c:/AI/MCP/FusionVision
 
 ## 2. Project History & "Do Not Repeat" Ledger
 
-Every prior caption experiment across [`caption_sprint_plan.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/caption_sprint_plan.md), [`caption_sprint_c4_plan.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/caption_sprint_c4_plan.md), [`c4_6_narrow_type_design.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/c4_6_narrow_type_design.md), and [`c4_7_text_line_design.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/c4_7_text_line_design.md) has been audited. **The failed routes below are permanently closed in their tested form and must not be re-run:**
+Every prior caption experiment across [`caption_sprint_plan.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/archive/caption_sprint_plan.md), [`caption_sprint_c4_plan.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/archive/caption_sprint_c4_plan.md), [`c4_6_narrow_type_design.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/archive/c4_6_narrow_type_design.md), and [`c4_7_text_line_design.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/archive/c4_7_text_line_design.md) has been audited. **The failed routes below are permanently closed in their tested form and must not be re-run:**
 
 | Sprint / ID | What Was Tested | Outcome & Exact Numbers | Status / Why Not Repeated |
 | :--- | :--- | :--- | :--- |
@@ -432,7 +432,7 @@ With Track 1 freeing ~3.5–4.5 s in Default (`caption(deep=False)` now ~8.5–9
     - Test whether `Moondream2` with `max_crops=1` (or `2`), `slice_kv=True`, and `length="normal"` / `"long"` (160-token cap) + `ocr_pages` runs within the **$\le 15.0\text{ s}$ median budget** across all 120 tune images (~5.4 s encode + ~6.5 s decode + ~2.0 s OCR = **~13.9 s**). If it meets the $\le 15.0\text{ s}$ latency gate and COCO CHAIR gate, Default `caption` jumps by **+5 to +8 points** across the board!
 
 #### Step 2B: CHAIR-Safe `<DENSE_REGION_CAPTION>` Supplement (Completing Untested `C4-2c` for Default & `deep`)
-- **Context:** In [`caption_sprint_c4_plan.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/caption_sprint_c4_plan.md), `C4-2c` (`Also visible: x, y, z.` from `Florence-2` `<DENSE_REGION_CAPTION>`) was designed to recover secondary objects (`scissors`, `armchair`, `palette`, `red panda`, `scoreboard`, `candles`, `lanternfish`), **but was never run** because `C4-2a` stopped in `fp32`. Furthermore, in `deep=True` (`Moondream2`), adding `Florence-2`'s localized region/object detections directly recovers the **19 `flo_only` keyword groups (+4.3 pts on Tune)** where `Florence-2` beat `Moondream2`!
+- **Context:** In [`caption_sprint_c4_plan.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/archive/caption_sprint_c4_plan.md), `C4-2c` (`Also visible: x, y, z.` from `Florence-2` `<DENSE_REGION_CAPTION>`) was designed to recover secondary objects (`scissors`, `armchair`, `palette`, `red panda`, `scoreboard`, `candles`, `lanternfish`), **but was never run** because `C4-2a` stopped in `fp32`. Furthermore, in `deep=True` (`Moondream2`), adding `Florence-2`'s localized region/object detections directly recovers the **19 `flo_only` keyword groups (+4.3 pts on Tune)** where `Florence-2` beat `Moondream2`!
 - **Why Naive Region Appending Could Risk COCO CHAIR — and Our CHAIR-Safe Filter:**
   - If `<DENSE_REGION_CAPTION>` names a noisy background COCO category on an everyday photo, `CHAIR-i` could rise.
   - **CHAIR-Safe Filtering Rules (Fixed Before Tune Run):**
@@ -461,7 +461,7 @@ With Track 1 freeing ~3.5–4.5 s in Default (`caption(deep=False)` now ~8.5–9
 
 Because `caption(read_text=True)` calls `ocr_pages(app, [img])` in [`src/fusion_vision_mcp/analysis.py`](file:///c:/AI/MCP/FusionVisionMCP/src/fusion_vision_mcp/analysis.py#L46-L73) and formats the output via `visible_text_line`, improvements to the OCR pipeline directly improve **both** the primary `caption` Keyword Recall score and the secondary **Key Text Phrases in `caption`** score (`60.0%` on Round 20 / `67.3%` on Phase 11).
 
-#### Step 3A: Automatic Inheritance of [`OCR-TextVQA_Improvement_Plan.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/OCR-TextVQA_Improvement_Plan.md) (Track 1 & Track 3)
+#### Step 3A: Automatic Inheritance of [`OCR-TextVQA_Improvement_Plan.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/archive/OCR-TextVQA_Improvement_Plan.md) (Track 1 & Track 3)
 - **Synergy with OCR Plan:**
   1. **Track 1 of OCR Plan (`PP-OCRv5` models + `limit_side_len=2000` + Adaptive Contrast/CLAHE Retry)**:
      - Directly fixes low-contrast UI text, stylized banners (`"À VOS SOUHAITS !"`, `"Harc Wesnothért"`), and dense document lines where `PP-OCRv6` at `limit_side_len=960` missed characters or whole lines, with near-zero latency cost (~0.3–1.2 s).

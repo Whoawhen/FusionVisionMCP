@@ -2,7 +2,7 @@
 
 **Model:** Sonnet 5.5, in a new session. Opus 5.5 fixed these rules on 2026-10-18 before anything ran; don't change
 them. If one can't be followed, stop and report.
-**Plan:** `Future_Ideas/caption_sprint_c4_plan.md`, section "C4-3b". Read it, and the "Rules carried over" section,
+**Plan:** `Future_Ideas/archive/caption_sprint_c4_plan.md`, section "C4-3b". Read it, and the "Rules carried over" section,
 first.
 **Time:** about 1 to 1.5 hours, most of it the 4 GB download and 40 caption calls.
 **Deadline:** finish before the user's phase 11 scoreboard run tonight (2026-10-18). Never time anything while

@@ -244,7 +244,7 @@ helper at 3 beams equalled `Florence2.caption` on 5 of 5 images, and its 3-beam 
   11:48-11:58 during the smoke's timing, so the smoke ran under some load; settings alternated per image, the
   saving is 4.5x the 1.0 s bar, and the fail is CHAIR, not speed. Run by Opus 5.5, not the Sonnet 5.5 the handoff named.
 
-**b. The OCR line: a bigger word cap, then titles first** (rewritten 2026-10-17 from `docs/plans/Caption_Ideas.md`
+**b. The OCR line: a bigger word cap, then titles first** (rewritten 2026-10-17 from `Future_Ideas/archive/Caption_Ideas.md`
 Track 1; Opus 5.5 fixed these rules, Sonnet 5.5 runs them). It applies to both slots, costs no time (`ocr_pages`
 already runs on every call and already returns the boxes), and works only on OCR output, so it carries over unchanged
 when PP-OCRv6 is replaced.
@@ -747,10 +747,10 @@ tools unchanged.
 
 | File | Change |
 |---|---|
-| [moondream.py](../src/fusion_vision_mcp/moondream.py) | Pass `settings` (greedy) to `caption` only, leaving `query` sampled (Decision 5); `encode_image` once per image; optional extra question |
-| [florence2.py](../src/fusion_vision_mcp/florence2.py) | Generation kwargs per task (beams for caption only); optional PEFT adapter toggled for caption only |
-| [analysis.py](../src/fusion_vision_mcp/analysis.py) | `visible_text_line`: title-first ordering from OCR boxes |
-| [tools/text.py](../src/fusion_vision_mcp/tools/text.py) | `caption` docstring figures updated from the fresh holdout |
+| [moondream.py](../../src/fusion_vision_mcp/moondream.py) | Pass `settings` (greedy) to `caption` only, leaving `query` sampled (Decision 5); `encode_image` once per image; optional extra question |
+| [florence2.py](../../src/fusion_vision_mcp/florence2.py) | Generation kwargs per task (beams for caption only); optional PEFT adapter toggled for caption only |
+| [analysis.py](../../src/fusion_vision_mcp/analysis.py) | `visible_text_line`: title-first ordering from OCR boxes |
+| [tools/text.py](../../src/fusion_vision_mcp/tools/text.py) | `caption` docstring figures updated from the fresh holdout |
 | `tests/test_analysis_helpers.py`, new `tests/test_moondream.py`, `tests/test_florence2_adapter.py` | Permanent tests listed under each sprint |
 
 ## Rough cost

@@ -2,7 +2,7 @@
 
 **Model:** Sonnet 5.5, in a new session. Opus 5.5 fixed these rules on 2026-10-18 before anything ran; don't change
 them. If one can't be followed, stop and report.
-**Plan:** `Future_Ideas/caption_sprint_c4_plan.md`, "C4-3b" (with its gate 1 result) and "Rules carried over". Read
+**Plan:** `Future_Ideas/archive/caption_sprint_c4_plan.md`, "C4-3b" (with its gate 1 result) and "Rules carried over". Read
 both first, and gate 1's script `VisionBench/benchmarks/caption_c4_3b_gate1.py`.
 **Time:** about 1.5 to 2 CPU hours (120 Gemma captions at ~45 s, plus OCR).
 **When:** only while nothing else is running: not during C4-2a or the phase 11 scoreboard run.

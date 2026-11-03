@@ -4,7 +4,7 @@
 **Status:** Reviewed 2026-10-27 (Section 0 supersedes the rest where they disagree). **Phase 1 done 2026-10-27**
 (0.7): Track 1A/4A shipped with the Q2 crowd gate and Q3 consensus default. Next: round 26 (fresh confirmation) and
 Gate 1 (bounded LFM arbiter).
-**Companion docs:** [`Future_Ideas/frontier_capability_gaps.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/frontier_capability_gaps.md) (Gap 2), [`Future_Ideas/counting_problem_statement.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/counting_problem_statement.md), [`Future_Ideas/counting_plan.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/counting_plan.md), [`Future_Ideas/detector_ocr_replacement_plan.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/detector_ocr_replacement_plan.md)
+**Companion docs:** [`Future_Ideas/frontier_capability_gaps.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/frontier_capability_gaps.md) (Gap 2), [`Future_Ideas/archive/counting_problem_statement.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/archive/counting_problem_statement.md), [`Future_Ideas/archive/counting_plan.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/archive/counting_plan.md), [`Future_Ideas/archive/detector_ocr_replacement_plan.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/archive/detector_ocr_replacement_plan.md)
 
 ---
 
@@ -460,7 +460,7 @@ On the 2026-10-25 VisionBench frontier comparison (`FusionVision vs frontier mod
 
 ## 2. "Do Not Repeat" Ledger (What Already Failed and Why)
 
-Every prior counting experiment is logged in [`CLAUDE.md`](file:///c:/AI/MCP/FusionVisionMCP/CLAUDE.md), [`Future_Ideas/counting_plan.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/counting_plan.md), and `C:\AI\Projects\VisionBench\benchmarks\results\`. The plan below explicitly avoids repeating any of these rejected paths:
+Every prior counting experiment is logged in [`CLAUDE.md`](file:///c:/AI/MCP/FusionVisionMCP/CLAUDE.md), [`Future_Ideas/archive/counting_plan.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/archive/counting_plan.md), and `C:\AI\Projects\VisionBench\benchmarks\results\`. The plan below explicitly avoids repeating any of these rejected paths:
 
 | # | Previously Tested Idea | Benchmark Script / Result | Why It Failed (Root Cause) |
 | --- | --- | --- | --- |
@@ -691,7 +691,7 @@ In `FusionVisionMCP`, `LFM2.5-VL-3B ONNX` (`app.answerer`) is **already loaded i
 
 ### Track 3: `SAM 2.1` Mask-Territory & Merged-Instance Verification (`analysis.py`)
 
-**Goal:** Address the two geometry-level failure modes identified in [`Future_Ideas/counting_plan.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/counting_plan.md) (Options 2 and 6) that box coordinates alone cannot resolve:
+**Goal:** Address the two geometry-level failure modes identified in [`Future_Ideas/archive/counting_plan.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/archive/counting_plan.md) (Options 2 and 6) that box coordinates alone cannot resolve:
 
 #### Step 3A — `SAM 2.1` "New Territory" Mask Check for `[0.18, 0.425)` Candidates
 - **How it works:**
@@ -762,7 +762,7 @@ Write `C:\AI\Projects\VisionBench\benchmarks\count_gate_lfm_arbiter.py` (with JS
 ### Gate 2 — Held-Out Confirmation (Sprint R Confirm + Round 14 + Fresh Confirm Slice)
 > [!WARNING]
 > **Preventing Confirm-Split Reuse:**
-> As noted in [`Future_Ideas/counting_plan.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/counting_plan.md#L168-L176), Round 14 (`103` Open Images counts) was already used to reject Gate C1 and evaluate Gate P1. While we will report Round 14 (`103` items) and Sprint R Confirm (`427` items) for continuity with the historical table, final confirmation will also include a **fresh held-out Open Images / COCO exact-count slice (1–5 objects, N >= 150)** never touched by any prior gate.
+> As noted in [`Future_Ideas/archive/counting_plan.md`](file:///c:/AI/MCP/FusionVisionMCP/Future_Ideas/archive/counting_plan.md#L168-L176), Round 14 (`103` Open Images counts) was already used to reject Gate C1 and evaluate Gate P1. While we will report Round 14 (`103` items) and Sprint R Confirm (`427` items) for continuity with the historical table, final confirmation will also include a **fresh held-out Open Images / COCO exact-count slice (1–5 objects, N >= 150)** never touched by any prior gate.
 
 **Gate 2 Ship Criteria:**
 1. **16/16** synthetic negative controls pass (`8/8` literal + `8/8` `"petal"`).

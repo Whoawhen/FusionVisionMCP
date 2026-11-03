@@ -2,7 +2,7 @@
 
 **Model:** Sonnet 5.5, in a new session. Opus 5.5 fixed these rules on 2026-10-18 before anything ran; don't change
 them. If one can't be followed, stop and report.
-**Plan:** `Future_Ideas/caption_sprint_c4_plan.md`, "Sprint C4-2", item a. Read it, and "Rules carried over", first.
+**Plan:** `Future_Ideas/archive/caption_sprint_c4_plan.md`, "Sprint C4-2", item a. Read it, and "Rules carried over", first.
 **Time:** about 1 to 1.5 CPU hours if it gets past the smoke test, 15 minutes if it doesn't.
 **When:** only while nothing else is running: not during C4-3b gate 1 (Gemma timing) or the phase 11 scoreboard
 run. Seconds measured under load aren't comparable.

@@ -178,7 +178,7 @@ disagree with Section 0, Section 0 wins.*
 
 ## 2. What Has Already Been Tried (Do Not Repeat)
 
-Every prior OCR experiment across `CLAUDE.md`, `CHANGELOG.md`, `Future_Ideas/detector_ocr_replacement_plan.md`, and `Future_Ideas/OCR-TextVQA_Improvement_Plan.md` has been audited so rejected paths are not repeated:
+Every prior OCR experiment across `CLAUDE.md`, `CHANGELOG.md`, `Future_Ideas/archive/detector_ocr_replacement_plan.md`, and `Future_Ideas/archive/OCR-TextVQA_Improvement_Plan.md` has been audited so rejected paths are not repeated:
 
 | Prior Experiment | Where Measured | Outcome & Why It Failed or Succeeded | Rule for This Plan |
 | :--- | :--- | :--- | :--- |

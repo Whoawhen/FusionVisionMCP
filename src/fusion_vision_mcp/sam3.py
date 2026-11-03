@@ -1,7 +1,7 @@
 """SAM 3's open-vocabulary detector, backing `detect_objects` on photographs.
 
 It replaced Grounding DINO there after VisionBench sprint R (2026-10-12; plan in
-`Future_Ideas/detector_ocr_replacement_plan.md`). On the held-out half, against Grounding DINO at 0.35, it
+`Future_Ideas/archive/detector_ocr_replacement_plan.md`). On the held-out half, against Grounding DINO at 0.35, it
 found 16 points more of the labelled objects and boxed a plausible-but-absent neighbour on 9% of probes
 instead of 66%. It did not take over counting: asked for the synthetic fixtures by name it returns no box
 for "ball", "rod" or "blob", so `count_objects` stays on Grounding DINO.

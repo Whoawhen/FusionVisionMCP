@@ -1,5 +1,75 @@
 # Changelog
 
+## Unreleased
+
+Everything since v0.8.2 (2026-09-16). Each change was measured on VisionBench
+(`C:\AI\Projects\VisionBench`, where benchmarking moved on 2026-09-18) before it shipped; the
+figures below are its held-out results, and CLAUDE.md has the detail.
+
+### Models
+
+- **LFM2.5-VL-3B (Liquid AI) now backs `caption` and `query_image`**, on ONNX Runtime on CPU.
+  The default caption replaced Florence-2 (key facts 64.8% -> 71.0% on 280 held-out images),
+  `deep` replaced Moondream2's long caption (bf16, 4 tiles; 69.0% -> 74.8%), and `query_image`
+  replaced Moondream2 (78.5% vs 66.5% on 892 fresh questions). `--caption-model florence2` and
+  `--vqa-model moondream` restore the old models. Weights are under the LFM Open License v1.0.
+- **SAM 3 (Meta) backs `detect_objects`**, on photos and flat images, with Grounding DINO and
+  Florence-2 as fallbacks when it can't load (it is gated on Hugging Face). It boxes a plausible
+  but absent neighbour on 9% of probes against Grounding DINO's 66%.
+- **PP-OCRv6 English (via RapidOCR) replaced EasyOCR as the `ocr` engine** (TextVQA answer
+  recall 37.5% -> 53.0%). EasyOCR stays for non-English `--ocr-languages` and for
+  `structured_analysis`' gibberish check.
+- **transformers 5**, which SAM 3 needs. Every model's outputs were checked against 4.57 and
+  the differences fixed; Moondream2 is pinned to `5d6c926` (the same weights).
+- Florence-2 runs in bfloat16 on CPU (caption -2.7 s, every consumer within its rule).
+
+### New tools and parameters
+
+- **`classify_image`**: which of the caller's labels an image shows, with a probability each
+  (CLIP zero-shot; 98.5% vs `query_image`'s 77.5% on 200 fresh images).
+- **`server_status`**: models loaded, memory held and free, and recent loads, releases and
+  refusals. It loads no model.
+- `caption`: `read_text` (the `ocr` text as a `Visible text` line, up to 400 words), `image_type`
+  (an `Image type:` line from CLIP), `deep`, and `region=[x1, y1, x2, y2]`.
+- `ocr`: a sharpened second reading, and `lfm_read` (LFM2.5-VL's transcription of pages with
+  text, default on). Real-blur key phrases 47.9% -> 62.2%.
+- `count_objects`: `possibly_more`, `crowd_range`, and `lfm_check` (LFM2.5-VL presence checks
+  that may move a count by one step on photos, or veto a flat-image count).
+- `critique_composition`: `background: {busy, reliability}` (`check_background`) and a named
+  `subject`.
+- `--transport streamable-http`: one server several MCP clients share by URL.
+- `--memory-reserve GB` and `--memory-budget GB`.
+
+### Changed behaviour
+
+- `count_objects` counts at 0.425 on photos, not 0.15 (exact counts 43.8% -> 61.8%), drops boxes
+  that are a part or near-duplicate of another, and drops Florence-2's whole-group box on flat
+  images. `consensus` is opt-in now.
+- `query_image` gives text and name lookups the `ocr` reading with a verbatim prompt
+  (80.2% vs 76.8% on 917 fresh questions), and `check_consistency` judges agreement by question
+  kind. A What/Which/Who/Where question it does not route first asks whether the thing is there
+  (`presence_check`, default on; 76.0 -> 81.2% on 780 fresh questions, shipped on the user's
+  decision although its gate failed).
+- `ocr` reads lines that cross a column gutter whole, turns sideways pages upright, and finds
+  more text on photos (detector box threshold 0.4: 55.0% -> 58.5%).
+- `structured_analysis` flags AI defects with a learned probe on hand and face crops
+  (DINOv2-large) instead of the part count.
+- `spatial_relations` reports how much of one object lies within the other's outline
+  (containment 67.6% -> 83.8%).
+- `detect_objects`' description says to trust the first box (right 71-73% of the time).
+
+### Memory
+
+`MemoryManager` checks that every model load and heavy call fits in free RAM and commit before
+it runs, releasing least-recently-used idle models to make room, and refuses with a tool error
+instead of letting the server die. A watcher releases idle models when the machine runs short,
+including when Windows starts paging.
+
+### Removed
+
+- `caption(auto_verify_text)`: +0.0 key text on 60 images, at twice the time, once every caption
+  carried the `ocr` text.
+
 ## v0.8.2
 
 ### Structure

@@ -105,7 +105,7 @@ by hand. For example, asking *"How many bolts are in this photo?"* with an image
 Most tools above expose one underlying model's own capability directly. Two do not — no single model in the
 stack answers these on its own:
 
-- **`spatial_relations`** combines Florence-2 boxes, SAM2 masks, and a from-scratch geometry module to measure
+- **`spatial_relations`** combines Grounding DINO boxes, SAM2 masks, and a from-scratch geometry module to measure
   whether two objects actually touch, contain, or overlap — a bounding box alone can't answer that, since boxes
   overlap the instant one object is merely in front of another.
 - **`critique_composition`** combines Florence-2 localization, a from-scratch rule-of-thirds check, the CLIP/LAION
@@ -224,7 +224,7 @@ a session that only captions never loads the segmentation or aesthetic models at
 The main models, each loaded on demand and released on its own idle timer:
 
 - **Florence-2** (Microsoft) — OCR with regions, object detection/grounding, dense region captioning (and `caption` with `--caption-model florence2`)
-- **Moondream2** (Vikhyat) — `critique_composition`'s busy-background and subject hints, `count_objects`' estimate (and `query_image` with `--vqa-model moondream`)
+- **Moondream2** (Vikhyat) — `critique_composition`'s busy-background and subject hints (and `query_image` with `--vqa-model moondream`)
 - **LFM2.5-VL-3B** (Liquid AI) — `caption`: ONNX Runtime for the default caption, bf16 for `deep=true` (weights under the LFM Open License v1.0)
 - **SAM2** (Meta) — segmentation masks, the basis for `spatial_relations`
 - **Grounding DINO** (IDEA-Research) — open-vocabulary detection backing `count_objects`

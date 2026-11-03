@@ -4,7 +4,7 @@
 decides *whether the next one fits*. Without it, a session that touched enough models
 kept them all, and on 2026-10-24 the test server reached 26.8 GB of commit on a 31.5 GB
 laptop: Windows logged a low-virtual-memory condition and the process died with every
-client seeing only "connection closed" (Future_Ideas/memory_manager.md).
+client seeing only "connection closed" (Future_Ideas/archive/memory_manager.md).
 
 Before a load, `MemoryManager` compares the model's estimated size with live free
 memory and, when it is short, releases least-recently-used idle models first. Two

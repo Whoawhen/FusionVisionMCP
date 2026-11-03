@@ -231,7 +231,7 @@ that, lower-cased with punctuation as spaces, is under 2 characters or repeats a
 a cut line ends `…" (N more words not shown; ocr returns the full text).` Lines the prose already contains are
 *kept*: the quoted line is the verified text and the prose is not. Decided on VisionBench round 20 (150 fresh
 text-heavy images, 30 per kind; 144 of 144 key phrases right in the user's spot-check), rule fixed before the
-images existed (`Future_Ideas/c4_7_text_line_design.md`, `caption_text_line_r20.py`): key phrases 48.1 -> 60.0%
+images existed (`Future_Ideas/archive/c4_7_text_line_design.md`, `caption_text_line_r20.py`): key phrases 48.1 -> 60.0%
 (+11.9, CI 9.1 to 14.9), `deep` 54.3 -> 63.0% (+8.8, CI 6.4 to 11.2), no image worse, absent objects named
 unchanged; the marker shows on 56 of 150. Most of it is the length (raw 160 words: +10.8; cleaning at 80: +2.4).
 COCO CHAIR exactly unchanged in both slots and round 11 gained no absent object (`caption_text_line_r20_guards.py`).
@@ -548,7 +548,7 @@ than confirmed.
 
 ## `detect_objects` runs SAM 3 on photos, which needs transformers 5
 
-**2026-10-12.** VisionBench sprint R (`Future_Ideas/detector_ocr_replacement_plan.md`) replaced Grounding DINO in
+**2026-10-12.** VisionBench sprint R (`Future_Ideas/archive/detector_ocr_replacement_plan.md`) replaced Grounding DINO in
 `detect_objects` on photographs with SAM 3 (`sam3.py`, `facebook/sam3`, threshold `LOCATE_BOX_THRESHOLD` 0.125).
 On the held-out half it found 76.4% of labelled objects against 60.2%, and boxed a plausible-but-absent neighbour
 on 9.0% of probes against 65.7%; its boxes are less precise (about a third land on a labelled instance on COCO).
@@ -560,7 +560,7 @@ of many was boxed), SAM 3's score does not separate them (more wrong boxes than 
 query precision is 48-51%. The highest-scoring box, which comes first, is right 70.9 / 72.9% (tune / confirm), so the
 tool description tells callers to trust the first box and treat the rest as candidates.
 **2026-10-14: flat images too.** VisionBench gate F (`sam3_flat_gate.py` screen on 63 images, then
-`sam3_flat_confirm.py` on 88 fresh ones, rule fixed in `Future_Ideas/sam3_expansion_plan.md` before they existed):
+`sam3_flat_confirm.py` on 88 fresh ones, rule fixed in `Future_Ideas/archive/sam3_expansion_plan.md` before they existed):
 on the confirm set SAM 3 boxed the absent object on 11.4% against Florence-2's 100%, and found 53.8% of labelled
 objects against 40.5%; precision 22.4% vs 35.9%, ~29 s vs ~12 s per image, and 21 of 275 queries returned more than
 20 boxes. "Flat" is the router's pixel test (under 10 colours per 1,000 pixels, not greyscale with tonal range),
@@ -658,7 +658,7 @@ not re-measured. Gate 2 also showed SAM 3 cannot take over counting: on the lite
 boxes for "ball", "rod", "shape" and "blob" at every threshold.
 
 **2026-10-15: `possibly_more` says when a photo count may be too low; `count` is unchanged.** VisionBench gate
-C1 (`count_gate_c1.py`, Future_Ideas/counting_plan.md) found the missed 2- and 3-object counts are undercounts whose
+C1 (`count_gate_c1.py`, Future_Ideas/archive/counting_plan.md) found the missed 2- and 3-object counts are undercounts whose
 extra objects are mostly boxed just under 0.425, while lowering the floor overcounts single objects (a learned box
 scorer that tried to tell them apart failed, 51.5 vs 57.3% on round 14). So `count_objects` reports the gap instead:
 Grounding DINO's unreturned boxes in [`COUNT_RANGE_FLOOR` 0.18, threshold), each kept only if it is neither on (IoU)
@@ -713,7 +713,7 @@ day, by the user's decision: SAM 3 runs for `crowd_range` only when `possibly_mo
 (`CROWD_RANGE_RUN_UPPER`; round 17 replay 85.9 -> 80.4%, 428 of 644 phase 11 photo counts skip it), and `consensus`
 is opt-in, with `separable` always reported (on phase 11 the count was right 43% when the dense-region tally agreed
 and 66% when it disagreed). Round 26 is the fresh confirmation for all three
-(`Future_Ideas/Counting_Improvement_Plan.md`, Section 0).
+(`Future_Ideas/archive/Counting_Improvement_Plan.md`, Section 0).
 
 **2026-10-28: LFM2.5-VL may move a photo count by one step (`lfm_check`, default on; `analysis.lfm_count_check`).**
 At the default threshold only, after `possibly_more`/`crowd_range`: a count of 1 whose box scores under
@@ -889,7 +889,7 @@ it does not judge" section above — measure and flag, don't paper over.
   the gap of having to guess or make a second blind call, not the gap of the caption head misreading text.
 - **`query_image(check_consistency=true)`** asks a rephrased control question and returns
   `{answer, control_answer, consistent, confidence}`.
-- **`count_objects(consensus=true)`** (default on) adds a `dense_region_caption`-based second opinion and a
+- **`count_objects(consensus=true)`** (default on until 2026-10-27, opt-in since) adds a `dense_region_caption`-based second opinion and a
   `separable` flag reading `count` against the silhouette's `by_distance`/`by_radial`/`agreement` fields.
 - **`score_aesthetics`/`critique_composition`(`style_context=true`)** classifies the image's medium via
   zero-shot CLIP (16 style prompts, reusing the already-loaded aesthetic backbone) and returns it alongside the
@@ -1057,7 +1057,7 @@ reads live free RAM and commit (`GlobalMemoryStatusEx`; free RAM + swap on Linux
 (`try_release`, never mid-call, never blocking on another model's lock) until it fits. Still short on commit: it
 raises `ModelMemoryError`, a tool error rather than a dead server. Short on RAM alone: it loads with a warning.
 `--memory-budget GB` adds a soft cap. Loads are serialised. This runs in `persistent` mode too, which is what lets the
-session-scoped test server pass (523 of 523, 25 releases to make room; `Future_Ideas/memory_manager.md`).
+session-scoped test server pass (523 of 523, 25 releases to make room; `Future_Ideas/archive/memory_manager.md`).
 
 Two things to know. **The cache name is the table key**: a new `_lazy(factory, "Name")` in `app_lifespan` needs a
 `MODEL_MEMORY_GB` entry (measure it with VisionBench `model_memory.py`) or it is estimated at 1 GB. And **the table is

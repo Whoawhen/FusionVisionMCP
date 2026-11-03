@@ -1,9 +1,9 @@
 # Plan to Improve the Caption Tool / Function
 
 *Compiled: 2026-10-16*
-*Context: Follows the scoreboard in `Future_Ideas/frontier_capability_gaps.md#L79-L103`, the diagnostics in `Future_Ideas/caption_sprint_c4_plan.md`, and VisionBench evaluations.*
+*Context: Follows the scoreboard in `Future_Ideas/frontier_capability_gaps.md#L79-L103`, the diagnostics in `Future_Ideas/archive/caption_sprint_c4_plan.md`, and VisionBench evaluations.*
 
-> **Status (2026-10-17):** reviewed against `Future_Ideas/caption_sprint_c4_plan.md`, which is where the work is
+> **Status (2026-10-17):** reviewed against `Future_Ideas/archive/caption_sprint_c4_plan.md`, which is where the work is
 > tracked now. **Track 1** became C4-2b there, cap first: on the cached recheck rows all 307 dropped phrases are the
 > 40-word cap (none the ` / ` join), so the word cap is stage 1 and title-first ordering stage 2. **Track 2 is done
 > and did not ship** (C4-1, 2026-10-16: encode-once shipped as `cfa0d31`, but the theme line failed COCO CHAIR,

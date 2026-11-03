@@ -8,9 +8,9 @@
 
 ## 0. Review Outcome (2026-10-21) — Supersedes Where It Conflicts
 
-Every claim was checked against the live code ([`ppocr_engine.py`](../src/fusion_vision_mcp/ppocr_engine.py),
-[`analysis.py`](../src/fusion_vision_mcp/analysis.py) `_read_page` / `_looks_sideways` / `_read_upright` / `ocr_pages`,
-[`routing.py`](../src/fusion_vision_mcp/routing.py) `choose_count_backend`), RapidOCR 3.9.2's shipped `config.yaml` in the
+Every claim was checked against the live code ([`ppocr_engine.py`](../../src/fusion_vision_mcp/ppocr_engine.py),
+[`analysis.py`](../../src/fusion_vision_mcp/analysis.py) `_read_page` / `_looks_sideways` / `_read_upright` / `ocr_pages`,
+[`routing.py`](../../src/fusion_vision_mcp/routing.py) `choose_count_backend`), RapidOCR 3.9.2's shipped `config.yaml` in the
 server `.venv`, and VisionBench's cached results (`replacement_gate1_tune.json`, the per-item
 `replacement_gate1_ocr_*_tune.jsonl` rows, `ppocr_det_sweep.json`, `textvqa_annotations_extended.json`). The
 diagnosis in Section 2 holds up well: the 37 tune misses and every quoted example match the cached rows and
@@ -393,7 +393,7 @@ VisionBench `benchmarks/ocr_a3_diagnostic.py`, `results/ocr_a3_diagnostic.json`:
 ## 1. Goal & Policy Update
 
 ### Scoreboard Context
-On the current scoreboard ([`frontier_capability_gaps.md`](frontier_capability_gaps.md)), **`ocr`, photos (TextVQA)** is one of the largest remaining 🔻 gaps:
+On the current scoreboard ([`frontier_capability_gaps.md`](../frontier_capability_gaps.md)), **`ocr`, photos (TextVQA)** is one of the largest remaining 🔻 gaps:
 - **FusionVisionMCP now:** **58.5%** answer-text recall on all 200 TextVQA photos (**61.9%** on the 181 text-bearing questions; **59.8%** on the 92-item Sprint R tune split).
 - **Frontier model estimate:** **76.5–80.8%** (published VQA metric; **~75–80%** estimated on verbatim phrase containment).
 - **Current gap:** **🔻 −17 to −22 points** (and **−52 points** on Phase 13 blurred images).
