@@ -113,7 +113,10 @@ stack answers these on its own:
   Since 2026-10-11 it also reports `background: {busy, reliability}` by default (`check_background`), Moondream2's
   yes/no on whether the background competes with the subject: a hint, agreeing with a person's blind calls on 69%
   of 52 held-out photos. Without a `target_subject`, Moondream2 now names the subject and Florence-2 boxes it
-  (84.4% of boxes overlapping a labeller's on 96 fresh photos, against 75.0% for the old region pick).
+  (84.4% of boxes overlapping a labeller's on 96 fresh photos, against 75.0% for the old region pick). Since
+  2026-11-03 `framing` also names the subject's place and size in words (`horizontal`, `vertical`, `size`,
+  `area_share`): the same fifth of the frame as a labeller's box on 88-90% (across) and 80-87% (down) of held-out
+  photos, the same size class on 76-82%.
 
 ---
 

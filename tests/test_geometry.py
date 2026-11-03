@@ -370,6 +370,42 @@ def test_rule_of_thirds_prefers_the_gridpoint_over_the_center() -> None:
     assert on_gridpoint["thirds_offset"] < centered["thirds_offset"]
 
 
+def test_placement_names_the_bin_the_box_centre_falls_in() -> None:
+    result = geometry.placement([0.0, 140.0, 20.0, 160.0], (SIZE, SIZE))
+
+    assert result["horizontal"] == "left"
+    assert result["vertical"] == "lower_third"
+
+
+def test_placement_centred_box_is_center_and_middle() -> None:
+    result = geometry.placement([90.0, 90.0, 110.0, 110.0], (SIZE, SIZE))
+
+    assert (result["horizontal"], result["vertical"]) == ("center", "middle")
+
+
+def test_placement_bins_a_box_on_the_far_edge_into_the_last_bin() -> None:
+    """A centre at exactly the frame edge would index past five bins without the clamp."""
+    result = geometry.placement([SIZE, SIZE, SIZE, SIZE], (SIZE, SIZE))
+
+    assert (result["horizontal"], result["vertical"]) == ("right", "bottom")
+
+
+@pytest.mark.parametrize(("side", "size"), [(60.0, "small"), (100.0, "medium"), (160.0, "large"), (180.0, "fills")])
+def test_placement_size_follows_the_share_of_the_frame(side: float, size: str) -> None:
+    """Shares 0.09, 0.25, 0.64 and 0.81 of a 200 px frame, one in each of K1's four bins."""
+    result = geometry.placement([0.0, 0.0, side, side], (SIZE, SIZE))
+
+    assert result["size"] == size
+    assert result["area_share"] == pytest.approx(side * side / (SIZE * SIZE))
+
+
+def test_placement_uses_width_and_height_separately() -> None:
+    """A wide frame: a centre at (150, 50) is the second fifth across but the middle one down."""
+    result = geometry.placement([140.0, 40.0, 160.0, 60.0], (400, 100))
+
+    assert (result["horizontal"], result["vertical"]) == ("left_third", "middle")
+
+
 def test_radial_lobes_rejects_a_mask_too_small_to_measure() -> None:
     """`elongation` returns nan below 10 px, and `nan > threshold` is False.
 

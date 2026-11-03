@@ -360,6 +360,23 @@ did not. `composition_critique.py` then scored candidates with rules committed b
   three sets it never cost a hit and gained two.
 - **Untestable here:** subject in focus (3 "no" of 150) and awkward crop (no measurement matched the user's calls).
 
+**Gate K3 (2026-11-02/03): LFM2.5-VL could not take over any of the three Moondream2 questions, and the geometry
+words shipped.** Plan: `Future_Ideas/Critique_Composition_Improvement_Plan.md`, Review R5-R8; VisionBench
+`composition_{prose,subject,busy}_k3.py`, rules fixed before each run.
+
+- **Prose** (tune, 50): no LFM prompt passed the guards, so confirm was not run. Moondream2 18.5 token F1; LFM with
+  the same question 17.6, a structured one (subject, light and mood, one weakness) 17.8 (−0.5 at matched length, CI
+  −2.5 to +1.6), the structured one plus detector facts 16.9. Every arm fell below Moondream2 at matched length. A
+  fixed boilerplate sentence scores 14.7 on this metric and another photo's reference 9.3, so the usable range is
+  narrow.
+- **Subject naming** (confirm + box2): LFM's name −7.0 points IoU ≥ 0.5, CI −12.4 to −1.6 (margin −5), though 3.5 s
+  against 9.4 s. Picking among grounding boxes instead of the first: −0.5, CI −2.7 to +1.1, so `bboxes[0]` stays.
+- **Busy background** (the user's 77 seen calls): LFM 54.7% balanced against 75.2%, saying "busy" on 5% of photos;
+  the screen stopped it, so no fresh box2 labels were collected.
+- **Shipped: `framing.horizontal`/`vertical`/`size`/`area_share`** (`geometry.placement`), with K1's bins. Vertical
+  was scored from K1's cached boxes first: 82.1 / 86.5 / 80.2% on tune / confirm / box2, against horizontal's
+  84.6 / 89.9 / 88.5 and size's 64.1 / 82.0 / 76.0.
+
 ## Multi-column layouts are handled by geometry, not by asking the model harder
 
 `ocr` reads strictly in raster order, so a document laid out in side-by-side columns (a two-column form, meeting

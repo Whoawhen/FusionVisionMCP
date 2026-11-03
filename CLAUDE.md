@@ -207,6 +207,11 @@ Live plan: [Future_Ideas/Critique_Composition_Improvement_Plan.md](Future_Ideas/
 with the user's blind calls). Without `target_subject`, Moondream2 names the subject (`MAIN_SUBJECT_QUESTION`) and
 Florence-2 boxes it; a box covering 95%+ of the frame (`_WHOLE_FRAME`) defers to the largest central dense region.
 Background blur, subject focus and awkward crops are not shipped: nothing measured matched the user's calls.
+`framing`'s `horizontal`/`vertical`/`size` (`geometry.placement`) are K1's bins exactly (five equal fifths per axis
+on the box centre; size at 0.10/0.40/0.75), checked bin-for-bin against VisionBench's scorers on 448 cached boxes;
+changing a bin means re-scoring. No `touching_edges`: edge contact did not mean "cut off" in K1. Gate K3 (2026-11-03)
+tried LFM2.5-VL for all three Moondream2 questions and every swap failed (prose, naming −7, busy −20.5): Moondream2
+stays, and a prose gain needs a different approach than re-prompting LFM.
 
 ### `detect_objects`
 

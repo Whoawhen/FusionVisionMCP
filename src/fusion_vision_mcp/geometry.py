@@ -672,6 +672,40 @@ def rule_of_thirds(box: Sequence[float], image_size: tuple[int, int]) -> dict[st
     }
 
 
+#: Five equal bins per axis, named as VisionBench's composition labels name them.
+_HORIZONTAL_BINS: Final[tuple[str, ...]] = ("left", "left_third", "center", "right_third", "right")
+_VERTICAL_BINS: Final[tuple[str, ...]] = ("top", "upper_third", "middle", "lower_third", "bottom")
+#: Upper bounds of the frame share for "small", "medium" and "large"; anything above is "fills".
+_SIZE_BOUNDS: Final[tuple[tuple[float, str], ...]] = ((0.10, "small"), (0.40, "medium"), (0.75, "large"))
+
+
+def placement(box: Sequence[float], image_size: tuple[int, int]) -> dict[str, Any]:
+    """Where a subject box sits in the frame and how much of it it fills, in words.
+
+    The box centre falls into one of five equal bins per axis (`horizontal`, `vertical`), and
+    the box's share of the frame (`area_share`) into `size`: small under 0.10, medium under
+    0.40, large under 0.75, else fills. These are the rules VisionBench `composition_critique.py`
+    measured: with the tool's own box against a labeller's, horizontal agreed on 89.9% / 88.5%
+    and size on 82.0% / 76.0% of two photo sets (89 and 96), and vertical (same bins, scored
+    2026-11-02 from the cached boxes) on 86.5% / 80.2%.
+    """
+    x0, y0, x1, y1 = box
+    width, height = image_size
+    if width <= 0 or height <= 0:
+        return {}
+
+    def bin_of(centre: float, extent: int, names: tuple[str, ...]) -> str:
+        return names[min(4, max(0, int(centre / extent * 5)))]
+
+    share = box_area(box) / (width * height)
+    return {
+        "horizontal": bin_of((x0 + x1) / 2, width, _HORIZONTAL_BINS),
+        "vertical": bin_of((y0 + y1) / 2, height, _VERTICAL_BINS),
+        "size": next((name for bound, name in _SIZE_BOUNDS if share < bound), "fills"),
+        "area_share": round(share, 4),
+    }
+
+
 def box_area(box: Sequence[float]) -> float:
     """Area of an [x1, y1, x2, y2] box, clamped at zero for inverted coordinates."""
     return max(0.0, box[2] - box[0]) * max(0.0, box[3] - box[1])

@@ -895,6 +895,7 @@ async def test_critique_composition(mcp_client_session: ClientSession) -> None:
     assert not res.is_error
     assert "aesthetics" in result
     assert "framing" in result
+    assert {"horizontal", "vertical", "size", "area_share"} <= set(result["framing"])
     assert "subject_box" in result
     assert result["background"]["busy"] in (True, False, None)
 

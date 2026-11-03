@@ -902,7 +902,10 @@ def _critique_one(
         "subject": subject or None,
         "subject_box": box,
         "aesthetics": aesthetics,
-        "framing": geometry.rule_of_thirds(box, (image.width, image.height)),
+        "framing": {
+            **geometry.rule_of_thirds(box, (image.width, image.height)),
+            **geometry.placement(box, (image.width, image.height)),
+        },
     }
     if style is not None:
         result["style"] = style["style"]
