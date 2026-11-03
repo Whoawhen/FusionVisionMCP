@@ -244,6 +244,25 @@ h. **Track 4's tiling has no server path.** `processor_for("tiles4")` belongs to
   worst type colour -1.7 (round 23). `B_suffix` tied (+1.40) and lost the tie to A by order. Both fixed-reply arms
   failed (other changed -2.7 / -1.4, colour -5.9 / -5.1): when the check is wrong the suffix still lets the model
   answer. Adds ~3.9 s to every unrouted Wh question. Seen sets only; next is round 30 (fresh images) and Gate V7.
+- **Gate V7 ran 2026-11-02: `A_suffix` FAILED rule 3, then shipped on the user's decision** (VisionBench c2f74c4,
+  `results/vqa_gate_v7.json`; 780 round 30 questions, none dropped; 0 errors). Rules 1, 2, 4, 5 passed: overall
+  76.0 -> 81.2% (+5.2, CI 3.5 to 6.8; 43 gained / 3 lost), changed `no_object` 49.4 -> 97.7% (+48.3, n 87), worst
+  type `object` -2.1, slice b +7.5. Rule 3 failed: other changed questions 74.5 -> 72.8% (-1.7 vs -1.0). The check
+  said no to 88 of 88 changed premise questions and 10 of 184 others; median 6.9 -> 10.6 s on changed questions.
+  The 3 losses were all wrong "no"s; the user's look judged 2 right for the candidate (no train visible; "oval" fair
+  for a round window), leaving a hookah asked "on the low table", which is not there. That review covered the
+  losses only (one-sided), so the gate result stays a fail and -1.7 is the measured figure. Shipped as
+  `presence_check` (default on); parity 780/780 picks, 272/272 prompts, live 8/8 (VisionBench `vqa_v7_parity.py`).
+- **Track 8 follow-ups, to earn a justified gate pass** (user, 2026-11-02; each needs rules fixed first, a screen on
+  the seen sets, now including round 30, and a fresh round 31):
+  - *Object-only check:* pull the object out of the question and ask "Is there a <object> in this image?", so a
+    wrong detail ("on the low table") no longer turns a real object into a "no". Needs a noun extractor (`question.py`
+    has the count-noun one) and a fallback to check A when no noun parses.
+  - *Second signal before "absent":* take the "no" path only when SAM 3 (`detect_objects`' model, 9% false boxes on
+    absent probes) also returns no box for the object. Would have vetoed the hookah; a thin sketch "train" may still
+    slip. ~7 s more on the "no" path only (~1 in 3 changed questions).
+  - *Review both directions:* if a reviewer pass is ever used, it covers gains and losses alike, decided before the
+    run.
 
 ### R.5 Kept from the plan
 

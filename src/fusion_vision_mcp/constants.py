@@ -294,6 +294,21 @@ VQA_TEXT_SUFFIX: Final[str] = (
     "If the question asks about text or an item that is not in the image, answer that there is none."
 )
 VQA_OCR_WORDS: Final[int] = 160
+#: `query_image`'s presence check since 2026-11-02 (Track 8, Gate V6's pick `A_suffix`): a What/Which/Who/Where question
+#: VQA_TEXT_QUESTION does not route first gets VQA_PRESENCE_CHECK (at most VQA_PRESENCE_CHECK_TOKENS tokens); when
+#: `analysis._polarity` of the reply is "no", the question is answered with VQA_ABSENT_SUFFIX after it. Gate V6 screened
+#: it on round 23, phase 11 and round 29; Gate V7 (VisionBench `vqa_gate_v7.py`, rules fixed before round 30 existed)
+#: tested it on round 30's 780 fresh questions: 76.0 -> 81.2% (+5.2, CI 3.5 to 6.8; 43 gained, 3 lost), changed
+#: `no_object` 49.4 -> 97.7%, slice b +7.5, but other changed questions 74.5 -> 72.8% (-1.7 against a -1.0 limit), so it
+#: FAILED rule 3. Shipped on the user's decision: the user's look at the 3 losses judged 2 of them right (no train
+#: visible; "oval" for a round window), leaving the hookah (asked as "on the low table", which is not there) -- a
+#: one-sided review of the losses, not a gate pass. Changing the prompts or the "no" rule means a fresh round.
+VQA_PRESENCE_CHECK: Final[str] = "Is the thing this question asks about in the image? Question: {q} Answer yes or no."
+VQA_PRESENCE_CHECK_TOKENS: Final[int] = 8
+VQA_ABSENT_SUFFIX: Final[str] = (
+    "\nIf the question asks about something that is not in the image, answer that there is none."
+)
+VQA_WH_QUESTION: Final[str] = r"^\s*(?:what|where|which|who)\b"
 VQA_MAX_NEW_TOKENS: Final[int] = 128
 VQA_SEED: Final[int] = 0
 #: `--vqa-model` choices.

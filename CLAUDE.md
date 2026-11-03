@@ -393,6 +393,31 @@ there, object -5.5 to -6.3). Parity (VisionBench `vqa_v5_parity.py`): server pro
 are frozen in VisionBench `vqa_shipped_20261024.py`, which the earlier gates import so they still measure their own
 baseline.
 
+## `query_image` checks presence before an unrouted Wh question -- shipped on the user's decision, not a gate pass (2026-11-02)
+
+**Read this as a failed gate that shipped anyway.** `analysis.presence_checked` / `presence_prompts` (`presence_check`,
+default on): a What/Which/Who/Where question that `VQA_TEXT_QUESTION` does not route first gets `VQA_PRESENCE_CHECK`
+(8 tokens); when `_polarity` of the reply is "no", it is answered with `VQA_ABSENT_SUFFIX` after it. Control questions
+start "Looking", so `check_consistency` never checks them. Gate V6 picked the arm (`A_suffix`) on round 23, phase 11 and
+round 29. Gate V7 (VisionBench `vqa_gate_v7.py`, rules fixed before round 30 existed; 780 fresh questions, the user's
+spot-check 40 of 40) scored it once:
+
+- Overall 76.0 -> **81.2%** (+5.2, CI 3.5 to 6.8; 43 gained, 3 lost); premise questions 72.3 -> 94.4%; changed
+  `no_object` 49.4 -> 97.7% (n 87); slice b +7.5; every image kind up; worst type `object` -2.1; median 6.9 -> 10.6 s
+  per changed question; the check said "no" to 88 of 88 changed premise questions and 10 of 184 others; 0 errors.
+- **Rule 3 failed:** other changed questions 74.5 -> 72.8% (**-1.7**, limit -1.0). All three losses were the check
+  saying "no". The user then looked at them: no train visible in the sketch (the label's red train is doubtful) and
+  "oval" fair for a round window, leaving one real loss, a hookah asked about "on the low table", which is not
+  there. The check judges the whole question, so a wrong detail on a real object gets a "no".
+- **Shipped by the user's choice** on that reading (-0.5 if accepted). That review covered only the 3 losses, not
+  the 43 gains, so it is one-sided: quote the gate's -1.7, not -0.5, as the measured figure.
+
+Parity (VisionBench `vqa_v7_parity.py`): the server picks the gate's changed questions on 780 of 780, sends its check
+and answer prompts on 272 of 272 (cached check replies replayed), and live answers equal the gate's 8 of 8 (4 through
+the "no" path). Changing the check prompt, the suffix or the "no" rule means a fresh round. What would earn a real
+pass (plan Track 8): ask about the object alone rather than the whole question, and/or require SAM 3 to find no box
+before taking the "no" path.
+
 ## `classify_image` is CLIP zero-shot over the caller's labels (2026-10-16)
 
 `classify_image(src, labels)` puts each label in `CLASSIFY_TEMPLATE` ("a photo of {}") and ranks them with

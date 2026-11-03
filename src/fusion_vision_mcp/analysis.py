@@ -45,16 +45,20 @@ from fusion_vision_mcp.constants import (
     OCR_SHARPEN_MIN_CHARS,
     OCR_SHARPEN_PERCENT,
     OCR_SHARPEN_RADIUS,
+    VQA_ABSENT_SUFFIX,
     VQA_AGREE_COVER,
     VQA_COUNT_QUESTION,
     VQA_OCR_PREFIX,
     VQA_OCR_WORDS,
+    VQA_PRESENCE_CHECK,
+    VQA_PRESENCE_CHECK_TOKENS,
     VQA_TEXT_QUESTION,
     VQA_TEXT_SUFFIX,
+    VQA_WH_QUESTION,
     CaptionLevel,
 )
 from fusion_vision_mcp.detection_policy import execute_detection
-from fusion_vision_mcp.protocols import AppContext, Processor
+from fusion_vision_mcp.protocols import Answerer, AppContext, Processor
 
 #: Ceiling on objects compared in one `spatial_relations` call. Relations grow as
 #: n(n-1)/2, so an over-broad detection could otherwise return a huge payload.
@@ -1061,6 +1065,24 @@ def image_type_lines(app: AppContext, images: Sequence[Image]) -> list[str]:
 
 
 _TEXT_QUESTION_RE: Final = re.compile(VQA_TEXT_QUESTION, re.IGNORECASE)
+_WH_QUESTION_RE: Final = re.compile(VQA_WH_QUESTION, re.IGNORECASE)
+
+
+def presence_checked(question: str) -> bool:
+    """Whether `query_image` asks the presence check before `question`: a What/Which/Who/Where question the text
+    routing does not take (VisionBench `vqa_gate_v2a.changed`)."""
+    return not _TEXT_QUESTION_RE.search(question) and bool(_WH_QUESTION_RE.search(question))
+
+
+def presence_prompts(answerer: Answerer, images: Sequence[Image], question: str) -> tuple[list[str], list[str]]:
+    """The presence check (VQA_PRESENCE_CHECK) per image, and the prompt each image is answered with: the question,
+    with VQA_ABSENT_SUFFIX after it when the check's reply says "no" (Gate V6's `A_suffix`, Gate V7)."""
+    replies = answerer.answer(
+        list(images),
+        [VQA_PRESENCE_CHECK.format(q=question)] * len(images),
+        max_new_tokens=VQA_PRESENCE_CHECK_TOKENS,
+    )
+    return replies, [question + VQA_ABSENT_SUFFIX if _polarity(r) == "no" else question for r in replies]
 
 
 def lfm_vqa_prompt(question: str, ocr_text: str) -> str:
@@ -1090,16 +1112,20 @@ def vqa_answers(
     question: str,
     *,
     ocr_readings: Sequence[dict[str, Any]] | None = None,
+    presence_check: bool = True,
 ) -> list[str]:
-    """`query_image`'s answers: LFM2.5-VL-3B ONNX (`app.answerer`), a text question carrying the `ocr` reading; Moondream2
-    (`app.vqa`) without an answerer or when LFM cannot load or is refused for memory. `ocr_readings`, one per image,
-    stands in for the reading a text question would otherwise run."""
+    """`query_image`'s answers: LFM2.5-VL-3B ONNX (`app.answerer`), a text question carrying the `ocr` reading, an
+    unrouted What/Which/Who/Where question the presence check first (`presence_prompts`, unless `presence_check` is
+    false); Moondream2 (`app.vqa`) without an answerer or when LFM cannot load or is refused for memory. `ocr_readings`,
+    one per image, stands in for the reading a text question would otherwise run."""
     if app.answerer is not None:
         try:
             if _TEXT_QUESTION_RE.search(question):
                 if ocr_readings is None:
                     ocr_readings = ocr_pages(app, images, sharpened=False, lfm_read=False)
                 prompts = [lfm_vqa_prompt(question, p["text"]) for p in ocr_readings]
+            elif presence_check and presence_checked(question):
+                prompts = presence_prompts(app.answerer, images, question)[1]
             else:
                 prompts = [question] * len(images)
             return app.answerer.answer(list(images), prompts)

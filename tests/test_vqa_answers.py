@@ -18,14 +18,19 @@ SUFFIX = (
 
 
 class _Answerer:
-    def __init__(self, fail: Exception | None = None) -> None:
+    def __init__(self, fail: Exception | None = None, check_replies: list[str] | None = None) -> None:
         self.prompts: list[str] = []
+        self.tokens: list[int | None] = []
         self.fail = fail
+        self.check_replies = check_replies
 
-    def answer(self, images: list[Any], prompts: list[str]) -> list[str]:
+    def answer(self, images: list[Any], prompts: list[str], *, max_new_tokens: int | None = None) -> list[str]:
         if self.fail:
             raise self.fail
         self.prompts += prompts
+        self.tokens += [max_new_tokens] * len(prompts)
+        if self.check_replies is not None and prompts[0].startswith("Is the thing this question asks about"):
+            return self.check_replies[: len(prompts)]
         return [f"lfm:{p}" for p in prompts]
 
 
@@ -191,4 +196,83 @@ def test_unrouted_question_makes_no_ocr_call_under_consistency(
     query = _query_image_tool(_app(ans), monkeypatch)
     query(_png(tmp_path), "What colour is the car?", check_consistency=True, structured_analysis=False)
     assert ocr_calls == []
-    assert ans.prompts[0] == "What colour is the car?"
+    # The presence check, then the bare question; the control question starts "Looking", so it is never checked.
+    assert ans.prompts[1:] == [
+        "What colour is the car?",
+        "Looking carefully at this image, answer precisely: What colour is the car?",
+    ]
+
+
+# Track 8, Gate V7: the presence check before an unrouted What/Which/Who/Where question.
+CHECK = "Is the thing this question asks about in the image? Question: {q} Answer yes or no."
+ABSENT = "\nIf the question asks about something that is not in the image, answer that there is none."
+
+
+@pytest.mark.parametrize(
+    ("question", "checked"),
+    [
+        ("What colour is the passenger train?", True),
+        ("  which dog is sleeping?", True),
+        ("Who is holding the umbrella?", True),
+        ("Where is the cat?", True),
+        ("What does the sign say?", False),  # routed to the OCR context instead
+        ("What brand of laptop is it?", False),  # routed by the lookup branch
+        ("Is there a hookah on the table?", False),  # not a Wh question
+        ("How many people are there?", False),
+        ("Looking carefully at this image, answer precisely: What colour is it?", False),  # a control question
+        ("Whatever is on the table?", False),  # a whole word only
+    ],
+)
+def test_presence_checked_questions(question: str, checked: bool) -> None:
+    assert analysis.presence_checked(question) is checked
+
+
+@pytest.mark.parametrize(
+    ("reply", "suffixed"),
+    [("No.", True), ("no, it is not", True), ("Yes", False), ("Yes, there is no doubt", False), ("Maybe", False)],
+)
+def test_check_no_adds_the_absent_suffix(reply: str, suffixed: bool, ocr_calls: list[int]) -> None:
+    question = "What colour is the passenger train?"
+    ans = _Answerer(check_replies=[reply])
+    out = vqa_answers(_app(ans), [Image.new("RGB", (8, 8))], question)
+    assert ans.prompts[0] == CHECK.format(q=question)  # the gate's prompt, byte for byte
+    assert ans.tokens[0] == 8
+    assert ans.prompts[1] == question + (ABSENT if suffixed else "")
+    assert ans.tokens[1] is None  # the answer keeps the answerer's own token cap
+    assert out == ["lfm:" + ans.prompts[1]]
+    assert ocr_calls == []
+
+
+def test_check_decides_per_image(ocr_calls: list[int]) -> None:
+    question = "Which dog is sleeping?"
+    ans = _Answerer(check_replies=["No", "Yes"])
+    vqa_answers(_app(ans), [Image.new("RGB", (8, 8))] * 2, question)
+    assert ans.prompts[2:] == [question + ABSENT, question]
+
+
+def test_presence_check_can_be_turned_off(ocr_calls: list[int]) -> None:
+    ans = _Answerer(check_replies=["No"])
+    assert vqa_answers(_app(ans), [Image.new("RGB", (8, 8))], "Where is the cat?", presence_check=False) == [
+        "lfm:Where is the cat?"
+    ]
+    assert ans.prompts == ["Where is the cat?"]
+
+
+def test_routed_question_skips_the_check(ocr_calls: list[int]) -> None:
+    ans = _Answerer(check_replies=["No"])
+    vqa_answers(_app(ans), [Image.new("RGB", (8, 8))], "What does the sign say?")
+    assert ans.prompts == [lfm_vqa_prompt("What does the sign say?", "OPEN\n 24 HOURS")]
+
+
+def test_moondream_fallback_has_no_check(ocr_calls: list[int]) -> None:
+    out = vqa_answers(_app(_Answerer(fail=OSError("gated"))), [Image.new("RGB", (8, 8))], "Where is the cat?")
+    assert out == ["moondream:Where is the cat?"]
+
+
+def test_query_image_passes_presence_check(
+    ocr_calls: list[int], tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ans = _Answerer(check_replies=["No"])
+    query = _query_image_tool(_app(ans), monkeypatch)
+    query(_png(tmp_path), "Where is the cat?", structured_analysis=False, presence_check=False)
+    assert ans.prompts == ["Where is the cat?"]

@@ -73,6 +73,21 @@ def register(mcp: MCPServer) -> None:
                 )
             ),
         ] = False,
+        presence_check: Annotated[
+            bool,
+            Field(
+                description=(
+                    "When true (default), a What/Which/Who/Where question that does not get the OCR "
+                    "context is preceded by a short check asking whether the thing it asks about is in "
+                    "the image; if the check says no, the question is asked with an instruction to answer "
+                    "that there is none. On 780 fresh questions: 81.2% right vs 76.0% without it, and "
+                    "questions about an absent object 49% -> 98% right, but it denied a real object on 3 "
+                    "of 184 other changed questions (1.7 points; its pre-set limit was 1.0). Adds ~4 s to "
+                    "those questions. Set false for speed, or when a question names a real object with a "
+                    "detail that may be wrong (it can then answer that the object is not there)."
+                )
+            ),
+        ] = True,
     ) -> list[Any]:
         """Ask a free-form question about an image (visual question answering).
 
@@ -89,9 +104,10 @@ def register(mcp: MCPServer) -> None:
         a What/Which/Who/Where question asking for a name, number, price, date, sign, logo, menu item
         and so on (not a colour), gets the `ocr` engine's reading of the image as context, told to keep
         its exact spelling and to say "none" when the text or item is not there. Since 2026-11-02 that
-        wider routing answers 80.2% of 917 fresh questions against 76.8% before. Asked about text or an
-        object that is not there it says so 71% of the time (61% for an absent object) -- which still
-        means it invents an answer more than a quarter of the time. An answer is not a measurement:
+        wider routing answers 80.2% of 917 fresh questions against 76.8% before. Other
+        What/Which/Who/Where questions first get a presence check (`presence_check`, default on):
+        on 780 fresh questions 81.2% right vs 76.0%, false-premise questions 72% -> 94% right, though
+        it occasionally says a real object is not there. An answer is not a measurement:
         for "how many" use `count_objects`, for touching/inside `spatial_relations`.
 
         Set `check_consistency=true` for a reliability flag: the tool also
@@ -124,7 +140,7 @@ def register(mcp: MCPServer) -> None:
             # With check_consistency the control question asks the same thing, so both calls share one reading.
             control_question = f"Looking carefully at this image, answer precisely: {question}"
             readings = text_question_readings(app, images, question, *([control_question] if check_consistency else []))
-            answers = vqa_answers(app, images, question, ocr_readings=readings)
+            answers = vqa_answers(app, images, question, ocr_readings=readings, presence_check=presence_check)
 
             if structured_analysis:
                 results = []
