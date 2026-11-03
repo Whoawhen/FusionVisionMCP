@@ -20,12 +20,12 @@ file, "What good means").
 ## `caption`
 
 - **`Image type:` line on `deep`.** Shipped on the default caption only (2026-10-24); `deep`, `region` and the
-  Florence-2 fallback were never measured. The user asked to be reminded. Source: CLAUDE.md, "the default caption
+  Florence-2 fallback were never measured. The user asked to be reminded. Source: [docs/history.md](../docs/history.md), "the default caption
   starts with `Image type:`".
 - **Sharpened and LFM readings in the `Visible text` line.** `caption`'s text line passes `sharpened=False,
   lfm_read=False` because its gates measured the first reading. `lfm_read` alone took TextVQA 57.4 -> 68.5% on
   `ocr`, so a gate here is the obvious next test. The same applies to `query_image`'s OCR context (not in its
-  plan). Source: CLAUDE.md, the 2026-10-30 `ocr` sections.
+  plan). Source: [docs/history.md](../docs/history.md), the 2026-10-30 `ocr` sections.
 - **Escalate some images to `deep`** (old step 2A). Worth about +2 points when the default was Florence-2 and `deep`
   Moondream2; both slots are LFM2.5-VL now, so the premise has to be re-derived from cached captions before
   anything runs. Source: [archive/Caption_Improvement_Plan.md](archive/Caption_Improvement_Plan.md) 0.3 and 0.12.
@@ -51,7 +51,7 @@ file, "What good means").
 - **Flat-image counts of present objects** (34.8% exact on round 28). Closed with the current models: LFM's own
   count gained +19 points but fails the spotted-ball and multicolour-logo controls. Needs a different model, not a
   setting. Source: same, 0.18.
-- **`crowd_range`'s 0.3 SAM 3 floor** was picked by looking; any change needs a fresh crowd set. Source: CLAUDE.md,
+- **`crowd_range`'s 0.3 SAM 3 floor** was picked by looking; any change needs a fresh crowd set. Source: [docs/history.md](../docs/history.md),
   "`crowd_range` brackets crowds with SAM 3".
 - **Adaptive threshold prevalence** (opt-in `adaptive_threshold`, default off). It provably drops a real but weaker
   second instance for some score pairs; how often real photos produce that pair was never measured. Low priority
@@ -66,7 +66,7 @@ file, "What good means").
 ## `query_image` (beyond its live plan)
 
 - **Route multiple-choice questions to `classify_image`.** CLIP beat `query_image` 98.5 vs 77.5% on listed labels,
-  but no `query_image` question has been routed there; it needs its own gate. Source: CLAUDE.md, "`classify_image`
+  but no `query_image` question has been routed there; it needs its own gate. Source: [docs/history.md](../docs/history.md), "`classify_image`
   is CLIP zero-shot".
 
 ## `query_image(structured_analysis)` and the defect probe
@@ -77,7 +77,7 @@ file, "What good means").
 - **Hand and face crops without Grounding DINO.** Swapping the locator means retraining the probe and re-scoring
   round 10. Source: [archive/sam3_expansion_plan.md](archive/sam3_expansion_plan.md) "Not in scope".
 - **Specificity** is the open gap (66.7% of clean images left alone end to end). Fine-tuning DINOv2 itself is
-  lower priority: more labels already made the linear probe worse on unseen images. Source: CLAUDE.md, the defect
+  lower priority: more labels already made the linear probe worse on unseen images. Source: [docs/history.md](../docs/history.md), the defect
   probe sections; [archive/model_variants_and_loras.md](archive/model_variants_and_loras.md) section 5.
 
 ## Grounding DINO's remaining callers

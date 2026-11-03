@@ -1,0 +1,884 @@
+# FusionVisionMCP: the measured history behind CLAUDE.md
+
+Moved verbatim from `CLAUDE.md` on 2026-11-03, so the file every session loads holds only what ships and the rules
+that hold it ("Tools: what ships and the rules that hold it"). This is the record behind those rules: which gate
+measured what, the figures, and what was tried and failed. Add to it when a tool changes, and keep CLAUDE.md's
+summary in step. `benchmarks/` citations point at VisionBench now.
+
+## `ocr` is PP-OCRv6 English, and it returns nothing rather than inventing text
+
+`ocr` runs **PaddleOCR's PP-OCRv6 English models through RapidOCR** on ONNX Runtime (`ppocr_engine.py`, no
+torch). It replaced EasyOCR on 2026-09-29, which had replaced Florence-2's `<OCR>` head before that. Measured
+on VisionBench's 200-photo TextVQA set before shipping (`VisionBench/benchmarks/ocr_param_sweep.py`, results in
+`benchmarks/results/ocr_engine_*.json`): answer-text recall 37.5% → **53.0%** end to end through the server,
+58.6% vs 40.3% on text questions without column splitting. It also reads the invoice fixture exactly, where
+EasyOCR produced `812.50` for $12.50 and `S11.00` for $11.00.
+
+**2026-10-03: 58.5%, from the detector, not the recognizer.** Column zoning and the sideways re-read (see the
+layout section) took TextVQA recall from 53.0% to 55.0%. Then `VisionBench/benchmarks/ppocr_det_sweep.py` swept
+PP-OCR's *detector*, never tuned before, through the server's own `ocr_pages` with three controls: rendered pages
+(exact lines), the 100 held-out sourced images by line, and the text-free fixtures. Lowering `Det.box_thresh`
+(`OCR_DET_BOX_THRESHOLD`) from RapidOCR's document-tuned 0.5 climbs smoothly to a plateau — 55.0 → 57.0 (0.45) →
+**58.5 (0.4)** → 58.0 (0.35, 0.3) — with every control held (rendered 97.5%, held-out lines 75.6 → 76.2%,
+text-free empty). Rejected: a larger detector side length, `thresh` 0.2, `unclip` 2.0 and a 1.5x upscale gained
+less or lost lines. The PP-OCRv5 server detector reads photos best (61%) but drops rendered pages to 87%; routing
+it to photos only reached 62% while losing on the held-out images and rendered pages and doubling photo latency,
+so it is a trade, not a gain, and was not shipped.
+
+**2026-10-30: every page is read a second time, sharpened (blur plan B2-B5).** `analysis._sharpened_extra`: after
+the normal reading, PP-OCRv6 reads the whole page after a PIL unsharp mask (`OCR_SHARPEN_RADIUS` 1.5, `_PERCENT`
+220, threshold 0) and appends, sorted top then left, the spans whose lower-case alphanumerics number 3+
+(`OCR_SHARPEN_MIN_CHARS`) and are not inside the first reading's. VisionBench `ocr_blur_b2.py` screened 12 arms
+(loose detector, larger detector input, unsharp masks, CLAHE, upscale, Richardson-Lucy; only unsharp gained on both
+blur sets); all four finalists failed the text-free check on lone letters ("A", "7", "03"), so `ocr_blur_b2b.py`
+added the 3-character rule (written after seeing that) and skipped "text-free" photos the shipped OCR reads at full
+size. `ocr_blur_b4.py`, scored once on held-out images: real-blur pool (rounds 25 v2 + 25b, 89 images) 47.9 ->
+51.9% of key phrases (+4.0, CI 2.1 to 6.2; motion +9.1, defocus +3.6, heavy / compression / low-res 0), p11_blur
+37.0 -> 45.1%, sharp lines 79.5 -> 80.5% and phrases 73.0 -> 74.8%, TextVQA 57.4 level, no text-free photo newly
+non-empty (34 photos at sharp, G2 and G3; 7 excluded as read sharp), median 1.3 -> 2.7 s per photo. Server parity 20
+of 20. Frontier on the same confirm images: Opus 5.5 96.2%, Sonnet 5.5 84.4%. **`caption`'s text line and
+`query_image`'s OCR context pass `sharpened=False`**: the pass changes the text on ~60% of sharp photos and their
+gates measured the first reading; using it there needs its own gate. EasyOCR (non-English) has no second pass
+(`sharpened_pass` is PP-OCRv6's). A B2 harness bug worth knowing: replacement_gate1 gives p11_blur, p11_text and
+lines items one id, so a cache keyed on id scored B2's sharp controls on blurred reads; B4 keys them per set.
+
+**2026-10-30 (later): LFM2.5-VL transcribes every page with text (`lfm_read`, default on; `analysis._lfm_extra`).**
+After the sharpened pass, if the page's reading is non-empty, `app.answerer` (the default caption's ONNX LFM2.5-VL-3B)
+gets `OCR_LFM_PROMPT` (VQA_SEED, 512 tokens); each reply line not matching `OCR_LFM_NO_TEXT`, with 3+ alphanumerics
+(`OCR_LFM_MIN_CHARS`) and not inside the reading's, is appended in reply order as `{text, confidence: None, box: None,
+source: "lfm"}`. Preprocessing had plateaued (B2's twelve arms, heavy blur +0) and PP-OCR's CTC recognizer has no
+language context. VisionBench `ocr_blur_lfm_screen.py` (tune, rules fixed first): ONNX and bf16 4-tile LFM tied at
++11.1 with `append_if_text`; plain append (LFM also on pages read empty) added text to 4-5 text-free images, which
+is why an empty page is never sent. `ocr_blur_lfm_confirm.py` (controls, then the pool confirm, scored once): real-blur
+pool 51.9 -> 62.2% (+10.3, CI 6.7 to 14.3; heavy +8.3, defocus +12.3, low-res +8.3, motion +2.3, compression/mixed 0),
+p11_blur +7.1 (CI 4.9 to 9.7), TextVQA 57.4 -> 68.5%, lines 80.5 -> 83.1%, p11_text 74.8 -> 78.3%, no text-free image
+newly non-empty; median per TextVQA photo 2.66 -> 7.6 s, failing the plan's 5 s limit, which made it opt-in only under
+the rules; **the user chose it as the default**. Parity (`scratch/lfm_ocr_parity.py`): 680 of 680 cached decisions,
+live replies 8 of 8. `caption`'s text line and `query_image`'s OCR context pass `lfm_read=False` (their gates; a gate
+for them is the obvious next test, given TextVQA +11). Skipped without an answerer, on LFM load failure and on EasyOCR.
+
+Four things about that swap are load-bearing:
+
+- **No EasyOCR setting would have closed the gap.** Magnification (1.5x, 2x), beam-search decoding and turning
+  off column splitting were all swept first: none beat EasyOCR's defaults on photos, and beam search dropped a
+  third of a paragraph's words. The limit was the recognition model.
+- **The recognizer must be the English one.** RapidOCR's default PP-OCRv4 model is Chinese/English and drops
+  the spaces between English words ("Thisisasinglewideparagraph"). `ppocr_engine.py` pins `LangRec.EN` +
+  `PP-OCRv6`; v4/v5 English are not valid combinations in rapidocr 3.9.
+- **The 0.75 confidence floor (`OCR_MIN_CONFIDENCE`) is what keeps a text-free image empty.** Unfiltered,
+  PP-OCRv6 read "S" (0.52) on `tests/sample.jpg` and "0" (0.57) on a shapes fixture, and garbled the last line
+  of `layout_small_text_paragraph.png` at 0.70. Recall is flat from no floor to 0.70 and loses one item at 0.80.
+  With the floor that last line is *missing* rather than garbled — the right failure, but still a gap.
+- **EasyOCR is still installed, for two reasons.** `query_image(structured_analysis=true)` flags spans below
+  0.20 as likely generated gibberish, and that threshold is calibrated to EasyOCR's scores (PP-OCRv6 gave real
+  garbage 0.70), so it stays on `AppContext.ocr_specialist`. And the PP-OCRv6 recognizer is English-only, so
+  any non-English `--ocr-languages` routes `ocr` back to EasyOCR (`AppContext.ocr_engine` is then the same proxy).
+
+easyocr needs `opencv-python-headless` and rapidocr needs `opencv-python`; both install `cv2`, so
+`[tool.uv] override-dependencies` drops `opencv-python`. Keep that override if either dependency moves.
+
+`detail=true` returns `{text, text_regions}` per page, each region carrying `{text, confidence, box}` in page
+coordinates. Because of the floor, low-confidence spans never reach it, so `detail` is not a gibberish detector.
+
+**An image with no text returns empty, and that is correct.** This is worth stating because the repo's own test
+suite asserted the opposite for four tests: they ran against `tests/sample.jpg` (a paper flower, no text at all)
+and asserted `len(text) > 0`. That passed only because Florence-2's OCR head emitted *something* for a text-free
+image — the assertions were pinning a hallucination. The `ocr` engine returns 0 regions there. `tests/test_server.py::test_ocr_textless_image_returns_no_text` now pins the
+correct behaviour. Do not "fix" an empty OCR result by routing to a VLM; an empty result is an answer.
+
+**`caption` describes text, it does not transcribe it.** Tested live on this repo's own banner (2026-08-25):
+`caption` rendered the logo "FusionVisionMCP" as "FusionVisionMP" mid-sentence, while the OCR path read it
+exactly right. A caption quoting a name, brand or label is not evidence of what it says — confirm it with `ocr`.
+This is stated in `caption`'s MCP description, since a calling agent reads that at tool-selection time and not
+this file. `caption(verify_text=true)` still uses Florence-2's `<OCR_WITH_REGION>` head for that cross-check —
+the one remaining place Florence-2 reads text.
+
+**2026-10-10: the caption now carries the `ocr` engine's text (`read_text`, on by default).** The captioners
+paraphrase text and cannot read most of it, so `caption` runs `ocr_pages` and ends the caption with
+`Visible text: "..."` (verbatim, reading order, ` / ` between lines, 400 words at most since 2026-10-24 (160 from 2026-10-20), with
+repeated and single-character lines dropped and a cut marked; `CAPTION_TEXT_WORDS`). A
+text-free image gets no line, so its caption is unchanged. On VisionBench's 280 held-out images (variants fixed
+before running, `caption_text_grounding.py`): default 53.3% -> 60.9% of key facts, `deep` 61.5% -> 66.3%, no image
+worse, and none of the absent objects named came from the text. The line is appended *after* any `verify_text`
+work, so `verify_text` checks only the prose's own quotes. Two things lost on the tune
+split and were not shipped: asking Moondream2 for the image type first (-9.2 points; its answers are a third the
+length of its long caption) and a language tag on the text (no recall gain, about 1 in 4 tags wrong).
+
+**2026-10-18: the line holds 80 words, not 40.** On phase 11 every key phrase the line dropped was cut by the cap,
+but the tune split could not decide it (its keyword groups are mostly not image text). VisionBench round 18 did: 136
+fresh text-heavy images (screenshots, documents, charts, game UI, signage; the Gemini worker's key phrases, 105 of 105
+right in the user's spot-check), rule fixed before they existed (`caption_text_cap_r18.py`). Key phrases 46.8 -> 57.5%
+at 80 words (+10.7, CI 8.4 to 13.1), `deep` 53.9 -> 63.6%, no image worse, no absent object named; 60 words gave
+about half that. The server's own line matched the rebuilt one on 272 of 272 captions. COCO CHAIR was unchanged (only
+2 of 300 photos have more than 40 words) and on round 11 the 80-word line added no absent object
+(`caption_text_cap_guards.py`). Putting titles and large lines first gained nothing (+0.4, CI -1.4 to 2.2). OCR alone
+finds 76% of round 18's phrases, so text is still left out of the caption on dense images.
+
+**2026-10-24: the line holds 400 words.** Re-measured with the LFM ONNX default's prose (VisionBench
+`caption_text_cap_lfm.py`, caps and rule fixed before the run; round 20 reused, as no fresh text-heavy set exists): key
+phrases 62.5% at 160 -> 65.7 (240) -> 67.2 (320, +4.7, CI 3.1 to 6.7) -> 68.5% uncapped (+6.0, CI 4.0 to 8.5), all
+qualifying (round 20's absent objects and COCO CHAIR unchanged). The rule recommended uncapped (320 reached 78% of its
+gain, under the 80% bar); the user chose 400 (67.8%, +5.3; computed after the run), because uncapped lines reached
+1,021 words on round 20 and 1,985 on round 21. The median line is ~117 words on text-heavy pages and 10 on a general mix;
+400 cuts 7% of text-heavy pages. `query_image`'s OCR context (`VQA_OCR_WORDS`) stays 160, as gated.
+
+**2026-10-20: the line is cleaned, holds 160 words, and says when it is cut (C4-7).** `visible_text_line` drops a line
+that, lower-cased with punctuation as spaces, is under 2 characters or repeats an earlier one, caps at 160 words, and
+a cut line ends `…" (N more words not shown; ocr returns the full text).` Lines the prose already contains are
+*kept*: the quoted line is the verified text and the prose is not. Decided on VisionBench round 20 (150 fresh
+text-heavy images, 30 per kind; 144 of 144 key phrases right in the user's spot-check), rule fixed before the
+images existed (`Future_Ideas/archive/c4_7_text_line_design.md`, `caption_text_line_r20.py`): key phrases 48.1 -> 60.0%
+(+11.9, CI 9.1 to 14.9), `deep` 54.3 -> 63.0% (+8.8, CI 6.4 to 11.2), no image worse, absent objects named
+unchanged; the marker shows on 56 of 150. Most of it is the length (raw 160 words: +10.8; cleaning at 80: +2.4).
+COCO CHAIR exactly unchanged in both slots and round 11 gained no absent object (`caption_text_line_r20_guards.py`).
+The server's line equals the measured candidate on 150 of 150 round 20 pages and 535 of 535 cached guard texts.
+Uncapped, the cleaned line would reach 67.4% (lines up to ~400 words), so dense pages still lose text.
+
+**2026-10-15: `caption(region=[x1, y1, x2, y2])` captions one part of the image.** The caller points; the tool
+crops (`images.crop_region`: the box widened 15% each side, at least 32 px, clipped), so the region gets the
+captioner's whole input resolution. VisionBench gate R (`region_inspect_gate.py`): the Gemini worker drew, for 1,055
+phase 11 questions, where it would look **without seeing the answer** (round 15; the user found 3 of 40 boxes wrong).
+The caption of the crop named the answer 80.3% of the time against 67.8% for the whole image (+12.5, CI 8.3 to 16.9;
+528 colour, text and object questions); the server reproduces the gate's crop captions 8 of 8. The same crop was
+**not** shipped on `ocr` (71.6 -> 54.5%: tight crops cut words at the edge, and 51 of 341 read nothing) or
+`query_image` (79.0 -> 80.3%, CI -1.0 to +3.7). Changing the pad means re-running the gate on fresh questions.
+
+**2026-10-12: `deep` stops when Moondream2 loops.** Its long caption is sampled (temperature 0.5, top_p 0.3) and
+on ~7% of images ends in a loop ("effects, effects, ...", hundreds of "Í", a list of languages cycling) up to the
+768-token cap. `Moondream.caption` now streams and stops once 16 consecutive 8-word spans repeat earlier text
+(`repetition.py`, `LOOP_NGRAM`/`LOOP_RUN`), cutting the repeats off. Replayed on cached tune captions it cost 0.2
+points (one group, hit only inside a loop). On 18 tune images that had looped, timed in one session against the
+unstopped call: median 57.3 -> 40.7 s, 9 loops -> 0. Greedy decoding was tried first (VisionBench `caption_c4_0.py`)
+and is *not* shipped: a tie on recall and speed, but it failed the loop guard fixed before the run. Seconds measured
+in different sessions are not comparable here: the same captioner measured 39.3 s one day and 32.1 s the next.
+
+**2026-10-21: Moondream2's decode step reads only the filled KV cache (plan step 1C-a).** The pinned code hands
+SDPA all 2,048 cache slots and a boolean mask on every generated token; `moondream.sliced_decode_attn` (installed
+into the remote `text` module, pinned revision only) slices keys, values *and the mask* to `:pos+1`. VisionBench
+`caption_1c_a.py`, 20 tune images, greedy, arms alternated: **20 of 20 captions token-identical**, median caption
+14.8 -> 10.3 s, 0.077 -> 0.055 s per token. **Keep the mask.** Dropping it as well (the plan's first form) was faster
+(-7.2 s) but changed all 20 captions: CPU SDPA then takes another kernel with different bf16 rounding, 5 of the 20
+diverging where the top two tokens were 0.5-2.5 logits apart. The unpatched path repeats exactly, so it is the kernel.
+
+**2026-10-21: Florence-2 runs in bfloat16 on CPU, for every consumer (plan steps 1A and 1A-g).** Caption
+(`caption_1a.py`): median 9.4 -> 6.6 s paired, tune keywords 62.9 -> 63.5%, COCO CHAIR-i 12.2 -> 12.1%, CHAIR-s
+23.3 -> 22.3%; the captions are different text of the same quality (158 of 300 COCO unchanged). Every other consumer
+replayed its own measurement fp32 vs bf16 (`florence_bf16_global.py`): flat-image counts 46.6 -> 46.6% and all 8
+fixture controls, `critique_composition`'s subject box 84.4 -> 85.4%, dense box recall 74.1 -> 74.1%, flat detection
+recall 40.5 -> 40.5%, `<OCR_WITH_REGION>` lines 58.4 -> 58.3% with the banner exact. The transformers-5 parity
+figures above were fp32; anything re-measured against them now has to be re-measured in bf16.
+
+**2026-10-22 (later): `deep` is LFM2.5-VL-3B now, not Moondream2 (caption plan Track 4).** `lfm.LfmCaptioner`
+(`AppContext.deep_captioner`, lazy and idle-released, ~6.4 GB bf16) runs Liquid AI's LFM2.5-VL-3B at revision
+`35a118d`, bf16, prompt "Describe this image in detail.", the card's decoding, and `max_tiles` 4. VisionBench
+`caption_track4.py`, rules fixed before each run: four non-Chinese candidates screened (Gemma 4 E2B and Granite Vision
+4.1 failed time or memory, LFM2.5-VL-1.6B too terse even with a fuller prompt); at the card's 10 tiles the 3B took
+46.8 s on tune, over the 45 s cap, so a 4-tile variant was fixed before running and went through confirm and CHAIR.
+Confirm (280 images) vs Moondream2's long caption: keyword recall 69.0 -> 74.8% (+5.7, CI 3.4 to 8.0), matched length
++8.0 (CI 5.8 to 10.3), median 34.7 s (p90 49.8 s), absent objects 3 vs 3; ahead on eight of nine kinds (signage -1.8).
+COCO CHAIR-i 17.1 -> 16.5%, CHAIR-s 30.3 -> 31.0%. The wrapper reproduced the gate's captions on 8 of 8 confirm images
+(VisionBench `lfm_wrapper_parity.py`, same seeds). **Not the default captioner:** even cut to Florence-2's length its
+CHAIR is 14.1% / 25.0% against Florence-2's 12.1% / 22.3%, and it is 5x slower. Moondream2 stays for `query_image`
+and `critique_composition`; whether LFM can take those over (which would also drop Moondream's ~7.5 GB fp32, its
+remote-code pin and `pyvips`) is untested. Weights are under the LFM Open License v1.0 (commercial use only below
+$10M annual revenue), downloaded on first use, not redistributed.
+
+**2026-10-23: the default caption is LFM2.5-VL-3B on ONNX Runtime, not Florence-2.** `lfm_onnx.LfmOnnxCaptioner`
+(`AppContext.captioner`, lazy and idle-released; `--caption-model florence2` or a failed load falls back to Florence-2)
+runs Liquid AI's transformers.js export at `020f931` on CPU: fp32 vision encoder and embeddings, q8 decoder, one image
+of at most 256 tokens, "Describe only what is clearly visible in this image.", the card's decoding seeded with
+`CAPTION_SEED`. The export has no generation loop, so the wrapper is one. VisionBench, rules fixed before each run:
+`caption_default_lfm.py` (Q8 GGUF on llama-server: screen, then confirm on 280 + a fresh COCO set `coco_chair2`),
+`caption_default_prompt.py` (fuller prompts won tune and tied on confirm), `lfm_onnx.py` (the shipped runtime):
+confirm 64.8 -> **71.0%** vs Florence-2-large bf16 (+6.2, CI 4.0 to 8.5; matched +9.1), CHAIR-i 13.3 -> 12.4%, CHAIR-s
+27.7 -> 23.0%, median caption 11.4 s / with the text line 14.1 s against the 15 s gate, ~8.3 GB. The wrapper reproduced
+the gate's captions on 8 of 8 (`lfm_onnx_wrapper_parity.py`). Four tiles took 20 s; the base prompt ("Describe this
+image in detail.") named more but failed CHAIR (16.7 / 31.7%). Florence-2 still backs `verify_text`, dense captions,
+flat-image detection and counting, the composition subject box and `process`.
+
+**2026-10-24: `query_image` answers with the same LFM2.5-VL-3B ONNX model, not Moondream2.** `analysis.vqa_answers`
+(`AppContext.answerer`, the default caption's proxy, so one loaded copy serves both; `--vqa-model moondream` or a failed
+load falls back to Moondream2) sends the question verbatim, except that a question matching `VQA_TEXT_QUESTION` gets the
+`ocr` reading in front (`lfm_vqa_prompt`, at most 160 words) and "answer that there is none" after; the card's decoding,
+`VQA_SEED`, 128 tokens. VisionBench, rules fixed before each run: `vqa_premise.py` screened arms on phase 11 (`ocr_text`
+82.4 vs Moondream2 78.8; tiles did not replace it), then `vqa_round23.py` confirmed on round 23 (892 fresh questions on
+223 round 21 images, a third false-premise; the user's spot-check 60 of 60 right): **78.5 vs 66.5%** (+12.0), premise
+66.4 vs 32.3% (no-text 65.7 vs 13.3), no question type worse (yes/no +0.6 the smallest), median 4.9 vs 9.8 s per answer,
+0 errors. The server reproduced the gate's prompts and answers 8 of 8 (`lfm_onnx_vqa_parity.py`). `batch_analyze_images`'
+`query` uses the same path. **Moondream2 stays loaded for** `critique_composition`'s busy-background and subject-naming
+questions; each needs its own gate before Moondream2 (~7.5 GB fp32, its remote-code pin, `pyvips`) can go.
+`count_objects`' `estimates.vqa` moved to LFM on 2026-10-29 (`analysis.vqa_count_estimate`, `COUNT_CHECK_COUNT`; VisionBench
+`count_gate_vqa_estimate.py`, non-inferiority: 64.1 -> 65.4% exact on 457 seen counts, CI -2.6 to 5.3). `check_consistency`'s control question now goes to LFM too; its rule was re-fitted and measured on 2026-11-02 (below).
+
+**2026-10-24: the default caption starts with `Image type: <x>.`** (`image_type`, default on; `analysis.image_type_lines`,
+CLIP ViT-L/14 over `CAPTION_IMAGE_TYPES`, prompts "a/an <type>", ~0.35 s). 106 of the default's 291 misses on the 280
+confirm images named the kind of image, and the two prompt rounds that asked for it in the prompt lost on confirm, so it
+is a separate line in front of the prose. VisionBench `caption_type_line.py` (rules fixed before each run): CLIP beat an
+LFM question on tune (74.5 vs 74.0%, 0.35 vs 4.4 s); round 21 64.6 -> 67.0% (+2.4, CI 1.4 to 3.6; matched +1.1; game UI
++10.4, app/web +6.2, no kind worse); the 280 confirm images 71.3 -> 73.2%. CHAIR unchanged by construction (no type
+label names a COCO object; asserted, so `coco_chair3` was not captioned). It agreed with the labelled kind on 69% of
+round 21. Parity 20 of 20 (`caption_type_line_parity.py`). Only the LFM default gets it: `deep` is untested (to do), and
+`region` and the Florence-2 fallback were not measured. Loads CLIP (~1.7 GB) on caption calls; a CLIP that cannot load
+drops the line, never the caption.
+
+**llama-server ran on the GPU without being asked.** The winget llama.cpp build ships Vulkan and defaults to
+`--n-gpu-layers auto`: every llama-server timing in the runs above was the RTX 5060 (2.4 s), not CPU (25.6 s). Recall
+was unaffected (CPU vs GPU +0.0 on tune). Any llama.cpp run here sets `LLAMA_ARG_N_GPU_LAYERS=0`,
+`LLAMA_ARG_DEVICE=none` and `LLAMA_ARG_MMPROJ_OFFLOAD=0` and checks `-v` for "offloaded 0/31 layers"
+(`llama_cpu_retime.py`).
+
+**`deep` against the new default adds detail, not accuracy per word:** 74.8 vs 71.0% raw but -1.3 at equal length,
+142 vs 94 words. It stayed under a rule fixed before the default's confirm (retire if it gained < 2.0 raw; it gained
+3.5, CI 1.6 to 5.4). Against Florence-2 it had been +8.1 at equal length, so its description changed with the default.
+
+**2026-10-22: `deep` tiles text-light pages into 6 crops, not 12 (plan step 1C-b).** (Applies to the Moondream2
+fallback only since Track 4 shipped.) `caption(deep=true)` now reads
+the page's text first and sets Moondream2's `max_crops` per image for the encode only (`analysis.deep_crops`,
+restored afterwards so `query_image` keeps 12): 12 when the `ocr` text has 30+ words, 6 below. VisionBench
+`caption_1c_b.py`, both arms greedy: tune recall 71.8 -> 72.3%, COCO CHAIR-i 18.5 -> 18.2%, ~5 s faster. On 140
+text-heavy confirm images 6 crops tied (+0.2, CI -1.8 to +2.3) and the rule fixed before that run picked 6 for every
+call, but documents dipped on both sets (tune 72.5 -> 67.5%, confirm 79.3 -> 77.2%), so the user kept 12 there. The
+first, sampled tune run failed its loop guard (13 -> 15 looping captions); the greedy re-test's paired sign test
+did not (p = 0.12, then 0.25).
+
+## `query_image` Track 1 fixes (2026-10-31)
+
+Five bug fixes from `Future_Ideas/Query_Image_Improvement_Plan.md`, checked by unit tests rather than a benchmark gate;
+no default prompt and no healthy `query_image(src, question)` answer changed.
+
+- `vqa_answers` falls back to Moondream2 on `MemoryError` (a refused load) as well as `OSError`/`ImportError`.
+- With `check_consistency=true` the answer and the control question share one `ocr` reading
+  (`analysis.text_question_readings`, `ocr_readings=`); the prompts are byte-identical. `_vqa_cross_check`'s own `ocr`
+  stays the full reading, as a second opinion.
+- `question.py` count nouns: fillers match whole words (`" in"` no longer cuts "inside", `" do"` no longer cuts "dogs"),
+  finite verbs end the noun ("vases stand on" -> "vases"), and a leading "image"/"photo" stays when a noun follows
+  ("image panels"). 2026-11-01: a verb that is also a noun ("cross", "form", "rest", ...) ends it only before a
+  preposition, article, quantifier or the question's end (`_AFTER_VERB`), so "red cross symbols" stays whole.
+- The cross-check's count now runs `analysis.count_image`, the same steps as `count_objects` at its defaults
+  (`finish_count`: nested boxes, `possibly_more`, `crowd_range`, the LFM presence check), where it was raw Grounding DINO at
+  0.15. Its size route detects as `detect_objects` does (SAM 3 on photos). `tests/test_server.py` pins the extreme circle on
+  `tests/size_three_circles.png`. VisionBench's `count_lfm_parity.py` and `count_flat_lfm_parity.py` call `lfm_count_check`,
+  `lfm_flat_check` and `drop_nested` directly, so they do not exercise `finish_count`.
+- `structured_analysis` reuses `_check_anatomy`'s `hand` detection in the defect probe: 7 Grounding DINO passes, not 8, same
+  observations and anomalies (`tests/test_inspection.py`).
+
+## `query_image` routes text lookups and checks consistency by question kind (Gate V5, 2026-11-02)
+
+Two changes, both confirmed once on round 29 (917 fresh questions on round 24's images: slice a by Gemini 3.8 Flash,
+slice b by Gemini 4 Argon as a phrasing check; the user's check 19 of 20 premises false, 18 of 20 answers right, 3
+questions dropped; rules fixed in VisionBench `vqa_gate_v5.py` before the questions existed).
+
+- **Routing and prompt** (`constants.VQA_TEXT_QUESTION`, `VQA_OCR_PREFIX`, `VQA_TEXT_SUFFIX`; Gate V1's pick
+  `route_item_suffix_verbatim`, screened on round 23 and phase 11): the regex adds more text words and a second branch,
+  a What/Which/Who/Where question (not "what colour") naming a name, number, price, sign, logo, UI element and so on;
+  the prompt drops "it may be incomplete or misread", asks for the OCR text's exact spelling, and covers an absent item
+  as well as absent text. Round 29: 76.8 -> **80.2%** (+3.4, CI 1.6 to 5.1; 50 gained, 19 lost), premise questions
+  59.4 -> 71.2% (`no_object` 46.1 -> 60.9, `no_text` 72.8 -> 81.6), worst type position -2.2 (n 46), slice b +1.9,
+  screenshots 62.6 -> 71.7, routed 30 -> 43%, median 6.1 -> 6.4 s per answer with OCR, 0 errors.
+- **`check_consistency`'s agreement rule** (`analysis._answers_agree`, `VQA_AGREE_COVER`; VisionBench
+  `vqa_consistency_rule.py`, fitted on round 23's real LFM control answers): typed by question -- polar answers by
+  polarity, "how many" by number, absent vs present, else half the shorter answer's content words in the longer;
+  "none" twice to an open-ended judgment question stays low. On the new routing's round 29 pairs: flagged 12.1%, quiet
+  on right 92.5%, catches wrong 30.8%, unflagged accuracy 84.4% (+4.2), error ratio 3.23x, against the old rule's
+  36.0 / 66.0 / 44.0 / +2.5 / 1.40x. No signal on `no_object` (0.84x). Ceiling: most wrong answers are repeated by the
+  control (on round 23 the control was right on only 28 of 192 wrong primaries).
+
+What did not ship: a Wh-question premise suffix (Gate V2A: `no_object` +11.1 but the model doubted objects that are
+there, object -5.5 to -6.3). Parity (VisionBench `vqa_v5_parity.py`): server prompts equal the gate's on 1,834 of
+1,834 questions and controls, agreement decisions 1,834 of 1,834, live answers 8 of 8. The old regex, prompt and rule
+are frozen in VisionBench `vqa_shipped_20261024.py`, which the earlier gates import so they still measure their own
+baseline.
+
+## `query_image` checks presence before an unrouted Wh question -- shipped on the user's decision, not a gate pass (2026-11-02)
+
+**Read this as a failed gate that shipped anyway.** `analysis.presence_checked` / `presence_prompts` (`presence_check`,
+default on): a What/Which/Who/Where question that `VQA_TEXT_QUESTION` does not route first gets `VQA_PRESENCE_CHECK`
+(8 tokens); when `_polarity` of the reply is "no", it is answered with `VQA_ABSENT_SUFFIX` after it. Control questions
+start "Looking", so `check_consistency` never checks them. Gate V6 picked the arm (`A_suffix`) on round 23, phase 11 and
+round 29. Gate V7 (VisionBench `vqa_gate_v7.py`, rules fixed before round 30 existed; 780 fresh questions, the user's
+spot-check 40 of 40) scored it once:
+
+- Overall 76.0 -> **81.2%** (+5.2, CI 3.5 to 6.8; 43 gained, 3 lost); premise questions 72.3 -> 94.4%; changed
+  `no_object` 49.4 -> 97.7% (n 87); slice b +7.5; every image kind up; worst type `object` -2.1; median 6.9 -> 10.6 s
+  per changed question; the check said "no" to 88 of 88 changed premise questions and 10 of 184 others; 0 errors.
+- **Rule 3 failed:** other changed questions 74.5 -> 72.8% (**-1.7**, limit -1.0). All three losses were the check
+  saying "no". The user then looked at them: no train visible in the sketch (the label's red train is doubtful) and
+  "oval" fair for a round window, leaving one real loss, a hookah asked about "on the low table", which is not
+  there. The check judges the whole question, so a wrong detail on a real object gets a "no".
+- **Shipped by the user's choice** on that reading (-0.5 if accepted). That review covered only the 3 losses, not
+  the 43 gains, so it is one-sided: quote the gate's -1.7, not -0.5, as the measured figure.
+
+Parity (VisionBench `vqa_v7_parity.py`): the server picks the gate's changed questions on 780 of 780, sends its check
+and answer prompts on 272 of 272 (cached check replies replayed), and live answers equal the gate's 8 of 8 (4 through
+the "no" path). Changing the check prompt, the suffix or the "no" rule means a fresh round. What would earn a real
+pass (plan Track 8): ask about the object alone rather than the whole question, and/or require SAM 3 to find no box
+before taking the "no" path.
+
+## `classify_image` is CLIP zero-shot over the caller's labels (2026-10-16)
+
+`classify_image(src, labels)` puts each label in `CLASSIFY_TEMPLATE` ("a photo of {}") and ranks them with
+`Aesthetic.zero_shot` (softmax of `logit_scale` x cosine), on the CLIP ViT-L/14 `score_aesthetics` already loads. Two
+VisionBench gates against `query_image` asked the same multiple-choice question (gate Z's `QUESTION`, pick = longest
+label in the reply):
+
+- **Gate Z** (`classify_gate.py`, image kinds and COCO objects): 79.9 vs 74.1%, CI 0.0 to +11.7 -- on the boundary,
+  not shipped. The template was chosen on its tune half.
+- **Gate Z2** (`classify_gate2.py`, rule fixed before the images existed): round 16, 200 Commons images the worker
+  sourced (20 species x 4, 20 landmarks x 3, 12 art styles x 5; the build re-verified all 200). **98.5 vs 77.5%,
+  CI +15.5 to +27.0**, ships. Styles were the weak set (95 vs 60%); CLIP's 3 misses were Klimt's *The Kiss*,
+  de Feure and Vermeer. 0.25 s vs 10 s. Right 197 of 198 at p >= 0.5.
+
+Read Z2 as an upper bound: the images are famous Commons files CLIP may have trained on; gate Z is the everyday-photo
+estimate. The server reproduced Z2's pick and probability on 13 of 13 images (the 3 misses included). It is a new tool,
+not a gain on an existing one: no scoreboard phase asks a multiple-choice question. Routing `query_image` questions
+that list options to it would be the gain on an existing tool, and would need its own gate.
+
+## `critique_composition` is scored on a checklist now: a better subject box and a busy-background hint passed
+
+Phase 7 scores the critique's prose by word overlap with frontier critiques, where even Claude, Gemini and GPT only
+reach 29-34% against each other. VisionBench `composition_labels.py` built 150 COCO photos (50 tune / 100 confirm)
+labelled with composition facts by the user's Gemini worker, and the user checked the worker blind twice: its subject
+boxes (34 good / 4 loose / 0 wrong of 38) and background blur (89.7%) held up; "cut off", "awkward crop" and "busy"
+did not. `composition_critique.py` then scored candidates with rules committed before each run (2026-10-11):
+
+- **Shipped: `background: {busy, reliability}`** (`check_background`, default on, ~10 s). Moondream2 asked
+  `BUSY_BACKGROUND_QUESTION` agreed with the user's own blind calls 88.1% (balanced) on 25 tune photos and **69.2%
+  on 52 held-out** (CI 56.5-81.0), about as often as the worker agreed with the user. The user chose to state it as
+  a hedged hint, so the reliability travels in the result.
+- **Not shipped: background blur.** A Laplacian sharpness ratio (subject box vs surroundings) scored 77.6% on tune
+  but its threshold was fitted on 7 blurred photos and fell to 61.4% held-out (CI 44.8-77.2). Moondream2's yes/no
+  says "no" to nearly everything (54%).
+- **Shipped after a fresh test: the subject box.** Without a `target_subject`, Moondream2 names the subject
+  (`MAIN_SUBJECT_QUESTION`, returned as `subject`) and Florence-2 boxes the name, instead of the largest, most
+  central dense region. IoU >= 0.5 against the worker's box: 79.5 vs 64.1% on tune (CI 0.0 to 30.8, short of the
+  rule), 82.0 vs 66.3% held-out (CI 6.7 to 25.8), so the user asked for new photos first: on 120 fresh ones
+  (`composition_box2`, tool boxes committed before the labels existed; the user found 0 of 40 boxes wrong, 18
+  loose) **84.4 vs 75.0%, +9.4, CI 1.0 to 18.8**. The loose labels did not favour it (both methods' boxes match the
+  labels' size; it led 20-18 on the good ones and tied 14-14 on the loose). About 10 s more per call. One guard
+  was added *after* that test: a named box covering 95%+ of the frame (`_WHOLE_FRAME`) defers to the region pick,
+  because a blank image came back as "a plain gray background" boxed edge to edge. On the cached boxes of all
+  three sets it never cost a hit and gained two.
+- **Untestable here:** subject in focus (3 "no" of 150) and awkward crop (no measurement matched the user's calls).
+
+## Multi-column layouts are handled by geometry, not by asking the model harder
+
+`ocr` reads strictly in raster order, so a document laid out in side-by-side columns (a two-column form, meeting
+notes, a resume) gets its fields interleaved: a synthetic two-column fixture (`tests/layout_two_column.png`) came
+back as `Attendee: Alice, Location: Room 4B, Attende: Ben, Duration: 45 min, ...` — alternating between two
+unrelated columns line by line, with two names mangled in the process (2026-08-25).
+
+**Re-prompting `query_image` to read the columns separately is not a reliable fix.** Four phrasings were tried —
+asking for both columns in one call, asking for each column separately, insisting on an exact line count, asking
+for a table — and `Deadline: Sept 10` never appeared in *any* of them, matching Moondream2's documented tendency
+to paraphrase rather than exhaustively transcribe (see the OCR-routing note above). One phrasing even bled left-
+column fields into the right-column answer.
+
+**What ships instead: `layout.find_column_splits`/`reading_blocks` (`src/fusion_vision_mcp/layout.py`), pure
+numpy/PIL, no model call.** It sums ink pixels per x-column, finds a vertical strip with near-zero ink density
+that's wide enough and far enough from the edges to be a real gutter rather than word-spacing or a margin, and
+crops there. `ocr` calls it automatically on every page: each column is OCR'd independently and the results
+joined in reading order, so nothing has to reason about layout *and* transcribe exhaustively in the same call.
+On the fixture above this recovers all ten fields in the correct order, including the one `query_image` never
+produced.
+
+Two details were load-bearing enough to test explicitly, both in `tests/test_layout.py`:
+
+- **A ruled divider line down the middle of a real gutter must not defeat detection.** A thin (≤3px) ink run
+  flanked by gutter on both sides is bridged and folded into the gutter, rather than being read as a second,
+  narrower column boundary. `tests/layout_two_column_ruled.png` produces the identical split to the unruled
+  version.
+- **A page heading spans the full width above the columns** and would otherwise mask a real gutter that only
+  starts below it — the top 15% of the image is excluded from gutter detection for exactly this reason.
+
+**Negative controls, held before this shipped:** a table (`tests/layout_table.png`) has its own column gaps, but
+every row carries ink in most columns, so there's no vertical strip blank across the whole body height — it is
+correctly *not* split, and Test 1 in the original comparison (a clean invoice table) already showed both `ocr`
+and `query_image` handle a proper table fine without this. A single wrapped paragraph
+(`tests/layout_paragraph.png`) and a stray content sliver near the edge are also correctly left unsplit. The
+approach generalizes past two columns without new code — `tests/layout_three_column.png` splits twice, at both
+gutters.
+
+**v0.7.1 found a second false-positive mode, and it was misdiagnosed at first.** A dense, small (11pt) single
+paragraph came back scrambled into out-of-order word fragments, and a "Second Vision Pass" comparison against
+Claude's native vision (2026-08-26) filed this as a Florence-2 *legibility* problem at small text scale.
+Direct testing disproved that: calling Florence-2's OCR head on the un-upscaled original text, bypassing this
+module entirely, reads it correctly. The real cause is the gutter detector above, misfiring on this specific
+input: with only two of the paragraph's three lines landing inside the analyzed page body (the heading-exclusion
+band at the top absorbs part of the first line), word-gaps in those two lines coincidentally lined up closely
+enough to pass the gutter test, producing six spurious splits and slicing the paragraph into fragments as narrow
+as 26px. Fixed by counting independent text lines first (`layout._count_line_bands`) and refusing to split when
+there are more than one but fewer than three — too few for that kind of coincidental alignment to mean anything
+real. Every existing multi-column fixture (five-plus lines) clears this floor easily; `layout_small_text_paragraph.png`
+(committed from the exact fixture that exposed the bug) is the regression test.
+
+**2026-10-02: a third mode, found by measuring rather than by a report — the split cut lines in half.** VisionBench
+phase 14 renders 60 pages in a browser and takes every line's exact box from the DOM, so a split can be checked
+against ground truth. Cropping the whole page height at each gutter cut **105 of 2,754 lines**: titles and intro
+paragraphs above the columns, table headings, and on a slide `Bicycles` → `Bicycl` + `es`. Two causes. A gutter's
+per-column tolerance scales with page height, so on a sparse page a strip passed it while running through the
+rounded edges of letters; and a gutter only has to be blank below the top 15%, while plenty of full-width text
+sits lower than that.
+
+`reading_blocks` replaced `split_columns`. It cuts the page into horizontal zones on blank rows: a line with more
+than two ink pixels in a gutter's interior is read across the full width, and a run of lines clear of every gutter
+is split into columns, provided some column in it has three or more lines. A gutter must also be at least as wide
+as the median line is tall (capped at 3% of the width), which stops a 10px word gap on a 1024px dashboard
+qualifying. Cut lines went 105 → 3 (two invoice "Total due:" labels whose word gap lines up with a table gap, and
+one accented word). Through the server: lines read verbatim 95.4% → 97.3%, character accuracy 98.8% → 99.6%,
+regions sitting on a real line 96.4% → 99.3%, non-English verbatim 92.9% → 97.3%; real images unchanged at 75.3%.
+Three things were load-bearing, each found by a regression on the rendered set: zone boundaries use *any* ink
+(rule lines excepted), since the density floor leaves descenders outside a line and a boundary there cut it;
+lines are counted per column, since columns at offset baselines leave no blank row across the page and merge
+into one "line"; and the outer 2px of a gutter are not checked, since an opening quote mark's anti-aliasing at a
+column's edge made a whole newspaper zone read full width.
+
+**That fix eliminates the scrambling, but does not make Florence-2's OCR head perfect at small text.** Verified
+end-to-end through the real MCP server (fresh subprocess, real protocol call, not a direct-Python import) on the
+same fixture: the transcription now comes back in the correct order with no interleaving, but it still drops two
+words ("font", "pixel"), duplicates one ("wide"), and merges two words across punctuation where a space should be
+("scale,independent", "directlycheckable") against the fixture's known-exact source string. That is ordinary
+small-text transcription error — a pre-existing, separate limitation of Florence-2's OCR head that this fix was
+never intended to solve and does not claim to. Don't read "no longer scrambled" as "verbatim at small scale";
+for text this small, a caller that needs the exact wording should still treat the output as approximate rather
+than confirmed.
+
+## `detect_objects` runs SAM 3 on photos, which needs transformers 5
+
+**2026-10-12.** VisionBench sprint R (`Future_Ideas/archive/detector_ocr_replacement_plan.md`) replaced Grounding DINO in
+`detect_objects` on photographs with SAM 3 (`sam3.py`, `facebook/sam3`, threshold `LOCATE_BOX_THRESHOLD` 0.125).
+On the held-out half it found 76.4% of labelled objects against 60.2%, and boxed a plausible-but-absent neighbour
+on 9.0% of probes against 65.7%; its boxes are less precise (about a third land on a labelled instance on COCO).
+**2026-10-16: that precision is mostly crowded scenes, and the first box is right 71-73% of the time.** VisionBench
+gate V (`detect_verify_gate.py`) tried dropping boxes CLIP rejects: precision 25.4 -> 28.7% on confirm but recall -3.4
+(CI -5.0 to -1.9), past the -3 limit, so not shipped. `detect_wrong_boxes.py` then sorted the wrong boxes by geometry:
+10% of queries hold 64% of them (a COCO apple pile returned 163 boxes for 8 labelled; phase 11 scenes where one lamp
+of many was boxed), SAM 3's score does not separate them (more wrong boxes than right ones score >= 0.4), and per
+query precision is 48-51%. The highest-scoring box, which comes first, is right 70.9 / 72.9% (tune / confirm), so the
+tool description tells callers to trust the first box and treat the rest as candidates.
+**2026-10-14: flat images too.** VisionBench gate F (`sam3_flat_gate.py` screen on 63 images, then
+`sam3_flat_confirm.py` on 88 fresh ones, rule fixed in `Future_Ideas/archive/sam3_expansion_plan.md` before they existed):
+on the confirm set SAM 3 boxed the absent object on 11.4% against Florence-2's 100%, and found 53.8% of labelled
+objects against 40.5%; precision 22.4% vs 35.9%, ~29 s vs ~12 s per image, and 21 of 275 queries returned more than
+20 boxes. "Flat" is the router's pixel test (under 10 colours per 1,000 pixels, not greyscale with tonal range),
+which most JPEG screenshots fail, so the flat path is mostly clip art, logos, vector charts and lossless UI
+captures. `detection_policy._flat_locate`; without SAM 3 it falls back to Florence-2. Counting on flat images
+keeps Florence-2.
+
+Every other Grounding DINO caller (`count_objects`, `spatial_relations`,
+structured analysis's part crops and the defect probe) is unchanged.
+
+**`spatial_relations` stays on Grounding DINO + SAM2: SAM 3 was shipped there and reverted the same day
+(2026-10-13).** Gate S (VisionBench `sam3_spatial_gate.py`) tied it on 36 Open Images relations (25 each; SAM 3 12/12
+on separate, 6/12 on contact). Round 12, 171 held-object pairs labelled by the worker and blind-checked by the user,
+then showed the regression the 12 contact scenes were too few to see (`gd_sam2_held_compare.py`): on 106 held pairs
+Grounding DINO + SAM2 agreed on 88, SAM 3 on 54 (+32 points, CI 23 to 42), 37 vs 22 of 39 with one of each object,
+equal on separate pairs at a table, and twice as fast. SAM 3 fails both ways: its best-scoring match is a different
+instance more often (labelled objects chosen 86 vs 59), and its instance masks stop a few pixels short of a hand.
+Picking the closest near-best pair fixed held objects but broke separate scenes (`sam3_held_gate.py`); a 5 px contact
+tolerance is waiting on a fresh set (round 12b). SAM 3's box with SAM2's mask (27/36 in gate S) was not shipped:
+it removes no model, since SAM2 also backs `count_objects`' silhouette check and Grounding DINO its counts.
+
+Four things are load-bearing:
+
+- **`sam3.py`'s post-processing is what the gates measured**: the processor at 0.05, top 300, the 0.125 floor,
+  class-agnostic NMS at IoU 0.5, then Grounding DINO's envelope filter. Change any step and re-run
+  `replacement_gate2.py`.
+- **SAM 3 does not count.** On the literal-name counting controls it returns no box for "ball", "rod", "shape" or
+  "blob" at any threshold, and on real photos it counted worse than Grounding DINO at 0.425.
+- **It is gated.** Without accepted access the load raises an `OSError` subclass; `detection_policy._photo_detect`
+  then falls back to Grounding DINO at 0.35, and the result's `detector` says which ran.
+- **It needs transformers 5**, and the old Moondream2 pin (2025-06-21) does not load there. Its commit `5d6c926`
+  ships byte-identical weights, tokenizer and config and only fixes buffer initialisation, so
+  `DEFAULT_MOONDREAM_REVISION` pins that commit. Meta's own `sam3` package was tried and not used: it is GPU-first
+  (hardcoded CUDA, a module-level triton import, a missing vocabulary file) and its scores differ from the
+  transformers port the gates measured.
+
+**What transformers 5 changed, found by checking every model's outputs against 4.57** (VisionBench
+`transformers5_equivalence.py`, 40 images, 2026-10-13). Moondream2, SAM2 and DINOv2 matched exactly as they were.
+The rest needed fixes, each verified by a rerun:
+
+- **Fast image processors are now the default.** CLIP's embeddings moved by up to 0.13 and Florence-2's captions
+  changed. `aesthetic.py`, `florence2.py` and `grounding_dino.py` pass `use_fast=False`, as `dinov2.py` already did.
+- **CLIP's `get_*_features` return an output object**, with the embedding in `pooler_output`; `score_aesthetics`
+  crashed. `Aesthetic._projected` reads either.
+- **Florence-2's tokenizer skips `clean_up_tokenization_spaces` for BPE**, so region text read "spa ., Nov". Forced
+  back on in `florence2.py`.
+- **Grounding DINO had two upstream bugs.** The phrase position ids give the closing "." position 0, and
+  `encode_sinusoidal_position_embedding` casts its result to the integer ids' dtype, truncating the text position
+  embeddings to 0s and 1s. Scores moved by up to 0.05 and box counts changed. `grounding_dino.py` restores the 4.57
+  position ids and casts the ids to float (module-level patches, with tests).
+
+After the fixes CLIP, Florence-2 and the three above match exactly. **Grounding DINO does not quite**: box counts are
+identical on all 80 calls and boxes within 0.08 px, but scores differ by a median 2e-4 and at most 0.012, against
+a limit of 1e-4 fixed before the run. That residue starts in transformers 5's rewritten Swin backbone (feature
+differences around 50x float32 epsilon, eager attention barely changes them), so it is arithmetic order rather than
+a logic change. Replayed on all 719 of gate 1's confirm queries (`gd_tf5_decision_replay.py`, 1,110 scored queries at 0.35 / 0.425), every metric was unchanged (exact counts 61.8%, detect recall 60.2%, controls 8/8 under both prompts) and one box count moved (a chandelier, 3 -> 2). `sam3.py` reproduces the gates'
+replayed boxes on 20 of 20 confirm queries (`sam3_wrapper_parity.py`).
+
+## Counting is a separate tool from detection, and it is still not solved
+
+`detect_objects`' region count was never a tally (see the `wing` and `sword blade` cases in
+[README_DETAILED.md](../README_DETAILED.md#detect_objects-)), so `count_objects` routes "how many" elsewhere.
+
+**Grounding DINO backs it, chosen by measurement rather than taste.** Moondream2's detect head held the job
+first; both were built and benchmarked against the same cases before either shipped. They tie on eight shapes
+separated (8) and touching (8), but Moondream collapses to **1** when those same *separated* shapes are asked
+for as `pink circle` instead of `petal`, where Grounding DINO still returns 8 — the class-name sensitivity is
+gone. It is also ~4x faster (2.1s vs 8.6s per call). Both pass the negative controls (one blob → 1, a rod → 1).
+
+Grounding DINO returns one box around the whole arrangement *in addition to* the instances — 68% of the frame
+when they are separated, and carrying the **highest** score, so a confidence cut removes the real instances
+first. `grounding_dino.py` drops boxes that swallow most of the others' centres and reports
+`group_boxes_dropped`. Without that filter every count is one too many.
+
+**Tune counting against `benchmarks/`, never against one image.** The fixture suite draws its synthetic cases
+programmatically, so their counts are exact by construction, and it includes eight negative controls that are
+each exactly one object. Two settings were chosen from it and should not be nudged without re-running it:
+the box threshold (0.25 → **0.15**) and the envelope filter's floor (4 → **3** boxes, since two instances plus
+their envelope is only three). Together those took exact positives from 6/10 to 9/10 and mean absolute count
+error from 1.07 to 0.10, holding all eight controls.
+
+The sweep is also the clearest illustration of why this repo insists on negative controls. Thresholds of 0.125
+and 0.10 score a **perfect 10/10 on positives** — and fragment a spotted ball into 3–4 objects and a rough-edged
+rod into 2. Optimising on positives alone would have shipped exactly the failure mode the project exists to
+avoid. 0.15 is the *lowest* threshold at which every control still holds, and that is the reason it is the
+default.
+
+**2026-10-12: `count_objects` now counts at 0.425 (`COUNT_BOX_THRESHOLD`), not 0.15.** 0.15 was right for the
+fixtures and wrong for photos, where counts ran high. VisionBench sprint R picked 0.425 on the tune half of its
+photo counts under the same rule (most exact counts with all 8 controls held). On 427 held-out counts it went
+43.8% -> 61.8% exact (+18.0, CI 14.1 to 22.2), with the controls holding under both the "petal" and literal-name
+prompts (positives 8/10 -> 7/10). `DEFAULT_BOX_THRESHOLD` stays 0.15 for every other Grounding DINO caller
+(spatial relations, structured analysis's part crops, the defect probe's hand and face boxes), because those were
+not re-measured. Gate 2 also showed SAM 3 cannot take over counting: on the literal-name controls it returns 0
+boxes for "ball", "rod", "shape" and "blob" at every threshold.
+
+**2026-10-15: `possibly_more` says when a photo count may be too low; `count` is unchanged.** VisionBench gate
+C1 (`count_gate_c1.py`, Future_Ideas/archive/counting_plan.md) found the missed 2- and 3-object counts are undercounts whose
+extra objects are mostly boxed just under 0.425, while lowering the floor overcounts single objects (a learned box
+scorer that tried to tell them apart failed, 51.5 vs 57.3% on round 14). So `count_objects` reports the gap instead:
+Grounding DINO's unreturned boxes in [`COUNT_RANGE_FLOOR` 0.18, threshold), each kept only if it is neither on (IoU)
+nor inside a counted or accepted box at 0.5 (`analysis.possibly_more`), give `possibly_more: {upper,
+extra_candidates, reliability}`. On 953 photo counts the truth lay in [count, upper] 78.6-79.4% of the time against
+55.6-61.8% exact; when `upper` > `count` the truth was higher about half the time (38-58%), and when they are equal
+it was too low only 7-14%. No negative control gets an extra. The boxes come from the same pass
+(`candidates_floor` on `GroundingDino.detect_objects`); the server reproduced the gate's replay on 20 of 20 round 14
+images. The user chose to ship it as a hedged hint.
+
+**2026-10-16: `crowd_range` brackets crowds with SAM 3.** Grounding DINO's count runs low on crowds and SAM 3's
+(`detect_objects`' model, at `CROWD_RANGE_SAM3_FLOOR` 0.3 with its NMS and envelope filter) runs high, so photo counts
+at the default threshold carry `crowd_range: {low, high, sam3_count, reliability}` when either is at least
+`CROWD_RANGE_SHOW` 4 (`analysis.crowd_range`). VisionBench gate K (`count_range_gate.py`; round 17, 160 fresh Open
+Images crowds of 4-30, counted by the worker and blind-checked by the user, who agreed with its exact counts on only 18
+of 25): truth inside 85.9% vs `possibly_more`'s 64.1%, +21.8 (CI 13.0 to 30.4), on every band from 4-6 to 21-30;
+median width 0.61 of the count; shown on 17.5% of sprint R's counts of 1-3; on the user's own 27 counts 25 inside vs
+18. One gate bug was fixed after the first score and recorded: its raw cache was not sorted by score, which NMS
+depends on; sorting moved `possibly_more` 65.2 -> 64.1 and nothing else, and the server then reproduced the gate 12 of
+12. Costs SAM 3's ~7 s on every photo count. The 0.3 was picked on sprint R's tune half by looking; changing it means
+a fresh set.
+
+**2026-10-20: on a generalist set the range is mostly a false alarm, not a crowd.** Phase 11 (2026-10-19) scored it
+right on only 60.0% of the 16.1% of counts where it showed. Its cached count rows explain why: of 747 exact counts, 675
+are single objects and only 13 are 4 or more, so at least 107 of the ~120 ranges shown were on 1-3 objects, where it
+appears because one model overcounted. Where Grounding DINO itself said 4+ (39 counts), the truth was under 4 in 38 (a
+planter as 5, a logo as 5, a pie chart as 4; many are JPEG screenshots and charts, which take the photo path). On the 13
+real crowds Grounding DINO was low 12 times and never high, gate K's pattern, too few to re-measure its 86%. The tool
+description now says its appearance does not mean a crowd. The exact non-crowd figure (about 55-60%) would need SAM 3
+re-run on phase 11's count images; it would not change the wording, so it was not run.
+
+**2026-10-21: flat-image counts drop Florence-2's group box too.** Flat images (synthetic shapes included) count on
+Florence-2's grounding head, which returns a box around the whole arrangement besides the instances, and only the
+Grounding DINO path dropped it: eight separated petals counted 9 on the live server, and the "9 of 10 fixtures" in the
+tool description dated from before flat routing (the fixtures were 0 of 10 exact). `count_objects` now passes
+`drop_group_box=True`, applying the same rule (`geometry.envelope_indices`, moved there from `grounding_dino` so the
+torch-free path can use it). VisionBench `flat_count_envelope.py`: fixtures 0 -> 5 of 10 exact with all 8 controls
+held; phase 11 flat counts 46.6 -> 54.4% exact (MAE 1.04 -> 0.75); confirmed on round 13's 187 fresh flat counts,
+47.6 -> 50.8% (MAE 1.08 -> 0.84). Dropping exact duplicates first (Florence-2 has no NMS; a banner went to 0 on
+phase 11) tied on round 13 and was not shipped. Still wrong: touching or overlapping shapes merge into one Florence-2
+box (rings of 8 touching discs count 1), and nested shapes (concentric circles) lose the outer ones.
+
+**2026-10-27: a box that is a part or near-duplicate of another counted box is dropped, on both paths
+(counting plan Track 1A/4A, `geometry.nested_indices`, applied in `count_objects` and the batch `count`).** In score
+order (Florence-2: output order) a box IoU >= 0.55 with a kept box goes; then a box 90%+ inside a larger kept one
+(and under 0.85 of its area) goes, unless that larger box holds 2+ barely-overlapping nested boxes, which makes it
+the group box that goes instead. VisionBench `count_gate_track1.py` (six variants, rule fixed before scoring, all sets
+seen): 709 -> 782 exact of 1,243 (+5.9, CI 4.4 to 7.3), phase 11 photos 60.9 -> 65.4%, phase 11 flat 54.4 -> 68.9%,
+round 13 flat 50.8 -> 68.4%, all of it single objects; multi-object COCO -1.4, round 14 -1.0; every control and
+fixture positive held on both paths; server parity 1,297 of 1,297. A concentric exemption scored lower. The same
+day, by the user's decision: SAM 3 runs for `crowd_range` only when `possibly_more.upper >= 3`
+(`CROWD_RANGE_RUN_UPPER`; round 17 replay 85.9 -> 80.4%, 428 of 644 phase 11 photo counts skip it), and `consensus`
+is opt-in, with `separable` always reported (on phase 11 the count was right 43% when the dense-region tally agreed
+and 66% when it disagreed). Round 26 is the fresh confirmation for all three
+(`Future_Ideas/archive/Counting_Improvement_Plan.md`, Section 0).
+
+**2026-10-28: LFM2.5-VL may move a photo count by one step (`lfm_check`, default on; `analysis.lfm_count_check`).**
+At the default threshold only, after `possibly_more`/`crowd_range`: a count of 1 whose box scores under
+`COUNT_CHECK_WEAK` 0.6 becomes 0 when `app.answerer` answers "no" to `COUNT_CHECK_PRESENCE` (V1w); a count of 0 with a
+distinct candidate in [0.18, threshold) becomes 1 (the best candidate) when `COUNT_CHECK_COUNT` parses to 1+ *and*
+presence says "yes" (P1). Nothing else changes `count`; `detector_count`, `count_basis` and `count_check` (replies, or
+`skipped` when LFM cannot load or is refused for memory) report it. Gates 1b/1c on seen sets (counts 61.2 -> 70.3%,
+absent non-zero 34.6 -> 17.5%, controls 16/16), Gate 2 on fresh round 26 (227 photo counts; 1-5 exact 63.9 -> 68.1%,
+CI 0.8 to 8.4; hard negatives non-zero 74.5 -> 69.1%). LFM alone rescuing zeros (Gate 1) failed the absent rule
+(34.6 -> 43.1%); the presence question is what makes the rescue safe. VisionBench `count_lfm_parity.py`: the server's
+function reproduces the gates' decisions from their cached replies on 1,696 of 1,696 rows, and live replies match the caches 8 of 8. The prompts,
+0.6 and the reply parsing were fixed before the gates; changing any of them means a fresh set. Hard negatives are the
+open gap: Grounding DINO still counts a verified-absent object about 7 times in 10.
+
+**2026-10-30: on flat images LFM2.5-VL can zero any count (`lfm_check`; `analysis.lfm_flat_check`, F3).** On a
+Florence-2 count (`detector == "florence2"`, routed or `clip_art=true`), any count of 1+ becomes 0 when `app.answerer`
+answers "no" to `COUNT_CHECK_PRESENCE` (all boxes to `vetoed_boxes`); a zero is never raised. Florence-2 has no scores,
+so there is no weak-box guard to lean on. Phase 8 screen on seen flat sets (`count_gate_flat_lfm.py`: absent 0 -> 87%,
+counted 55.4 -> 53.8; its controls first failed only on "petal" names and were re-run with literal names, 18/18
+unchanged), then Gate 5 on fresh round 28 (`count_gate5_round28.py`, 103 flat images, the user's blind check 34 of 38
+agreeing): absent answered 0 1.9 -> 89.3% (CI 80.6 to 93.2), counted exact 34.8 -> 34.8%, controls unchanged. Parity
+(`count_flat_lfm_parity.py`): 1,045 of 1,045 cached decisions, live 8 of 8. **Round 28 exposed the flat path's own
+weakness: exact counts of present objects 34.8%** (77% at 1, 26% at 2-5, 0% at 6+) on screenshots, game UI and charts,
+against 68.4% on round 13's simpler flat images. `clip_art=true` on a photo also gets the check; that case was not
+measured. The guarded photo veto (V2g, t = 0.6) was not taken to a fresh round: the user chose not to (plan 0.16).
+
+**The honest negative result: the flower is not counted by anything here.** `tests/sample.jpg` — a paper flower
+with overlapping petals — returns 1 from *every* approach tried: Florence-2 grounding, Moondream's detect head,
+Grounding DINO (at every box threshold down to 0.10), the `count_lobes` outline measurement, SAM2 in
+segment-everything mode (one mask for the whole flower), and a CIELAB interior-colour experiment.
+
+Two measurements explain it, and together they close the case. Its silhouette has **solidity 0.984**, so the
+outline is essentially a smooth disc — nothing there. And its interior colour boundary strength is **0.87**,
+barely above a plain textured blob's 0.52, because the petals are pastel and low-contrast; the interior
+experiment returns 1 even with its validity gate disabled entirely, so that is an absence of signal rather than
+a threshold rejecting one. See `benchmarks/interior_structure.py`, which is kept *only* to make this
+reproducible. Don't spend another pass on silhouettes, detectors, or colour for this image.
+
+That experiment also failed the controls it had to pass: a striped ball came back as **7** objects and a
+four-colour logo as **4**. Interior colour cannot distinguish a pattern from a group of parts, and fixing that
+would still not deliver the flower, because the contrast is not there to begin with.
+
+**CountGD was ported and measured, and is worse than what ships.** It was the counting plan's recommended
+candidate, and the port turned out easy: its checkpoint is Grounding DINO Swin-B plus a single 1x1 conv for
+visual exemplars, so HF's own conversion mapping loads it onto stock `GroundingDinoForObjectDetection` with zero
+substantive missing keys, CPU-only, no compiled ops — none of the GCC/CUDA/Python-3.9 apparatus its repository
+demands. On identical fixtures it scores 8/10 positives against 9/10, holds **4 of 8** negative controls against
+8/8, and triples the mean count error. It misses a rough-edged rod entirely (0 objects), and the flower comes
+back as 11, 4 and 5 at three resolutions of the *same image* — a spread that is noise, not a count. Rejected;
+see `benchmarks/countgd_spike.py`, which is kept only to make that reproducible.
+
+**Tiling and exemplar prompting were also tried, and fail the same way.** Tiled inference (2x2 and 3x3
+overlapping crops, merged by IoU) buys one point on the heavy-overlap case and costs 5-12x the latency while
+dropping to 7/8 and then 5/8 negative controls. CountGD's visual-exemplar path, reimplemented onto the HF graph,
+breaks five of six controls. See `benchmarks/tiling.py` and `benchmarks/countgd_exemplar.py`.
+
+**All four rejected approaches failed in exactly the same place, and it is worth naming.** Interior colour,
+tiled crops, and exemplar matching each raise recall by attending to sub-object detail — and each one turns the
+**spotted ball**, a single object covered in high-contrast spots, into many objects: 6 at 2x2 tiling, 15 at 3x3,
+and 31 with an exemplar. Any future method that zooms in, matches appearance, or reads interior contrast will
+meet the same wall. A spot, a stripe, a logo segment and a petal are the same thing to a detector; what
+separates them is knowing what the object *is*, which is the calling model's job and not a measurement this
+server can make. Test any new idea against `neg_spotted_ball` first — it is the cheapest possible disproof.
+
+One trap the text-only spike recorded is worth knowing generally: **safetensors deduplicates shared tensors.** CountGD's
+six `bbox_embed` heads are stored once with the aliases in `__metadata__`, so a naive `load_file` leaves 66
+decoder box-head tensors missing and randomly initialised. HF ties those weights, so the outputs looked fine
+anyway — restore aliases from the metadata before converting any checkpoint, and check *substantive* missing
+keys rather than trusting that inference produced plausible numbers.
+
+Two rules follow, both stated in the tool's own MCP description because a calling agent reads that and not this
+file. A low count on something expected to be many means *"could not separate them"*, not a tally. And `count`
+is never rewritten by the silhouette check — `count: 1` beside `silhouette.lobes: 8` reports two methods
+disagreeing, which is information, rather than hiding one behind the other.
+
+The Moondream pin still moved `2025-01-09` → `2025-06-21` (`src/fusion_vision_mcp/moondream.py`) and stays there
+for `query_image`: it fixed a measured *self-consistency* failure, where asked to count the petals in
+`tests/sample.jpg` the old pin answered 12 then listed 6 colors for them, and the new pin answers 10 and lists
+exactly 10.
+
+## `spatial_relations` measures; it does not judge
+
+`spatial_relations` (Grounding DINO boxes → SAM2 masks → `geometry.py`) reports numbers and deliberately stops
+there. That split came out of testing, not taste: Moondream answered a plain "describe anything wrong in this
+image" with a flat `"None"` on six different images that all contained a real, human-visible defect, and closed
+yes/no questions gave the *same* answer across genuinely different images often enough that the answer was
+clearly a default rather than an observation. A small VLM does not reliably supply that judgement. The calling
+model does — and what it cannot do is measure, so that is what the tool provides.
+
+**Locating the named objects doesn't reliably use color to discriminate, and this was found the hard way.** A
+usage-quality pass (2026-08-26) built a synthetic scene with one red, one blue and one green circle and asked
+`spatial_relations` for `['red circle', 'blue circle', 'green circle']`. Every query returned the *same three
+boxes* — the detector (both Florence-2's grounding head and Grounding DINO were tested; both do this) found
+"circle" and largely ignored the color word. The relations computed from that were nonsense: "red circle" vs
+"blue circle" came back `overlapping` with `a_inside_b: 1.0`, because both labels pointed at the same physical
+region compared against itself.
+
+What made this fixable: the correctly-matching box scored highest for its own query, every time, in every test
+run (5/5 on the color case, plus the pre-existing size-disparity case in `spatial_containment.png`). Switching
+the detector from Florence-2's `detect_objects` (no per-box confidence available) to Grounding DINO (which
+already backs `count_objects` and does carry scores) and keeping only the single best-scoring match per
+requested name turned that ranking signal into a real filter. Verified end-to-end through a freshly spawned
+server on both fixtures: three distinct, correctly-colored boxes with clean `touching`/`separate` relations, and
+`b_inside_a: 1.0` on the containment case with no more self-comparison noise. Regression tests:
+`test_spatial_relations_discriminates_same_shaped_objects_by_color` and `test_spatial_relations_measures_containment`
+in `tests/test_server.py`, against `tests/spatial_touch_separate.png` and `tests/spatial_containment.png`.
+
+The real cost of this fix: `spatial_relations` now assumes **one instance per requested name**. A scene with two
+swords and you ask for `'sword'` twice gets you the same single best match twice, not two different swords —
+give them distinguishing names, or use `count_objects` for an actual tally. This wasn't a real regression so
+much as making an already-fuzzy assumption explicit: the tool never had a principled way to pair multiple
+same-label instances (it just returned everything and computed every pairwise relation), so this trades that
+loosely-defined behavior for one clear, documented rule.
+
+**A companion finding from the same pass turned out not to be a bug.** `score_aesthetics` scored a crisp flat
+vector-style graphic and a heavily blurred, noised version of it almost identically (4.19 vs 4.16). Re-run on an
+actual photograph (`tests/sample.jpg`) at four blur levels, the score dropped monotonically (5.23 → 4.40 → 4.08
+→ 3.95) — blur sensitivity works fine within the tool's already-documented scope ("rates photography, not fine
+art"). The flat-graphic test was invalid, not the tool; see the `score_aesthetics` section of
+`README_DETAILED.md` for the numbers. Recorded here so it isn't re-investigated as if it were still open.
+
+Two things follow for anyone extending this:
+
+- **Prefer aggregate statistics over a mask to fine topological derivatives of one.** Overlap fractions,
+  distance transforms, principal axes and per-band centroids all average over many pixels and were stable on
+  real photographs. Skeleton-based measures were tried first for curvature and for counting branch tips: both
+  produced *inverted* results on real images, because `skeletonize` on a rough silhouette turns bark-level
+  texture into spurious branches. `geometry.straightness` gets its centreline from band centroids for exactly
+  this reason.
+- **Validate any new metric against a negative control, not just a positive one.** Every check in `geometry.py`
+  was measured on a known-good image as well as a known-bad one; two candidate checks were dropped precisely
+  because the "good" case scored worse than the "bad" one, which a positive-only test would have hidden.
+
+`geometry.py` is pure numpy/scipy and is unit-tested against synthetic masks in `tests/test_geometry.py`, so
+its behaviour can be checked without downloading a model.
+
+## v0.6.0: four tools got an opt-in flag that surfaces unreliability instead of hiding it
+
+Four gaps against Claude's native vision were tracked as open: `caption` misreading embedded text (this
+project's own banner logo came back "FusionVisionMP"), `query_image` on open-ended judgment (documented flat
+"None" on six images with real defects), `count_objects`/`detect_objects` on overlapping cases (the flower — see
+above), and `score_aesthetics`'s photography bias. None of these are fixable locally — a caption head that
+paraphrases can't be made to transcribe, a small VQA model can't be made to reason reliably, a detector with no
+notion of object identity can't separate a spot from a petal, and a CLIP head trained on photographs can't be
+retrained into a fine-art critic without new weights. What shipped instead, on all four existing tools with no
+new tools and no new models: an opt-in parameter that either cross-checks the unreliable output against a second
+signal, or surfaces the disagreement instead of masking it. Same philosophy as the "`spatial_relations` measures;
+it does not judge" section above — measure and flag, don't paper over.
+
+- **`caption(verify_text=true)`** also runs Florence-2's `<OCR_WITH_REGION>` head and returns verbatim
+  `text_regions` alongside the caption. Re-verified live against the actual `FusionVisionMCP-Dark.jpg` banner:
+  the caption still reads "FusionVisionMP" (the head itself is unchanged and still wrong), but `text_regions`
+  correctly returns `[{"text": "FusionVisionMCP", "box": [562, 211, 1493, 300]}]` in the same call. This closes
+  the gap of having to guess or make a second blind call, not the gap of the caption head misreading text.
+- **`query_image(check_consistency=true)`** asks a rephrased control question and returns
+  `{answer, control_answer, consistent, confidence}`.
+- **`count_objects(consensus=true)`** (default on until 2026-10-27, opt-in since) adds a `dense_region_caption`-based second opinion and a
+  `separable` flag reading `count` against the silhouette's `by_distance`/`by_radial`/`agreement` fields.
+- **`score_aesthetics`/`critique_composition`(`style_context=true`)** classifies the image's medium via
+  zero-shot CLIP (16 style prompts, reusing the already-loaded aesthetic backbone) and returns it alongside the
+  score, so a non-photographic result is read with the documented caveat instead of as an absolute verdict.
+
+**Both of the first two shipped once already wrong, and both were caught by testing against the specific
+documented case rather than a generic unit test.** `separable` originally read only `by_distance` (the
+silhouette's `lobes` field), so on the flower/petal case — the canonical example the flag exists to catch — it
+returned `separable: "yes"` sitting directly next to `consensus.agree: false` in the same response: two fields
+in one payload contradicting each other. The fix makes `by_radial` (the rosette-specific angular-harmonic
+estimator) and `agreement` load-bearing: `by_distance=1, by_radial=8, agreement=false` — a detector collapse the
+outline's angular structure still catches — is now the one case documented to return `"no"`. Separately,
+`_vqa_consistency` originally scored `confidence: "low"` only when both answers reduced to the *same* short
+default token (e.g. "None"/"None"); asked to "describe anything wrong" on `tests/sample.jpg`, one answer invented
+a missing centerpiece and the control answer said nothing was wrong — a direct, substantive self-contradiction —
+and the original logic scored that `"normal"`. Fixed so `confidence` is `"low"` whenever the two answers
+disagree, not only when they agree on a default. The lesson both cases share: a flag meant to catch a known
+failure mode has to be tested against that exact failure mode, not just checked for producing *a* valid-shaped
+value — the original `count_objects` test only asserted `separable in ("yes", "no", "unknown")`, which the buggy
+version also satisfied.
+
+**What this does and does not buy.** All four are opt-in (default `false` except `count_objects`'s `consensus`,
+which is cheap and on by default) and none of them make the underlying model more capable. They convert a
+silent wrong answer into a flagged one a calling agent can act on — decline to trust it, fall back to
+`spatial_relations` or its own reasoning, or ask the user. That is the ceiling for what a local model stack can
+do about a gap that is genuinely about semantic understanding rather than measurement.
+
+## v0.8.0: The "Agentic Implementation" Refactor (Sprints 6–16)
+
+Sprints 6 through 16 shifted the project from raw model wrappers to "agentic" capabilities—making the server smart enough to route, measure, and cross-check its own answers rather than just passing VLM hallucinations through to the user.
+
+**The Routing Cascade (Sprint 5) & Adaptive Thresholding (Sprint 6)**
+We needed `count_objects` to handle both real photographs and flat vector art without the caller explicitly passing `clip_art=True`. We originally tried zero-shot CLIP (SigLIP2, Sprint 4) for domain routing, but found it confidently misclassified real photographs as clip art. The fix was model-free (Sprint 15): a simple pixel-statistics check (unique RGB colors per 1,000 pixels) cleanly separates the two domains.
+Similarly, `count_objects` using Grounding DINO on photographs originally used a static threshold (`0.30`). On dense scenes (like a flock of birds), it failed entirely. Sprint 6 introduced adaptive thresholding: it sweeps the threshold down to `0.10` if no boxes are found at `0.30`. This introduces a known risk (the "danger zone" of hallucinated boxes), so it is strictly gated: the lower thresholds are only accepted if `score_aesthetics` (or rather, its internal confidence) confirms the image is actually densely populated. We measure, we don't blindly lower the bar.
+
+**Specialist OCR & Text Fusion (Sprints 7 & 8; specialist replaced in v0.8.1)**
+Florence-2's caption head paraphrases and misspells text in the image, so `caption(auto_verify_text=true)` scanned
+the generated prose for signage words and, if it found any, cropped and upscaled those regions, cross-checked them
+against a specialist OCR model, and substituted the verbatim text back into the caption.
+
+**Retired 2026-10-15.** Once every caption ended with the `ocr` engine's `Visible text` line (2026-10-10), the
+reliable text was already in the caption. VisionBench `caption_text_recheck.py` re-measured it on 60 phase 11 text
+images: key text phrases 52.9% -> 52.9% (+0.0), firing on 73% of them, median 31.6 s against 14.5 s. The parameter,
+its caption-wording trigger (`textmatch.contains_likely_text`) and the crop-and-upscale re-read are gone;
+`verify_text` (Florence-2's text regions, `corrections`, `caption_corrected`) is unchanged, its `text_consensus`
+now comparing the caption with Florence-2 alone (`agreeing_sources` 1 or 2; it never had the third reading). Nothing
+outside this machine called it: the server is not in the MCP registry.
+
+The specialist was originally `ibm-granite/granite-docling-258M`, then **EasyOCR** (`easyocr_engine.py`), and
+from 2026-09-29 the `ocr` engine, PP-OCRv6 English (see the `ocr` section above). The `granite_docling`
+module is gone. If you find a reference to Granite-Docling anywhere, it is stale — two
+test files importing the deleted module survived the swap and broke `pytest` collection outright until v0.8.2.
+
+**Ground-Truth Suites (Sprints 15 & 16)**
+We historically relied on synthetic, geometric fixtures. We realized this was a massive blind spot. We pulled 35 real photographs from COCO val2017 and 24 from Open Images v7 into `benchmarks/`. Every structural change is now regression-tested against real-world complexity, not just white backgrounds.
+
+**Technical IQA & Reasoner (Sprints 11 & 12)**
+We needed to split aesthetics into `photographic_aesthetic`, `technical_quality`, and `artistic_judgment`.
+- `technical_quality` uses MUSIQ via ONNX. We chose MUSIQ over CLIP-IQA because it produces a native 0-100 score and uses 20% less memory, and we siloed it behind an `[iqa]` optional dependency so we don't force ONNX binaries on everyone.
+- `artistic_judgment` uses `VisionReasoner` (`reasoner.py`), an optional Ollama-backed LLM backend. A strict invariant here: the LLM is allowed to interpret, but it is explicitly forbidden from silently overriding direct physical measurements (like object counts). The code discards LLM-fabricated measurements and re-attaches the raw deterministic ones.
+
+**Structured Visual Inspection (Sprint 10)**
+VLMs are notoriously blind to generative AI artifacts (e.g., humans with 3 arms). We built `structured_analysis` into `query_image` to physically measure anatomy using Grounding DINO (`person`, `arm`, `leg`, etc.) and evaluate against physiological ratios (e.g., `arm > persons * 2 + 1`). If the ratio fails, it raises an `Anomaly` backed by a physical `Observation`, overriding the VLM's hallucination. (Sprints 17-19 later refined this by enforcing strict part-to-person association and bounding-box deduplication to ensure the anomaly flags aren't just detector noise).
+
+**2026-10-06: the part count no longer raises anomalies; a learned probe does.** Measured on VisionBench's
+user-reviewed round 7 (149 images, 49 defective) the part count flagged 38.8% of defective images and 30.0% of
+clean ones, near chance, and 47 of its 69 anomalies were leg counts. It can only say "too many", so a fused or
+misshapen hand passes it. `defect_probe.py` replaces it as the anomaly signal: every Grounding DINO `hand` and
+`face` crop (padded 20 px) is embedded with the CLIP ViT-L/14 `score_aesthetics` already loads, and a logistic
+regression trained on round 7's reviewed crops scores it (`data/defect_probe.json`, written by VisionBench's
+`probe_rounds_7_9.py --round7-only`, threshold set on round 7 alone at 85% specificity). The part count still
+reports an over-count as a `detector` observation.
+
+Three things were load-bearing, each measured:
+
+- **Train on the reviewed rounds, not SynArtifact.** The published probe (AUC 0.88 on SynArtifact, one generator)
+  scored round 7 at image AUC 0.65 and rated real photos as *more* defective than defects -- it had learned a
+  generator's look. Trained on round 7 it reached 0.885 on the held-out round 8; adding SynArtifact made it worse.
+- **The embeddings must be the unnormalised `image_embeds`**, which is what `Aesthetic.image_embeddings` returns
+  (`get_image_features`), not the normalised features the aesthetic head uses. Parity with the training
+  embeddings was checked to 4e-6.
+- **Round 7 is training data now.** Measure the shipped tool on what the probe never saw: VisionBench
+  `ai_defect_e2e.py` (round 8, phase 10, phase 11; 95 images). There, defective images flagged went 41.9% ->
+  59.7% and clean images left alone 72.7% -> 66.7%. Specificity is the open gap.
+
+**2026-10-08: retrained with the user's crop calls; more data stopped helping.** The user called every round 7
+crop the defect boxes did not cover (216), and re-graded phase 11 themselves (the e2e set is now 94 images, 47
+defective). Retrained on round 7's boxes plus those calls (261 defect, 772 clean crops): 72.3% of defective images
+flagged and 63.8% of clean left alone, against 63.8% / 63.8% for the first probe on the same 94 images (image AUC
+0.720 -> 0.741). VisionBench `ai_defect_rescore.py` re-scores the e2e set from cached boxes and embeddings, so a
+candidate probe is checked in minutes rather than a two-hour server run. Adding round 9 (246 user-graded Stable
+Diffusion 1.x images) made it *worse* on the unseen images (51.1% / 76.6%, AUC 0.699) while its own CV looked
+fine, so the CLIP crop probe has plateaued: the next gain has to come from what the probe looks at (a different
+backbone, landmarks), not from more of the same labels.
+
+**2026-10-09: the probe reads DINOv2-large, not CLIP.** Same crops, labels and training rule; only the features
+changed (`dinov2.py`: CLS token + mean patch token, 2,048 floats; `data/defect_probe.json` names its backbone).
+Chosen on VisionBench round 10, 299 user-graded images from six generators no probe trained on (DALL-E 2,
+Midjourney, RealVisXL, SDXL base, FLUX.2 Klein, SANA; 154 defective), by a rule committed before the run
+(`defect_round10.py`, a5efb20): image AUC 0.686 vs CLIP's 0.612, +0.074 with a 95% interval of 0.013-0.135. At
+each probe's own threshold: 44.8% of defective images caught, 84.1% of clean left alone, against 47.4% / 68.3%.
+MediaPipe landmarks were tried too and gave nothing on hands (landmarked on 17% of crops, defective or not).
+
+Four things to know:
+
+- **Feature parity is load-bearing.** The probe was fitted to the slow `AutoImageProcessor` in float32; the server
+  matches the research features to 7e-6 (probe scores to 3e-6). Don't switch to the fast processor or fp16
+  without re-checking.
+- **It is a new model in memory**, ~1.2GB, loaded only by `structured_analysis` when a hand or face is found and
+  idle-released like the rest. CLIP is no longer loaded by `structured_analysis` at all.
+- **Rollback is a data-file change.** `inspection._probe_features` reads the probe file's `backbone`: a CLIP probe
+  file (or one without the field) still runs on CLIP.
+- **DINOv2-base is the open question.** It scored as well on round 10 (0.709) at a quarter of the size, but it
+  was not the candidate named before the run, so it waits for a fresh test set rather than being picked after
+  seeing results.

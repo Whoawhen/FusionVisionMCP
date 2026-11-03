@@ -132,7 +132,7 @@ confidence scores were added here.
 > from different columns. `ocr` finds the column gutter (a blank vertical strip, pure numpy/PIL, no model call)
 > and OCRs each column independently before joining the results in reading order. A ruled divider line down the
 > real gutter doesn't defeat this, and a page's own title/heading can't mask a gutter that starts below it. A
-> table's column gaps don't trigger a false split — see `src/fusion_vision_mcp/layout.py` and `CLAUDE.md` for
+> table's column gaps don't trigger a false split — see `src/fusion_vision_mcp/layout.py` and `docs/history.md` for
 > the measured case that motivated this and the negative controls it holds.
 >
 > **v0.7.1: a short paragraph of small text no longer gets false column splits.** A dense, small-font single
