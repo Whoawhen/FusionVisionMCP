@@ -314,6 +314,23 @@ the "no" path). Changing the check prompt, the suffix or the "no" rule means a f
 pass (plan Track 8): ask about the object alone rather than the whole question, and/or require SAM 3 to find no box
 before taking the "no" path.
 
+## `query_image` and `caption` keep the first OCR reading: LFM's transcription did not help them (2026-11-03)
+
+`ocr(lfm_read=true)` appends the lines LFM2.5-VL's transcription adds; `caption`'s text line and `query_image`'s OCR
+context pass `lfm_read=False`. Both were checked on 2026-11-03 and both stay that way.
+
+- **`caption`, offline estimate, no gate run.** 155 phase 11 text images with cached LFM prose, readings and
+  transcriptions (the server's `_lfm_extra` replayed on cached replies), 786 key phrases: 81.4% shipped, 82.8% with
+  the LFM lines (+1.4, CI 0.6 to 2.3), 83.5% with the full `ocr` reading (+2.1, CI 1.0 to 3.2); no image worse. Not
+  gated: ~+6 s per caption with text puts the default (~14 s) well over its 15 s budget for two points on a line that
+  already finds most phrases. A caller wanting the full text calls `ocr`.
+- **`query_image`, screen FAILED** (VisionBench `vqa_ocr_lfm_screen.py`, rules fixed before any answer, e2fbffb):
+  the 770 routed questions of rounds 29 and 30, shipped answers reused from Gates V5/V7 at `VQA_SEED`. The answer sat
+  inside the 160-word context more often (TextVQA proxy 57.4 -> 68.5%), but answers got slightly worse: pooled 78.4 ->
+  77.3% (-1.1, CI -2.3 to 0.0; 6 gained, 15 lost), `text` -0.9, `no_text` -1.0, `no_object` -4.3 (n 47); +4.7 s
+  median per routed question. As round 22 suggested, the answering model already reads the text it would be handed.
+  No fresh round was built. Re-trying it needs a different idea, not a different cut of the same one.
+
 ## `classify_image` is CLIP zero-shot over the caller's labels (2026-10-16)
 
 `classify_image(src, labels)` puts each label in `CLASSIFY_TEMPLATE` ("a photo of {}") and ranks them with

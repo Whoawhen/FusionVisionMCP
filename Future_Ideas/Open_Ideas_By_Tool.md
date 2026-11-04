@@ -22,10 +22,6 @@ file, "What good means").
 - **`Image type:` line on `deep`.** Shipped on the default caption only (2026-10-24); `deep`, `region` and the
   Florence-2 fallback were never measured. The user asked to be reminded. Source: [docs/history.md](../docs/history.md), "the default caption
   starts with `Image type:`".
-- **Sharpened and LFM readings in the `Visible text` line.** `caption`'s text line passes `sharpened=False,
-  lfm_read=False` because its gates measured the first reading. `lfm_read` alone took TextVQA 57.4 -> 68.5% on
-  `ocr`, so a gate here is the obvious next test. The same applies to `query_image`'s OCR context (not in its
-  plan). Source: [docs/history.md](../docs/history.md), the 2026-10-30 `ocr` sections.
 - **Escalate some images to `deep`** (old step 2A). Worth about +2 points when the default was Florence-2 and `deep`
   Moondream2; both slots are LFM2.5-VL now, so the premise has to be re-derived from cached captions before
   anything runs. Source: [archive/Caption_Improvement_Plan.md](archive/Caption_Improvement_Plan.md) 0.3 and 0.12.
