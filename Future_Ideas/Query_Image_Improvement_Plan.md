@@ -1,6 +1,6 @@
 # `query_image` Frontier-Grade Improvement Plan
 
-**Status:** Phase 1 (Tracks 1–8, Gates V1–V7) shipped 2026-10-31 to 2026-11-02; post-V7 screens (`vqa_ocr_lfm_screen`, `vqa_presence_veto_screen`, `vqa_gap_screen`) closed 2026-11-03 to 2026-11-04. Phase 2 (Tracks 9–13) drafted 2026-11-04. **Reviewed 2026-11-04: P2.0 below supersedes P2.1–P2.5 where they disagree.** Gate path decided (P2.0.4): N and E ship on a seen-set screen; R goes to a fresh round 31 if the screen clears it. Next: Track 9.
+**Status:** Phase 1 (Tracks 1–8, Gates V1–V7) shipped 2026-10-31 to 2026-11-02; post-V7 screens (`vqa_ocr_lfm_screen`, `vqa_presence_veto_screen`, `vqa_gap_screen`) closed 2026-11-03 to 2026-11-04. Phase 2 (Tracks 9–13) drafted 2026-11-04. **Reviewed 2026-11-04: P2.0 below supersedes P2.1–P2.5 where they disagree.** Gate path decided (P2.0.4). Track 9 done (`48687e1`). Step 13A screen done (P2.0.6): NE +17/0 ships on the screen; R +13/0 goes to round 31. Next: implement NE (P2.0.5 step 5); then build round 31 for R.
 **Target tool:** `query_image` (`src/fusion_vision_mcp/tools/vqa.py:29–191`) and its supporting pipeline in `src/fusion_vision_mcp/analysis.py:1070–1142` and `src/fusion_vision_mcp/constants.py:267–313`.
 
 ---
@@ -109,6 +109,32 @@ scratchpad, read-only, FusionVisionMCP `.venv`), plus DuckDB over the VisionBenc
 They are quoted as "screened on seen sets, not gated". R goes to a fresh round 31 if the screen clears it. Both R and
 `R_narrow` are screened, and the better one on the screen is the single regex round 31 tests (picked before round 31
 is built). If neither passes the screen, round 31 is not built.
+
+#### P2.0.6 Step 13A result (2026-11-04): every arm passed, none lost a question
+
+VisionBench `vqa_gate_v8_screen.py` ran with its rules committed before any answer existed (`ffe7a69`). Checks: seed parity
+20/20 byte-identical, so the cached answers are the base. The frozen shipped prompt equals `src` and every set's cache on
+1,712/1,712 routed questions. 0 errors.
+
+| Arm | Touched | Gained / lost | Pooled (base 83.93) | 95% CI, pts |
+| :--- | ---: | :---: | ---: | :---: |
+| N (`clean_ocr_page`) | 37 | +10 / 0 | 84.19 | 0.11 to 0.45 |
+| E (`smart_ocr_excerpt`) | 76 | +7 / 0 | 84.11 | 0.05 to 0.32 |
+| **NE (pick)** | 113 | **+17 / 0** | **84.38** | 0.24 to 0.66 |
+| **R (pick)** | 51 (41 added, 10 removed) | +13 / 0 | 84.27 | 0.16 to 0.53 |
+| R_narrow | 37 (27 added, 10 removed) | +11 / 0 | 84.22 | 0.13 to 0.48 |
+
+- **The draft's per-track figures reproduce exactly** (N +10, E +7, R +13, all with no losses). So P2.0.2 item 1 was
+  about missing evidence, not wrong numbers. Item 2 was a miscount: the regex as written changes 51 routes and gives
+  the claimed +13.
+- **NE ships on this screen** (the user's decision, P2.0.4). It lost no question, so step 4 has no losses to review.
+  Quote it as "screened on seen sets, not gated": +17 of 3,789 (+0.45 pts). On the frontier 240 (r29) it is +3
+  (195 -> 198/240, all from N; E's r29 gain, "Ogg Vorbis", is not among the 240). R adds +4 there (199/240).
+- **R goes to round 31.** It beat R_narrow by 2 (the two extra gains come from the bare words `total`, in a folder-metadata
+  count, and `software`, in a 3D-graphics window question, both read off these sets). Zero losses is expected from a regex fitted to these questions.
+  Round 31 is the test, built on top of shipped NE.
+- Remaining costs: a newly routed question pays an OCR call (cached median 6.6 s on rounds 29/30, which are dense
+  pages). NE's answers took a median of 5.9 s, the same as unchanged ones.
 
 #### P2.0.5 Revised order (replaces P2.5)
 
