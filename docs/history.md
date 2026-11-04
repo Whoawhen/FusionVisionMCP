@@ -341,6 +341,25 @@ context pass `lfm_read=False`. Both were checked on 2026-11-03 and both stay tha
   median per routed question. As round 22 suggested, the answering model already reads the text it would be handed.
   No fresh round was built. Re-trying it needs a different idea, not a different cut of the same one.
 
+## `query_image` count and object questions: five ideas screened, none helped (2026-11-04)
+
+The two largest ordinary-question gaps against the frontier model (count -20, object -16 to -20 on 240 round 29
+questions). VisionBench `vqa_gap_screen.py` (rules fixed before any answer, b99d174; result ce2c1c7): seen sets, the
+arm chosen by wording as the server would (count: `question.classify` COUNT, not text-routed, 279 questions over round
+23, phase 11, rounds 29 and 30; object: `presence_checked`, 572 over rounds 29 and 30), against the shipped answers.
+
+- **Count (270 count questions, shipped 78.9%):** listing each one before a total 70.0% (-8.9); `count_objects`' count
+  as a hint before the question 78.5% (-0.4, CI -4.1 to 3.3, 12 gained / 13 lost); numbered detector boxes drawn on
+  the image, LFM naming which are the thing, 36.3% (-42.6: the detector draws too few boxes and LFM names numbers that
+  were never drawn).
+- **Object (160 object questions, shipped 76.2%):** Florence-2's dense region labels as context 70.6% (-5.6);
+  `deep`'s bf16 4-tile model answering 75.0% (-1.2, CI -6.3 to 3.8; all 572 touched questions level, 23 / 23), at
+  19.6 s median.
+- The failure sort before it: count misses mostly off by one and on flat images (columns, panels, axes); about a third
+  of object misses are synonyms the scorer rejects (chalkboard / blackboard, shears / scissors), most of the rest a
+  look-alike (donkey / cow, mule / horse). Neither a context hint nor more resolution moves these: the answering model
+  is the limit, and a scorer change would need its own blind review.
+
 ## `classify_image` is CLIP zero-shot over the caller's labels (2026-10-16)
 
 `classify_image(src, labels)` puts each label in `CLASSIFY_TEMPLATE` ("a photo of {}") and ranks them with
