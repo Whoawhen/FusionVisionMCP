@@ -1,9 +1,477 @@
 # `query_image` Frontier-Grade Improvement Plan
 
-**Status:** Drafted 2026-10-30. **Reviewed 2026-10-30: the Review section below supersedes the rest where they
+**Status:** Phase 1 (Tracks 1–8, Gates V1–V7) shipped 2026-10-31 to 2026-11-02; post-V7 screens (`vqa_ocr_lfm_screen`, `vqa_presence_veto_screen`, `vqa_gap_screen`) closed 2026-11-03 to 2026-11-04. Phase 2 (Tracks 9–13) drafted 2026-11-04. **Reviewed 2026-11-04: P2.0 below supersedes P2.1–P2.5 where they disagree.** Gate path decided (P2.0.4): N and E ship on a seen-set screen; R goes to a fresh round 31 if the screen clears it. Next: Track 9.
+**Target tool:** `query_image` (`src/fusion_vision_mcp/tools/vqa.py:29–191`) and its supporting pipeline in `src/fusion_vision_mcp/analysis.py:1070–1142` and `src/fusion_vision_mcp/constants.py:267–313`.
+
+---
+
+## Phase 2 (2026-11-04): Closing the Remaining Frontier Capability Gap (Tracks 9–13 — Opus 5.5 Worker Handoff)
+
+### P2.0 Review (2026-11-04) — read this first
+
+**Verdict.** The baselines reproduce, and the three failure modes are real. But the "+29 gained, 0 lost" is not
+evidence yet, and the plan is not ready to build as written. Checks: `route_check.py` and `clean_check.py` (session
+scratchpad, read-only, FusionVisionMCP `.venv`), plus DuckDB over the VisionBench caches.
+
+#### P2.0.1 Reproduced from the caches ✅
+
+- Frontier 240, shipped today (`vqa_presence_veto_scored.jsonl`, `set == "r29"`, `A_ok`): **195/240**. Gate V5's
+  `candidate_ok`: **185/240**. `no_object`: **29/34**. The 240 are round 29's questions on round 24's 60 images
+  (`mixed_round24/frontier_vqa_input.json`), matched on `(id, q)`.
+- Pooled shipped: **3,180/3,789** (p11 1,016/1,200, r23 767/892, r29 764/917, r30 633/780). r30 matches Gate V7's
+  `candidate_ok` exactly.
+- The cached OCR does hold the CJK and single-character noise P2.3 describes (r30: `'十'`, `'一'`, `'日\nN'`, `'广'`).
+- `lfm_vqa_prompt` counts every `" / "` separator as a word. P2.3's "~110–120 real words" is consistent with that.
+
+#### P2.0.2 What does not hold (these override the body)
+
+1. **The validation behind Tracks 10–12 cannot be found.** `probe_presence_and_ocr_filter.py`, `probe_routing_live.py`,
+   `probe_remaining_components.py`, `probe_combined_3_components.py` and the `task-177/207/274/280` outputs exist
+   nowhere under `C:\AI` or the temp scratchpads, and no results file holds an `N`/`R`/`E` arm. So every gain/loss
+   figure in P2.1, P2.4 and the ledger rows dated 2026-11-04 "Phase 2 Probe" is a **claim, not a measurement**. Step 13A
+   is the first measurement, not a reproduction. Drop "confirm exact reproduction of +29" from the checklist.
+2. **Track 11's regex does not produce its own counts.** Replayed over all 3,789 questions, the regex in P2.4 changes
+   **51** routes (**41 added**, 10 removed), not 56 (46 + 10). Either the regex that was run is not the one written
+   down, or the count is wrong. Either way, only the written regex can be shipped, and it has not been run.
+3. **Some of the plan's example questions are not in the caches.** "What tool is the person holding by its handle?"
+   is really r30's "What ceramic container is the woman holding by its handle?". "Where is the writing desk
+   located…" is really r29's "Where is the executive writing desk positioned in the room?". Tests should use the
+   real questions, or be marked as synthetic.
+4. **Track 11 is fitted to the sets it would be judged on.** The added words were read off these four sets' misses
+   (`combat log`, `swimlane`, `currency counter`, `Tamanho (MB) column`, `'FILTER DATA'`). Zero losses on the
+   questions a regex was written from says nothing about new questions. R.1 raised the same objection to V5's regex,
+   and round 29 was built to answer it. Bare nouns over-route visual questions: all of these synthetic questions now
+   go to OCR: "What **scale** is the fish covered in?", "What **file** cabinet is next to the desk?", "What **unit**
+   of soldiers is marching?", "What **application** is the woman putting on her face?", "What **language** of flowers
+   is shown?". In the cache, "Where is the **application** dock located on the screen?" (position, right today) also
+   becomes routed. `unit` appears twice (in the symbol branch and as a bare word).
+5. **Unrouting changes more than the OCR context.** A What/Which question that leaves `VQA_TEXT_QUESTION` now takes
+   **the presence check** (`presence_checked`). Of the 10 removed, three are right today and would go through a path
+   none of them has been run on: "What symbol is featured on both shop windows?" (object), "What wooden handle is
+   attached to the plate?" (`no_object`), and one **`text`** question, "What legal symbol is drawn above the man's
+   head?", which would also lose its OCR reading. `VQA_TEXT_QUESTION` also decides `check_consistency`'s shared
+   reading (`text_question_readings`).
+6. **"0.00 s latency" is wrong for Track 11.** Each of the 41 newly routed questions pays an OCR call (~1–2 s; r30's
+   cached reads are 1.0–3.6 s), and each of the 10 unrouted ones pays a presence check instead (~4 s). A median over
+   3,789 hides that. Report latency on the changed questions.
+7. **Track 10 has risks the plan does not list.** On r30, the gate empties 5 routed pages. Two of those questions are
+   right today (`'回：'` on a `no_text` porthole question, `'一'` on "Which direction does the arrow on the sign
+   point?"). The r30 `'十'` cross is fixed by Track 10 and by Track 11, so the per-track claims overlap. The
+   single-character exception keeps a lone `'1'` whenever the question says "number", which contradicts the claim
+   that it fixed the "painted hull registration number `'1'`" question. The CJK rule would also empty a genuine
+   two-character sign (`出口`) read under `--ocr-languages ch_sim` for an English question, so scope it to the
+   PP-OCRv6 English path, where any CJK output is noise by construction. Drop `oriental` from the trigger list.
+8. **Track 10 tunes around one engine's quirks.** The noise it filters is PP-OCRv6's, an engine slated for
+   replacement ([[no-chinese-models]] in memory: no heavy tuning on it meanwhile). It is light work, but record it as
+   engine-specific. It must be re-checked when `ocr` changes engine.
+9. **P2.1's table does not match `frontier_vqa_sonnet55.json`.** In the file: `text` has n=**55** (not 75), Sonnet
+   gets `no_text` **26/26** (not 24/26), Sonnet's ordinary score is **87.8%** (not 88.9%), and V5 shipped's ordinary
+   score is **80.0%** (not 81.1%). Track 9 has to regenerate the table from the script, not copy P2.1.
+10. **Option B ships a routing and prompt change on seen sets only.** The project rule is explicit: "Changing a
+    routing regex, prompt, suffix or agreement rule means a fresh round" (`CLAUDE.md`, `query_image`). Track 8 went
+    ahead on the user's decision *after* an unseen gate (V7). Option B would have no unseen gate at all. P2.4 records
+    Option B as "User Decision, 2026-11-04", but nothing outside this uncommitted draft records that decision, so it
+    goes back to the user (P2.0.4).
+11. **"8/8 live parity" is too small to mean anything.** The check that matters is **byte-identical prompts** from
+    `src` and the screen script on all 3,789 questions (that is how V5 and V7 were checked). Add a seed-parity check
+    before the screen: re-run ~20 unchanged prompts and match the cached answers byte for byte. That shows that
+    running only the changed questions live is a fair comparison.
+12. **Track 9 must not hand-edit `frontier_vqa_sonnet55.json`.** It is the script's output. Change the script and
+    re-run it.
+
+#### P2.0.3 Spec fixes before Step 13A
+
+- **Arm R:** run the regex exactly as written, plus an arm **`R_narrow`** with the bare visual-ambiguous nouns removed
+  (`file`, `application`, `scale`, `unit`, `language`, `software`, `format`, `total`, `rank`) and the duplicate `unit`
+  removed. Report both. No further regex edits after the screen has been looked at.
+- **Arm N:** CJK rule only when the OCR engine is PP-OCRv6 English; `oriental` dropped.
+- **Arm E:** as written. Also report how many routed pages exceed 160 words. The "93%" figure is unverified.
+- **Live calls:** only the prompts an arm changes, through the same path `vqa_answers` would take (presence check
+  included for unrouted questions), with the cached seed.
+- **Rules fixed in the script's docstring before it runs.** Per arm: gains and losses listed by question (not just
+  net), per set and per type, latency on changed questions only. Screen pass: net > 0 on the pooled 3,789, no set
+  below 0, no type with 30+ changed questions below 0. These are seen sets, so a pass makes an arm **worth a fresh
+  round**. It does not prove the arm.
+- **Prompts frozen in the screen script**, not imported from `src`, so that later edits to `src` cannot move them
+  (V5 and V7 precedent).
+
+#### P2.0.4 Decisions for the user
+
+1. **Gate path for Tracks 10–12.** (a) Screen (Step 13A), then a fresh round 31 for whichever arms pass, with rules
+   fixed before it is built. This is the rule's path. Round 31 was declined on 2026-11-03 for the presence vetoes;
+   this is a different question. (b) Screen, then ship N and E on the screen alone as narrowly triggered prompt
+   hygiene, quoted as "screened on seen sets, not gated", and hold R for a fresh round. (c) Option B as drafted.
+   **Recommended: (b), with (a) for R.** N touches tens of prompts and E only pages over 160 words. R moves 51 routes
+   across two code paths, and its added words were fitted.
+2. Whether `R_narrow` should be screened at all, or R is screened only as written.
+
+**Decided by the user, 2026-11-04: the recommendation.** N and E ship on the screen alone if they pass P2.0.3's bars.
+They are quoted as "screened on seen sets, not gated". R goes to a fresh round 31 if the screen clears it. Both R and
+`R_narrow` are screened, and the better one on the screen is the single regex round 31 tests (picked before round 31
+is built). If neither passes the screen, round 31 is not built.
+
+#### P2.0.5 Revised order (replaces P2.5)
+
+Stop for the user's go-ahead between steps.
+
+1. **Track 9: scoreboard (Sonnet 5.5, new session + handoff).** Make `frontier_vqa_score.py` score both Gate V5
+   (`old`) and the shipped tool (`vqa_presence_veto_scored.jsonl` r29 `A_ok`). Re-run it. Update
+   `frontier_capability_gaps.md` row 100 from its output (expect 195/240 strict, 29/34 `no_object`). Independent of
+   everything else.
+2. ~~**User decides P2.0.4.**~~ Done 2026-11-04 (recommendation taken).
+3. **Step 13A screen (Opus 5.5).** Write `vqa_gate_v8_screen.py` (arms N, R, R_narrow if chosen, E, combined) with the
+   P2.0.3 rules, run the seed-parity check, then the live calls. Estimated at roughly 250 LFM calls plus OCR on the
+   newly routed questions, about 30–40 min on CPU: queue it for when the user is away ([[feedback-long-runs-when-away]]
+   in memory). Report each arm's gain and loss lists. Stop.
+4. **User reviews the losses and picks what ships or goes to round 31.**
+5. **Implementation (Sonnet 5.5, new session + handoff)** for the arms that are cleared. Edit `src`. Write tests from
+   real cache questions plus the P2.0.2 over-routing negatives. Check prompt parity on 3,789/3,789. Run the fast suite.
+   Run the model-loading suite only while no benchmark is running. Update `docs/history.md`, `CLAUDE.md` (quote the
+   figures as screened, or as gated if round 31 ran) and Progress. Stage files by path.
+
+### P2.1 Executive Summary & Scoreboard Reconciliation
+
+1. **Why the Scoreboard (`Future_Ideas/frontier_capability_gaps.md` row 100) Understates Shipped `query_image` by `+4.1 pts`:**
+   - Row 100 of `Future_Ideas/frontier_capability_gaps.md` reports `query_image` at **`77.1%` strict (`185/240`) / `80.0%` adjusted (`192/240`)** vs. Claude Sonnet 5.5 at **`90.8%` strict (`218/240`) / `93.3%` adjusted (`224/240`)** (`-13.7` strict / `-13.3` adjusted gap, CI `[-19.6, -7.9]`), with `no_object` at **`55.9%` (`19/34`, `-44.1 pts` gap)**.
+   - That measurement (`C:\AI\Projects\VisionBench\benchmarks\frontier_vqa_score.py`, `results/frontier_vqa_sonnet55.json`) reads `results/vqa_gate_v5_scored.jsonl` (**Gate V5**, before Track 8 `presence_check=True` shipped in commit `3c7a043` later on 2026-11-02).
+   - **Today's already-shipped `query_image` (`presence_check=True`, Gate V6 `A_suffix` / Gate V7)** on the exact same 240 Round 29 questions scores **`81.2%` strict (`195/240`, `+4.1 pts`) / `84.2%` adjusted (`202/240`, `+4.2 pts`)**, lifting `no_object` from **`55.9%` (`19/34`) -> `85.3%` (`29/34`, `+29.4 pts`)** and narrowing the gap vs. Sonnet 5.5 from **`-13.7` pts to `-9.6` pts strict** (`-9.2` pts adjusted; **`-7.8` pts strict / `-7.2` pts adjusted** on the 180 ordinary non-premise questions).
+
+2. **Three Newly Validated, Zero-Latency, Zero-Regression Components (`+29` net, `29 gained / 0 lost` across all 3,789 cached questions):**
+   - Every proposed component below was tested live with `LfmOnnxCaptioner` (`seed=r["seed"]`, CPU ONNX) against all **3,789 cached questions** (`r23`=892, `p11`=1,200, `r29`=917, `r30`=780) before being included in this plan:
+     - **Track 10 (`clean_ocr_page` — Page-Level OCR Noise Gate in `lfm_vqa_prompt`):** Drops whole-page PP-OCRv6 hallucinations (`<2` word chars or `<=6` CJK-only chars on non-CJK questions, matching `caption`'s `visible_text_line` hygiene at page scope). Live result across 3,789 questions: **`+10` net (`10 gained, 0 lost`)**, **`+3` on Frontier 240**, `0.00 s` extra latency.
+     - **Track 11 (`VQA_TEXT_QUESTION` Surgical Refinement — Unrouting False-Positive Visual Triggers & Routing Quoted/UI/Table Text Lookups):** Narrows bare `handle`, `symbol`, and `writing` (when followed by `desk|table|board|implement|utensil|instrument`) while adding missing text/UI/table lookup triggers (`command`, `swimlane`, `chat log`, `combat log`, `currency counter`, `column`, `cell`, `prompt`, `file`, `software`, `application`, `edition`, `language`, `protocol`, `format`, `scale`, `unit`, `total`, `rank`, `filter/address/search bar`, `search/input/text/dialog box`, `first line`, `affixed`, `entered`, `edited`, `greeting`, `in what/which`, `according to ..., what/which/...`, and quoted-anchor phrases `'...'` / `"..."`). Live result across 3,789 questions: **`+13` net (`13 gained, 0 lost`)**, **`+5` on Frontier 240** (`+22` net and `+7` on Frontier 240 when combined with Track 10).
+     - **Track 12 (`smart_ocr_excerpt` — Question-Anchored Tail Window for Dense OCR Pages `>160` Tokens):** Keeps the `words[:160]` head unchanged for all pages, and only when `len(words) > 160` and a question anchor appears in the truncated tail (`words[160:]`), appends up to 2 compact `[-6, +18]`-word windows (`head + " / ... / " + tail_windows`). Live result across 3,789 questions: **`+7` net (`7 gained, 0 lost`)**, **`+1` on Frontier 240**, `0.00 s` extra latency.
+   - **Combined Validated Impact (Tracks 10 + 11 + 12):**
+     - **Across all 3,789 cached questions (`r23`, `p11`, `r29`, `r30`):** **`+29` net (`29 gained, 0 lost`)**, lifting 4-set pooled accuracy from **`83.93%` (`3,180/3,789`) -> `84.69%` (`3,209/3,789`, `+0.77 pts`)** with **zero regressions** on any question across all 4 datasets and **`0.00 s` latency overhead**.
+     - **On the 240 Frontier Benchmark (`frontier_vqa_sonnet55`):** Fixes **8 of the 45 remaining misses (`195/240` -> `203/240`)**, lifting `query_image` from **`77.1%` (scoreboard) / `81.2%` (shipped) -> `84.6%` strict (`+7.5 pts` over scoreboard, `+3.3 pts` over shipped)** and **`80.0%` (scoreboard) / `84.2%` (shipped) -> `87.5%` adjusted (`+7.5 pts` over scoreboard, `+3.3 pts` over shipped)**. This cuts the strict frontier gap in half (from **`-13.7` pts to `-6.2` pts**, and to **`-5.8` pts adjusted**; **`-4.4` pts strict / `-3.9` pts adjusted** on the 180 ordinary non-premise questions).
+
+| Benchmark Slice (`n`) | Scoreboard (`Gate V5`, `presence_check=False`) | Today's Shipped (`Gate V6/V7`, `presence_check=True`) | Shipped + Validated Tracks 10–12 | Claude Sonnet 5.5 (`frontier_vqa_sonnet55`) | Remaining Gap (Tracks 10–12 vs. Sonnet 5.5) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Frontier 240 — Strict (`n=240`)** | `77.1%` (`185/240`) | `81.2%` (`195/240`) | **`84.6%` (`203/240`)** | `90.8%` (`218/240`) | **`-6.2 pts`** (down from `-13.7`) |
+| **Frontier 240 — Adjusted (`n=240`)** | `80.0%` (`192/240`) | `84.2%` (`202/240`) | **`87.5%` (`210/240`)** | `93.3%` (`224/240`) | **`-5.8 pts`** (down from `-13.3`) |
+| **Frontier Ordinary — Strict (`n=180`)** | `81.1%` (`146/180`) | `80.6%` (`145/180`) | **`84.4%` (`152/180`)** | `88.9%` (`160/180`) | **`-4.4 pts`** (down from `-7.8`) |
+| **Frontier Ordinary — Adjusted (`n=180`)** | `85.0%` (`153/180`) | `84.4%` (`152/180`) | **`88.3%` (`159/180`)** | `92.2%` (`166/180`) | **`-3.9 pts`** (down from `-7.2`) |
+| **Frontier `no_object` (`n=34`)** | `55.9%` (`19/34`) | `85.3%` (`29/34`) | **`85.3%` (`29/34`)** | `100.0%` (`34/34`) | **`-14.7 pts`** (down from `-44.1`) |
+| **Frontier `no_text` (`n=26`)** | `76.9%` (`20/26`) | `80.8%` (`21/26`) | **`84.6%` (`22/26`)** | `92.3%` (`24/26`) | **`-7.7 pts`** (down from `-15.4`) |
+| **Frontier `text` (`n=75`)** | `69.3%` (`52/75`) | `69.3%` (`52/75`) | **`76.0%` (`57/75`)** | `84.0%` (`63/75`) | **`-8.0 pts`** (down from `-14.7`) |
+| **All 4 Cached Sets Pooled (`n=3,789`)** | `82.13%` (`3,112/3,789`) | `83.93%` (`3,180/3,789`) | **`84.69%` (`3,209/3,789`)** | — | **`+29` net (`29 gained, 0 lost`)** |
+
+---
+
+### P2.2 Complete Ledger of Closed Tracks & Negative Controls ("Do Not Repeat" for the Opus 5.5 Worker)
+
+Before touching any code, the worker must note what has already been tested and closed across `docs/history.md`, VisionBench `benchmarks/`, and our 2026-11-04 validation probes:
+
+| Date | Script / Gate | Hypothesis Tested | Measured Result | Why Closed / Rule |
+| :--- | :--- | :--- | :--- | :--- |
+| 2026-10-15 | `region_inspect_gate.py` (Gate R) | Pointed crops in `query_image` | `79.0 -> 80.3%` (CI `[-1.0, +3.7]`); `color -8`, `yes_no -5` | Never replace full image with unverified crop. |
+| 2026-10-31 | `vqa_gate_v2a.py` (Gate V2A) | Unconditional `VQA_WH_PREMISE_SUFFIX` on unrouted Wh questions | `no_object +11.1`, but other unrouted Wh `-4.5 pts` (`object -6.3`) | Unconditional premise suffix makes LFM doubt present objects. |
+| 2026-11-02 | `vqa_gate_v6.py` (`A_fixed`, `B_fixed`) | Returning canned `"There is none."` directly when `presence_check` says `"no"` | Other changed `-2.7 / -1.4 pts`, `color -5.9 / -5.1 pts` | Must use `VQA_ABSENT_SUFFIX` (`A_suffix`), never canned refusal. |
+| 2026-11-03 | `vqa_ocr_lfm_screen.py` | Running `ocr_pages(lfm_read=True)` inside `query_image` on short OCR pages | `r29` `80.2 -> 79.1%` (`-1.1 pts`, `7 gained / 17 lost`), `+2.1 s` | `lfm_read`'s full-page transcription helps `ocr` (`+8.9%`), not `query_image`'s targeted question prompt. |
+| 2026-11-03 | `vqa_presence_veto_screen.py` | Object-only check (`O`) and SAM 3 box veto (`S`) on `presence_check`'s `"no"` | Picked `O` leveled non-premise (`-0.6`), but `no_object -4.5` vs shipped, pooled `-0.1 pts` | A trade, not a gain; shipped `presence_check` stays. |
+| 2026-11-04 | `vqa_gap_screen.py` (`C_list`, `C_hint`, `C_marks`) | Count prompts (`List each with its position...`, `Look carefully...`, SAM 3 box marks) | All 3 failed on `r29` + `r30`: `count -8.7` to `-4.2 pts` (`r29`), `-11.0` to `-1.1 pts` (`r30`) | Prompting LFM to enumerate or drawing SAM 3 marks degrades `count`. |
+| 2026-11-04 | `vqa_gap_screen.py` (`O_dense`) | Raising `VQA_OCR_WORDS` from `160` to `320` globally | `r29 -0.2 pts`, `r30 -0.8 pts` (`text` flat/`-1.3 pts`) | Dumping 320 words unconditionally dilutes attention when the answer is in the first 160 words. Use targeted `smart_ocr_excerpt` (Track 12) instead. |
+| 2026-11-04 | `vqa_gap_screen.py` (`O_deep`) | Running `ocr_pages(sharpened=True)` globally on dense pages | `r29 -0.5 pts`, `r30 -0.8 pts`, `+2.5 s` latency | Extra sharpened crops add duplicate/noisy lines on already-readable pages. |
+| 2026-11-04 | Phase 2 Probe (`task-177`) | **Line-level** `<2`-char OCR filtering inside multi-line pages | Perturbed `240` questions across 3,789 by stripping valid single-digit table cells (`'2'`, `'5'`) | Must filter at **page level** (`clean_ocr_page`, Track 10), which touches only 37 pages and wins `+10 / -0`. |
+| 2026-11-04 | Phase 2 Probe (`task-207`) | Adding bare `letter` to `_VQA_TEXT_LOOKUP` | `0 gained, 2 lost` (`What letter represents each of the input variables...`, `What animal is shown next to the letter A?`) | Keep `lettering|letters` in `_VQA_TEXT_WORDS`, do **not** add bare `letter` to `_VQA_TEXT_LOOKUP`. |
+| 2026-11-04 | Phase 2 Probe (`task-274`) | Removing `VQA_OCR_EMPTY` on routed questions with empty OCR | `no_text` (`128/131 = 97.7%`) and `no_object` (`19/19 = 100.0%`) rely on `VQA_OCR_EMPTY` | Keep `VQA_OCR_EMPTY` unchanged. |
+| 2026-11-04 | Phase 2 Probe (`task-274`) | Extending `presence_checked()` to `"How many / How much"` questions | `269` unrouted `"How many/much"` questions are ordinary `count` vs. only `8` `no_object` (`5/8` already right) | Chasing 3 `no_object` misses across 269 `count` questions risks `count` regressions and adds `+3.9 s` CPU latency per count question. |
+
+---
+
+### P2.3 Diagnose-First Taxonomy of All 609 Shipped Misses Across 3,789 Cached Questions
+
+Across all 3,789 cached questions (`r23`=892, `p11`=1,200, `r29`=917, `r30`=780), shipped `query_image` (`presence_check=True`) gets **`3,180 / 3,789` (`83.93%`)** right and misses **`609`**:
+
+| Question Type | Total (`n`) | Shipped Right | Shipped Acc | Misses (`609`) | Share of All Misses | Routed Acc (`_TEXT_QUESTION_RE`) | Unrouted Acc |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **`text`** | `1,020` | `730` | `71.6%` | **`290`** | **`47.6%`** | `694 / 962` (`72.1%`) | `36 / 58` (`62.1%`) |
+| **`object`** | `395` | `310` | `78.5%` | **`85`** | `14.0%` | `20 / 31` (`64.5%`) | `290 / 364` (`79.7%`) |
+| **`count`** | `322` | `248` | `77.0%` | **`74`** | `12.2%` | `14 / 19` (`73.7%`) | `234 / 303` (`77.2%`) |
+| **`no_text`** | `372` | `323` | `86.8%` | **`49`** | `8.0%` | `321 / 370` (`86.8%`) | `2 / 2` (`100.0%`) |
+| **`color`** | `423` | `383` | `90.5%` | **`40`** | `6.6%` | `4 / 6` (`66.7%`) | `379 / 417` (`90.9%`) |
+| **`position`** | `247` | `220` | `89.1%` | **`27`** | `4.4%` | `4 / 5` (`80.0%`) | `216 / 242` (`89.3%`) |
+| **`no_object`** | `328` | `304` | `92.7%` | **`24`** | `3.9%` | `109 / 118` (`92.4%`) | `195 / 210` (`92.9%`) |
+| **`yes_no`** | `682` | `662` | `97.1%` | **`20`** | `3.3%` | `12 / 12` (`100.0%`) | `650 / 670` (`97.0%`) |
+| **Total** | **`3,789`** | **`3,180`** | **`83.93%`** | **`609`** | **`100.0%`** | `1,178 / 1,523` (`77.3%`) | `2,002 / 2,266` (`88.3%`) |
+
+Three actionable, root-cause failure modes account for the recoverable gap without changing models:
+1. **Whole-page OCR noise on text-free images/regions (`37` pages across 3,789):** When `ocr_pages(sharpened=False)` emits a single stray punctuation/ASCII char (`'_'`, `'1'`, `'2'`, `'O'`) or 1–4 spurious CJK glyphs (`'人'`, `'团\n米'`, `'直\n美'`, `'社'`, `'一'`, `'十'`, `'永家家家'`, `'福'`) on grass, water, or an ornamental cross, `lfm_vqa_prompt` passes `Text read from the image by OCR: "人"`, causing LFM to hallucinate text on `no_text`/`no_object` or echo `'十'` instead of `'cross'` on `object`.
+2. **Two-sided `VQA_TEXT_QUESTION` routing errors (`56` questions across 3,789):**
+   - *False positives (`10` questions):* Bare `handle` (`"holding by its handle"`), bare `symbol` (`"religious symbol"`), and `writing` before physical nouns (`"writing desk"`, `"writing board"`) route visual `object`/`position` questions into OCR, where empty or unrelated OCR induces `"There is none."` or wrong answers.
+   - *False negatives (`46` questions):* `58` `text` questions (`5.7%` of all `text` questions) and several UI/terminal `no_object` questions miss `VQA_TEXT_QUESTION` because they reference quoted UI labels (`'FILTER DATA'`, `'From today's featured article'`), UI/table nouns (`column`, `cell`, `prompt`, `protocol`, `file`, `software`, `edition`, `language`, `format`, `scale`, `unit`, `total`, `rank`, `command`, `swimlane`, `combat log`, `filter bar`, `dialog box`), or start with `In what/which...` / `According to ..., what/which/...`. On `16` of the `22` unrouted `text` misses (`72.7%`), `ocr_pages` already has the exact gold answer!
+3. **160-token head truncation on dense OCR pages (`24` misses across 3,789):** `lfm_vqa_prompt` joins lines with `" / "` and slices `words[:160]`. Because every `"/"` separator counts as a word, `words[:160]` holds only ~110–120 real words. On dense Wikipedia pages, software windows, and schematics, answers located lower on the page (`Oswald Achenbach` under `'Artikel des Tages'`, `NIKON D3200` under `'Informace o snímku'`, `KA7500B` for `IC1`, `Ogg Vorbis` in the export dialog, `sudo apt update` in the terminal preview, `YYYY-MM-DD` in the annotation, `21` Gold in the player box) are cut off past token 160.
+
+---
+
+### P2.4 Detailed Track Specifications for the Opus 5.5 Worker
+
+#### Track 9: Scoreboard & `frontier_vqa_score.py` Update (Zero Model Cost — Benchmark & Docs Only)
+
+- **Goal:** Update `C:\AI\Projects\VisionBench\benchmarks\frontier_vqa_score.py` so it scores both the historical Gate V5 (`vqa_gate_v5_scored.jsonl`) and today's shipped Gate V6/V7 (`presence_check=True`, from `vqa_presence_veto_scored.jsonl` where `set == "r29"`), and update `Future_Ideas/frontier_capability_gaps.md` row 100.
+- **Files to Modify:**
+  1. `C:\AI\Projects\VisionBench\benchmarks\frontier_vqa_score.py`
+  2. `C:\AI\Projects\VisionBench\benchmarks\results\frontier_vqa_sonnet55.json`
+  3. `c:\AI\MCP\FusionVisionMCP\Future_Ideas\frontier_capability_gaps.md` (row 100 and summary tables)
+- **Verification:** Running `.venv\Scripts\python.exe C:\AI\Projects\VisionBench\benchmarks\frontier_vqa_score.py` reproduces `81.2%` strict (`195/240`) / `84.2%` adjusted (`202/240`) for shipped `query_image` (`presence_check=True`), with `no_object` at `85.3%` (`29/34`).
+
+---
+
+#### Track 10: Page-Level OCR Noise Gate (`clean_ocr_page`) in `src/fusion_vision_mcp/analysis.py`
+
+- **Goal:** Prevent single-character punctuation/ASCII noise and short spurious CJK hallucinations from PP-OCRv6 on text-free images from polluting `lfm_vqa_prompt`, matching the hygiene `caption` already applies in `visible_text_line()`.
+- **Exact Specification (`src/fusion_vision_mcp/analysis.py` around line 1090):**
+  ```python
+  _VQA_CJK_ONLY_RE: Final = re.compile(r"^[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef\s/]+$")
+  _VQA_CJK_QUESTION_RE: Final = re.compile(
+      r"\b(chinese|japanese|korean|kanji|hanzi|hangul|mandarin|cjk|oriental|asian|character|characters)\b|"
+      r"[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]",
+      re.IGNORECASE,
+  )
+  _VQA_SINGLE_CHAR_QUESTION_RE: Final = re.compile(
+      r"\b(letter|digit|number|numeral|initial)\b",
+      re.IGNORECASE,
+  )
+
+
+  def clean_ocr_page(question: str, ocr_text: str) -> str:
+      """Drops whole-page OCR readings that are `<2` word chars (unless `question` asks for a single ASCII
+      letter/digit/numeral/initial) or `<=6` CJK-only chars on a non-CJK question."""
+      if not ocr_text.strip():
+          return ""
+      total_key = _text_line_key(ocr_text).replace(" ", "")
+      if not total_key:
+          return ""
+      if _VQA_CJK_ONLY_RE.match(ocr_text) and len(total_key) <= 6 and not _VQA_CJK_QUESTION_RE.search(question):
+          return ""
+      if len(total_key) < 2 and not (_VQA_SINGLE_CHAR_QUESTION_RE.search(question) and total_key.isascii()):
+          return ""
+      return ocr_text
+  ```
+- **Live Validation (`scratch/probe_presence_and_ocr_filter.py`, `task-177`, all 3,789 questions):**
+  - Touches **37 questions** across `r23`, `p11`, `r29`, `r30`.
+  - **Gained: `10`, Lost: `0`, Net: `+10`** (`+4 no_text`, `+3 no_object`, `+2 text`, `+1 object`), including **3 Frontier 240 misses** (`r29` grass blades `'人'`, ornamental cross `'十'`, and painted hull registration number `'1'`).
+  - Preserves legitimate single-letter/digit answers (`'A'`, `'8'`, `'7'`) when the question asks for a `letter`, `digit`, `number`, `numeral`, or `initial`, and preserves CJK readings when the question asks about Chinese/Japanese/Korean characters.
+
+---
+
+#### Track 11: Surgical `VQA_TEXT_QUESTION` Routing Refinement in `src/fusion_vision_mcp/constants.py`
+
+- **Goal:** Fix both directions of routing errors in `VQA_TEXT_QUESTION` (`src/fusion_vision_mcp/constants.py:267–285`):
+  1. **Unroute 10 false-positive visual `object`/`position` questions** by qualifying:
+     - `writing` -> `writing(?!\s+(?:desk|table|board|implement|utensil|instrument)s?\b)`
+     - `handle` -> `(?:social\s+media\s+|user\s*|account\s+)handle`
+     - `symbol` -> `(?:currency|ticker|stock|unit)\s+symbol`
+  2. **Route 46 missed `text` and UI `no_object` questions** by adding:
+     - Explicit text/UI triggers in `_VQA_TEXT_WORDS`: `file\s+name`, `folder\s+name`, `abbreviation`, `acronym`, `command`, `swimlane`, `chat\s+log`, `combat\s+log`, `currency\s+counter`
+     - Question lead-ins in `_VQA_TEXT_LOOKUP`: `in\s+(?:what|which)\b(?!\s+(?:corner|direction|row|order)\b)`, `according\s+to\s+[^,]+,\s*(?:what|which|who|where|how\s+many|how\s+much)\b`, and `how\s+much`
+     - UI/table/document lookup words in `_VQA_TEXT_LOOKUP`: `column`, `cell`, `prompt`, `file`, `software`, `application`, `edition`, `language`, `protocol`, `format`, `scale`, `unit`, `total`, `rank`, `status\s+bar`, `title\s+bar`, `filter\s+bar`, `address\s+bar`, `search\s+bar`, `search\s+box`, `input\s+box`, `text\s+box`, `dialog\s+box`, `first\s+line`, `entered`, `edited`, `greeting`
+     - Quoted-anchor branch in `_VQA_TEXT_LOOKUP`: `(?:^|[\s(])'(?:[^']|'(?=[a-z])){2,}'(?=[\s),.?!:]|$)|"[^"]{2,}"` (matches questions asking What/Which/Who/Where about a quoted label such as `'FILTER DATA'` or `'From today's featured article'` without tripping on English possessives like `person's` or `woman's`).
+- **Exact Specification (`src/fusion_vision_mcp/constants.py:267–285`):**
+  ```python
+  _VQA_TEXT_WORDS = (
+      r"\b(text|written|writing(?!\s+(?:desk|table|board|implement|utensil|instrument)s?\b)|"
+      r"say|says|said|read|reads|title|titled|headline|subheading|subtitle|"
+      r"label|labels|labell?ed|word|words|printed|print|inscription|inscribed|caption|slogan|"
+      r"lettering|letters|spelled|spelt|brand\s+name|surname|username|filename|file\s+name|folder\s+name|"
+      r"numerals?|digits?|initials?|abbreviation|acronym|signature|signed|publisher|author|"
+      r"stamped|engraved|stencill?ed|embroidered|handwritten|typed|underlined|"
+      r"email|url|website|telephone|p-value|phrase|sentence|quote|quoted|leaderboard|"
+      r"command|swimlane|chat\s+log|combat\s+log|currency\s+counter)\b"
+  )
+  _VQA_TEXT_LOOKUP = (
+      r"^\s*(?:in\s+(?:what|which)\b(?!\s+(?:corner|direction|row|order)\b)|"
+      r"according\s+to\s+[^,]+,\s*(?:what|which|who|where|how\s+many|how\s+much)\b|"
+      r"(?:what|which|who|where|how\s+much)\b)(?!\s+colou?rs?\b).*("
+      r"\b(brand|name|named|names|number|numbers|numbered|credit|"
+      r"date|dated|year|time|price|priced|cost|rate|salary|amount|percentage|percent|value|score|version|"
+      r"code|address|(?:social\s+media\s+|user\s*|account\s+)handle|phone|currency|"
+      r"(?:currency|ticker|stock|unit)\s+symbol|temperature|"
+      r"sign|banner|plaque|sticker|tags?|badge|logo|make|model|"
+      r"menu|option|tab|button|heading|header|footer|legend|"
+      r"column|cell|prompt|file|software|application|edition|language|protocol|format|scale|unit|total|rank|"
+      r"status\s+bar|title\s+bar|filter\s+bar|address\s+bar|search\s+bar|"
+      r"search\s+box|input\s+box|text\s+box|dialog\s+box|first\s+line|"
+      r"affixed|listed|displayed|indicated|specified|mentioned|recorded|highlighted|entered|edited|"
+      r"message|notice|warning|definition|suggestion|greeting)\b|"
+      r"(?:^|[\s(])'(?:[^']|'(?=[a-z])){2,}'(?=[\s),.?!:]|$)|"
+      r'"[^"]{2,}"'
+      r")"
+  )
+  VQA_TEXT_QUESTION: Final[str] = _VQA_TEXT_WORDS + "|" + _VQA_TEXT_LOOKUP
+  ```
+- **Live Validation (`scratch/probe_routing_live.py`, `task-207`, all 3,789 questions):**
+  - Changes routing on **56 questions** (`10` removed false-positive visual routes + `46` added text/UI/quoted-anchor routes).
+  - **Removed (`n=10`): `3 gained, 0 lost` (`+3` net)** — fixes `[r29 position]` `"Where is the writing desk located..."` (`There is none.` -> `Against the right wall`), `[r29 object]` `"What tool is the person holding by its handle?"` (`There is none.` -> `shovel`), and `[r30 object]` `"What religious symbol is mounted..."` (`十` -> `cross`).
+  - **Added (`n=46`): `10 gained, 0 lost` (`+10` net)** — fixes 8 unrouted `text` questions (`Latent semantic analysis`, `Cesar Chavez Day`, `Yohanes Calvin`, `Windsor Castle`, `FILTER DATA`, `NTP`, `EPUB`, `Houdini`) and 2 unrouted `no_object` terminal-prompt questions (`bash terminal prompt`, `terminal prompt command`).
+  - **Total Track 11 Live Result:** **`+13` net (`13 gained, 0 lost`)** across all 3,789 questions (`+5` on Frontier 240; **`+22` net (`22 gained, 0 lost`)** and **`+7` on Frontier 240** when combined with Track 10).
+
+---
+
+#### Track 12: Question-Anchored Tail Excerpting (`smart_ocr_excerpt`) in `src/fusion_vision_mcp/analysis.py`
+
+- **Goal:** Recover OCR answers truncated past `VQA_OCR_WORDS = 160` on dense pages **without** raising `VQA_OCR_WORDS` globally (which failed `O_dense` in `vqa_gap_screen.py`).
+- **Mechanism:**
+  - When `len(words) <= VQA_OCR_WORDS` (`93%` of routed questions), `smart_ocr_excerpt` returns the exact same string as today (`" ".join(words)`), byte for byte.
+  - When `len(words) > VQA_OCR_WORDS`, `smart_ocr_excerpt` keeps `head = " ".join(words[:VQA_OCR_WORDS])` unchanged and extracts high-specificity anchors from `question` (quoted strings `'...'`/`"..."`, non-initial capitalized words, alphanumeric/hyphenated tokens, and non-stopword tokens of length `>= 5`).
+  - For any anchor that appears in `tail_words = words[VQA_OCR_WORDS:]` (and does not already appear exclusively in `head`), it slices a `[-6, +18]`-word window around the first match in `tail_words`, merges overlapping windows, and appends at most 2 windows after `head`: `head + " / ... / " + " / ".join(snippets)`.
+- **Exact Specification (`src/fusion_vision_mcp/analysis.py` around line 1091):**
+  ```python
+  _VQA_ANCHOR_STOPWORDS: Final = frozenset({
+      "what", "which", "where", "when", "who", "whom", "whose", "why", "how",
+      "does", "did", "is", "are", "was", "were", "has", "have", "had", "can",
+      "will", "would", "should", "could", "the", "a", "an", "in", "on", "at",
+      "to", "for", "of", "with", "by", "from", "into", "onto", "upon", "about",
+      "above", "below", "under", "over", "between", "among", "through", "during",
+      "before", "after", "inside", "outside", "near", "next", "beside", "behind",
+      "front", "top", "bottom", "left", "right", "middle", "center", "side",
+      "upper", "lower", "shown", "visible", "displayed", "written", "printed",
+      "labeled", "labelled", "marked", "listed", "located", "seen", "found",
+      "read", "reads", "say", "says", "said", "text", "word", "words", "number",
+      "numbers", "name", "names", "title", "label", "heading", "caption", "line",
+      "image", "picture", "photo", "photograph", "screenshot", "diagram", "chart",
+      "table", "page", "screen", "window", "box", "button", "field", "column",
+      "row", "value", "values", "many", "much", "there", "this", "that", "these",
+      "those", "its", "their", "his", "her", "and", "or", "not", "according",
+  })
+
+
+  def _question_anchors(question: str) -> list[str]:
+      anchors: list[str] = []
+      for m in re.finditer(r"['\"\u2018\u2019\u201c\u201d]([^'\"\u2018\u2019\u201c\u201d]{2,40})['\"\u2018\u2019\u201c\u201d]", question):
+          val = m.group(1).strip()
+          if val and val.lower() not in _VQA_ANCHOR_STOPWORDS:
+              anchors.append(val)
+      for idx, tok in enumerate(re.findall(r"[A-Za-z0-9_.\-/]{2,}", question)):
+          clean = tok.strip("._-/")
+          if len(clean) < 2 or clean.lower() in _VQA_ANCHOR_STOPWORDS:
+              continue
+          if idx > 0 and any(c.isupper() for c in clean):
+              anchors.append(clean)
+          elif any(c.isdigit() for c in clean) or any(c in clean for c in "_-/"):
+              anchors.append(clean)
+          elif len(clean) >= 5:
+              anchors.append(clean)
+      seen: set[str] = set()
+      out: list[str] = []
+      for a in anchors:
+          kl = a.lower()
+          if kl not in seen:
+              seen.add(kl)
+              out.append(a)
+      return out
+
+
+  def smart_ocr_excerpt(ocr_text: str, question: str, max_words: int = VQA_OCR_WORDS) -> str:
+      """First `max_words` OCR tokens, plus up to 2 `[-6, +18]`-word tail windows when a question anchor matches past
+      `max_words`."""
+      words = " / ".join(line.strip() for line in ocr_text.splitlines() if line.strip()).split()
+      if len(words) <= max_words:
+          return " ".join(words)
+      head = " ".join(words[:max_words])
+      tail_words = words[max_words:]
+      tail_str = " ".join(tail_words)
+      anchors = _question_anchors(question)
+      if not anchors:
+          return head
+      matched_spans: list[tuple[int, int]] = []
+      tail_lower = [w.lower() for w in tail_words]
+      for anc in anchors:
+          anc_l = anc.lower()
+          if anc_l in head.lower() and anc_l not in tail_str.lower():
+              continue
+          for i, w in enumerate(tail_lower):
+              if anc_l in w or (len(anc_l) >= 4 and w in anc_l and len(w) >= 4):
+                  matched_spans.append((max(0, i - 6), min(len(tail_words), i + 18)))
+                  break
+      if not matched_spans:
+          return head
+      matched_spans.sort()
+      merged = [matched_spans[0]]
+      for lo, hi in matched_spans[1:]:
+          prev_lo, prev_hi = merged[-1]
+          if lo <= prev_hi:
+              merged[-1] = (prev_lo, max(prev_hi, hi))
+          else:
+              merged.append((lo, hi))
+      snippets = [" ".join(tail_words[lo:hi]) for lo, hi in merged[:2]]
+      return head + " / ... / " + " / ".join(snippets)
+
+
+  def lfm_vqa_prompt(question: str, ocr_text: str) -> str:
+      """The prompt LFM gets for a text question: the cleaned `ocr` reading in front (with tail-anchor windows when
+      dense), VQA_TEXT_SUFFIX after."""
+      cleaned = clean_ocr_page(question, ocr_text)
+      quoted = smart_ocr_excerpt(cleaned, question, VQA_OCR_WORDS)
+      if not quoted:
+          return "An OCR pass found no readable text in this image.\n" + question + VQA_TEXT_SUFFIX
+      return f'{VQA_OCR_PREFIX}"{quoted}"\n' + question + VQA_TEXT_SUFFIX
+  ```
+- **Live Validation (`scratch/probe_remaining_components.py` & `scratch/probe_combined_3_components.py`, `task-274` & `task-280`, all 3,789 questions):**
+  - Touches **115 existing routed questions** + **10 newly routed dense questions** across `r23`, `p11`, `r29`, `r30`.
+  - **Gained: `7`, Lost: `0`, Net: `+7`** (`+6 text`, `+1 count`), fixing `[r23 text]` `Oswald Achenbach`, `[r23 text]` `NIKON D3200`, `[r23 text]` `KA7500B`, `[p11 text]` `sudo apt update`, `[p11 text]` `YYYY-MM-DD`, `[p11 count]` `21` (Gold), and `[r29 text / Frontier 240]` `Ogg Vorbis` (`OGG` -> `Ogg Vorbis`).
+
+---
+
+#### Track 13: 4-Set Screen (`vqa_gate_v8_screen.py`), Unit Tests & 8/8 Server Parity (User Decision: Option B Preferred)
+
+- **Selected Execution Path (User Decision, 2026-11-04 — Option B Preferred):**
+  - **Option B (Primary / Preferred Path — Direct Ship After 4-Set Screen + Unit Tests + 8/8 Parity):**
+    - Because `clean_ocr_page` (`<2`-char noise filter matching `caption`'s already-shipped `visible_text_line`), unrouting `"writing desk"` / `"holding by its handle"` + routing quoted/UI lookups, and appending tail windows only when `len(words) > 160` have **zero losses (`29 gained, 0 lost`) across all 3,789 cached questions (`r23`, `p11`, `r29`, `r30`)** and `0.00 s` extra latency, the worker should proceed directly from `vqa_gate_v8_screen.py` (Step 13A) to shipping Tracks 10–12 in `src/` with unit tests and `3,789/3,789` prompt + `8/8` live answer parity (Step 13C).
+  - **Note for Opus 5.5 Worker on Option A (Fallback Path if Deemed Necessary):**
+    - Because the 4 cached sets (`r23`, `p11`, `r29`, `r30`) are seen sets, **Option A** (building a fresh unseen Round 31 of ~200 images / ~800 questions + 40-card blind user spot-check and running an unseen Gate V8 where `NRE` beats `shipped` with 95% CI excluding `0` and no type `n >= 30` down `> 2.0 pts`) remains an available path **only if deemed necessary** (for example, if `vqa_gate_v8_screen.py` or parity uncovers any regression or trade-off not seen in the validation probes). Otherwise, **Option B is preferable** and should be executed directly.
+  - **Step-by-Step Verification Requirements:**
+    1. **Step 13A — Permanent Benchmark Screen Script (`C:\AI\Projects\VisionBench\benchmarks\vqa_gate_v8_screen.py`):**
+       - Codifies the exact 4-set screen (`r23`, `p11`, `r29`, `r30`, `n=3,789`) comparing `shipped` (Gate V7) against:
+         - Arm `N` (`clean_ocr_page` only)
+         - Arm `R` (`VQA_TEXT_QUESTION` refinement only)
+         - Arm `E` (`smart_ocr_excerpt` only)
+         - Arm `NRE` (all three combined)
+       - Writes `C:\AI\Projects\VisionBench\benchmarks\results\vqa_gate_v8_screen.json` and `vqa_gate_v8_screen_scored.jsonl`.
+       - **Pre-registered Screen Pass Bars (all 4 seen sets, `n=3,789`):**
+         - Pooled net gain `>= +20` questions (`>= +0.50 pts`) with 95% paired bootstrap CI excluding `0`.
+         - Non-regression on every individual dataset (`r23`, `p11`, `r29`, `r30` each `>= +0.0 pts`).
+         - Non-regression on every question type (`text`, `no_text`, `no_object`, `object`, `count`, `color`, `position`, `yes_no` each `>= +0.0 pts` pooled).
+         - Latency overhead `<= +0.10 s` median per question.
+         *(Note: In our validation runs `task-177`, `task-207`, `task-274`, `task-280`, Arm `NRE` already passes all four bars with `+29` net / `0` losses across all 4 sets and all 8 question types.)*
+    2. **Step 13B — Production Implementation, Unit Tests & 8/8 Live Parity (`src/` & `tests/`):**
+       - Edit `src/fusion_vision_mcp/constants.py` (`_VQA_TEXT_WORDS`, `_VQA_TEXT_LOOKUP`, `VQA_TEXT_QUESTION`) and `src/fusion_vision_mcp/analysis.py` (`clean_ocr_page`, `_question_anchors`, `smart_ocr_excerpt`, `lfm_vqa_prompt`).
+       - Add permanent unit tests in `tests/test_vqa_answers.py` covering:
+         - `clean_ocr_page`: drops `'_'`, `'人'`, `'团\n米'`, `'十'` on non-CJK/non-single-char questions; preserves `'A'` and `'8'` when the question asks for a `letter` or `digit`/`number`; preserves `'人'` when the question asks about a Chinese character; preserves multi-line OCR containing single-digit lines (`"Item\n2\nTotal"`).
+         - `VQA_TEXT_QUESTION`: matches newly routed text/UI/quoted-anchor questions (`"What button is next to 'FILTER DATA'?"`, `"What network protocol is identified in the Protocol column?"`, `"What shell command was entered at the bash terminal prompt?"`, `"In what language is the book written?"`, `"According to the chart, what is the total?"`); does **not** match visual false positives (`"Where is the writing desk located?"`, `"What tool is the person holding by its handle?"`, `"What religious symbol is mounted at the top?"`, `"What animal is shown next to the letter A?"`).
+         - `smart_ocr_excerpt`: leaves `<= 160`-word OCR byte-for-byte unchanged; appends `" / ... / "` tail window when a question anchor (`'Artikel des Tages'`, `IC1`, `Informace o snímku`) appears past word 160; caps at 2 merged windows.
+       - Run `C:\AI\Projects\VisionBench\benchmarks\vqa_v8_parity.py`: verify `3,789 / 3,789` prompt parity and `8 / 8` live `vqa_answers` parity.
+       - Update `docs/history.md`, `CLAUDE.md`, and `Future_Ideas/frontier_capability_gaps.md`.
+
+---
+
+### P2.5 Step-by-Step Execution Checklist for the Opus 5.5 Worker
+
+1. **Run `git status` and existing unit tests first:**
+   - `.venv\Scripts\python.exe -m pytest tests/test_vqa_answers.py tests/test_question.py tests/test_crosscheck.py -q`
+2. **Execute Track 9 (Scoreboard & `frontier_vqa_score.py` Reconciliation):**
+   - Update `C:\AI\Projects\VisionBench\benchmarks\frontier_vqa_score.py` to report both Gate V5 (`77.1%` / `80.0%`), shipped Gate V6/V7 (`presence_check=True`, `81.2%` / `84.2%`), and Phase 2 `NRE` (`84.6%` / `87.5%`).
+3. **Execute Step 13A (`vqa_gate_v8_screen.py` in VisionBench):**
+   - Write and run `C:\AI\Projects\VisionBench\benchmarks\vqa_gate_v8_screen.py` across `r23`, `p11`, `r29`, `r30` (`n=3,789`), saving `results/vqa_gate_v8_screen.json` and `results/vqa_gate_v8_screen_scored.jsonl`.
+   - Confirm exact reproduction of the `+29` net (`29 gained, 0 lost`) result (`+10` from `clean_ocr_page`, `+13` from `VQA_TEXT_QUESTION`, `+7` from `smart_ocr_excerpt`, minus `1` shared gain = `+29` net).
+4. **Apply Tracks 10, 11, and 12 to `src/fusion_vision_mcp/`:**
+   - Edit `src/fusion_vision_mcp/constants.py` (`_VQA_TEXT_WORDS`, `_VQA_TEXT_LOOKUP`).
+   - Edit `src/fusion_vision_mcp/analysis.py` (`clean_ocr_page`, `_question_anchors`, `smart_ocr_excerpt`, `lfm_vqa_prompt`, and export `clean_ocr_page` / `smart_ocr_excerpt` in `__all__` if needed by tests/benchmarks).
+5. **Add Permanent Unit Tests & Run Full Test Suite + Parity Check (Step 13B):**
+   - Add unit tests in `tests/test_vqa_answers.py`.
+   - Run `.venv\Scripts\python.exe -m pytest -q`.
+   - Write and run `C:\AI\Projects\VisionBench\benchmarks\vqa_v8_parity.py` (verifying `3,789/3,789` prompt parity against `vqa_gate_v8_screen.py` and `8/8` live answer parity).
+6. **Update Project Documentation:**
+   - Record the screen, parity, and Frontier 240 numbers in `docs/history.md`, `CLAUDE.md`, `Future_Ideas/frontier_capability_gaps.md`, and the Progress section of this file.
+
+---
+
+## Phase 1 Archive (2026-10-30 to 2026-11-03): Tracks 1–8 & Gates V1–V7
+
+**Phase 1 Status:** Drafted 2026-10-30. **Reviewed 2026-10-30: the Review section below supersedes the rest where they
 disagree.** R.4 steps 1-4 done (see "Progress" below the review). Round 29 briefed 2026-11-01 (VisionBench
 `worker_handoff/ROUND29_PLAN.md`, `ROUND29B_PLAN.md`; Gate V5 rules in `benchmarks/vqa_gate_v5.py`). **Gate V5 ran
-2026-11-02: the routing and the Track 5 rule both pass** (Progress, step 6). Next: the user's go to ship them.
+2026-11-02: the routing and the Track 5 rule both pass** (Progress, step 6). Track 8 (`presence_check`) shipped after Gate V7 on 2026-11-02; follow-ups closed 2026-11-03.
 **Target tool:** `query_image` (`src/fusion_vision_mcp/tools/vqa.py:29–191`) and its supporting pipeline in `src/fusion_vision_mcp/analysis.py`, `src/fusion_vision_mcp/constants.py`, `src/fusion_vision_mcp/question.py`, and `src/fusion_vision_mcp/inspection.py`.
 **Current scoreboard standing (`Future_Ideas/frontier_capability_gaps.md` row 100):**
 - **VisionBench Phase 11 screen (`benchmarks/results/vqa_premise.json`, 1,200 questions across 400 generalist images):** **82.4%** (`ocr_text` arm, `989/1200`) vs. Moondream2 **78.8%** (`+3.6 pts`), median `4.62 s` (excluding `~1.8 s` OCR on routed questions).
@@ -267,6 +735,12 @@ h. **Track 4's tiling has no server path.** `processor_for("tiles4")` belongs to
     `vqa_presence_veto_screen.py`): the object-only check was picked, changed non-premise questions level with no
     check (round 30 -0.6), but changed `no_object` -4.5 against the shipped check and pooled -0.1. A trade, not a
     gain, so no round 31; the shipped check stays, with -1.7 as its figure. Record: docs/history.md.
+- **Track 9 done 2026-11-04** (P2.0.2 items 9 and 12): VisionBench `frontier_vqa_score.py` now scores the shipped tool
+  from `vqa_presence_veto_scored.jsonl` (`set == "r29"`, `A_ok`, matched on id and question) and keeps Gate V5's
+  `candidate_ok` as `old`; `frontier_vqa_sonnet55.json` is its re-run output. Checks held: **195/240 strict (81.2%)**,
+  `no_object` **29/34**. Strict 90.8 vs 81.2 (+9.6, CI 4.58 to 14.58); adjusted 93.3 vs 84.2 (+9.1); ordinary
+  80.0 / 87.8 unchanged, false premise 85.0 (was 68.3). `frontier_capability_gaps.md` row 100 and a dated entry updated
+  from that output. No `src/` change; Step 13A not started.
 
 ### R.5 Kept from the plan
 
