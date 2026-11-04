@@ -6,8 +6,8 @@ at the top of `Future_Ideas/`; when that plan is done it moves to `archive/` and
 
 Two tools have a live plan, and their open steps live there, not here:
 
-- `query_image`: [Query_Image_Improvement_Plan.md](Query_Image_Improvement_Plan.md) (Track 8 presence check,
-  round 30, Gate V7).
+- `query_image`: [Query_Image_Improvement_Plan.md](Query_Image_Improvement_Plan.md) (Track 8 presence check
+  shipped after Gate V7; its follow-ups closed 2026-11-03).
 - `critique_composition`: [Critique_Composition_Improvement_Plan.md](Critique_Composition_Improvement_Plan.md)
   (R3 step 0 next). Whether LFM can take over Moondream2's two questions here, and so retire Moondream2, rides on
   this plan.

@@ -263,6 +263,10 @@ h. **Track 4's tiling has no server path.** `processor_for("tiles4")` belongs to
     slip. ~7 s more on the "no" path only (~1 in 3 changed questions).
   - *Review both directions:* if a reviewer pass is ever used, it covers gains and losses alike, decided before the
     run.
+  - **Closed 2026-11-03 (user).** The first two were screened as vetoes on the check's "no" (VisionBench
+    `vqa_presence_veto_screen.py`): the object-only check was picked, changed non-premise questions level with no
+    check (round 30 -0.6), but changed `no_object` -4.5 against the shipped check and pooled -0.1. A trade, not a
+    gain, so no round 31; the shipped check stays, with -1.7 as its figure. Record: docs/history.md.
 
 ### R.5 Kept from the plan
 

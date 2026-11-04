@@ -314,6 +314,16 @@ the "no" path). Changing the check prompt, the suffix or the "no" rule means a f
 pass (plan Track 8): ask about the object alone rather than the whole question, and/or require SAM 3 to find no box
 before taking the "no" path.
 
+**Both were screened as a veto on the check's "no" and closed by the user (2026-11-03).** VisionBench
+`vqa_presence_veto_screen.py` (rules fixed first; round 23, phase 11, rounds 29 and 30, cached answers, 0 errors, an
+object phrase extracted from 234 of 235 "no"s): O (an object-only "Is there a <x>?" overrules the "no" on a "yes"), S
+(SAM 3 finds a box), O or S, O and S. O was picked: changed non-premise questions 83.1% (no check 83.1, shipped check
+82.5), round 30 alone -0.6 against no check (inside V7's -1.0), but changed `no_object` 94.1 -> 89.6%; pooled -0.1
+against the shipped check (CI -0.3 to 0.1). It overruled 29 of the 37 wrong "no"s and 13 of 198 right ones, so it
+trades one error for the other rather than adding accuracy, at ~3.8 s more on the "no" path. S did nothing on round
+30; O and S failed the premise rule (-5.5). Seen sets, extractor written while looking at them. Not taken to a fresh
+round 31: the user chose to keep the shipped check and its -1.7.
+
 ## `query_image` and `caption` keep the first OCR reading: LFM's transcription did not help them (2026-11-03)
 
 `ocr(lfm_read=true)` appends the lines LFM2.5-VL's transcription adds; `caption`'s text line and `query_image`'s OCR
