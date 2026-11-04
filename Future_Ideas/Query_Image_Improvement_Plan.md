@@ -1,6 +1,6 @@
 # `query_image` Frontier-Grade Improvement Plan
 
-**Status:** Phase 1 (Tracks 1–8, Gates V1–V7) shipped 2026-10-31 to 2026-11-02; post-V7 screens (`vqa_ocr_lfm_screen`, `vqa_presence_veto_screen`, `vqa_gap_screen`) closed 2026-11-03 to 2026-11-04. Phase 2 (Tracks 9–13) drafted 2026-11-04. **Reviewed 2026-11-04: P2.0 below supersedes P2.1–P2.5 where they disagree.** Gate path decided (P2.0.4). Track 9 done (`48687e1`). Step 13A screen done (P2.0.6): NE +17/0 ships on the screen; R +13/0 goes to round 31. Next: implement NE (P2.0.5 step 5); then build round 31 for R.
+**Status:** Phase 1 (Tracks 1–8, Gates V1–V7) shipped 2026-10-31 to 2026-11-02; post-V7 screens (`vqa_ocr_lfm_screen`, `vqa_presence_veto_screen`, `vqa_gap_screen`) closed 2026-11-03 to 2026-11-04. Phase 2 (Tracks 9–13) drafted 2026-11-04. **Reviewed 2026-11-04: P2.0 below supersedes P2.1–P2.5 where they disagree.** Gate path decided (P2.0.4). Track 9 done (`48687e1`). Step 13A screen done (P2.0.6): NE +17/0 ships on the screen; R +13/0 goes to round 31. Next, in parallel: implement NE (P2.0.5 step 5, Sonnet), and round 31 stage S (VisionBench `worker_handoff/ROUND31_PLAN.md`, Gemini 3.8 Flash) for Gate V9 (P2.0.7, rules fixed before sourcing).
 **Target tool:** `query_image` (`src/fusion_vision_mcp/tools/vqa.py:29–191`) and its supporting pipeline in `src/fusion_vision_mcp/analysis.py:1070–1142` and `src/fusion_vision_mcp/constants.py:267–313`.
 
 ---
@@ -135,6 +135,40 @@ VisionBench `vqa_gate_v8_screen.py` ran with its rules committed before any answ
   Round 31 is the test, built on top of shipped NE.
 - Remaining costs: a newly routed question pays an OCR call (cached median 6.6 s on rounds 29/30, which are dense
   pages). NE's answers took a median of 5.9 s, the same as unchanged ones.
+
+#### P2.0.7 Gate V9 on round 31 (rules fixed 2026-11-04, before round 31's images are sourced)
+
+**What round 31 is for.** R changes routing on 1.3% of questions (51 of 3,789), so a round shaped like round 30
+(~800 questions) would hand it ~10-20 to judge. Round 31 therefore does two jobs: confirm NE on fresh questions (it
+shipped on a seen-set screen), and test R. It leans toward the image kinds where both act: app/web screenshots, game
+UI and documents (VisionBench `worker_handoff/ROUND31_PLAN.md`; question rules unchanged from rounds 29-30, and the
+worker is not told what is tested). About 230 images, 920 questions. Gemini 3.8 Flash writes slice `a`, another
+non-Chinese model writes slice `b`, and the user blind-checks a sample. Labels the user rejects are dropped before any
+run, as in round 29.
+
+**Arms** (LFM2.5-VL-3B ONNX, CPU, `VQA_SEED`; OCR is `ocr_pages(sharpened=False, lfm_read=False)` once per image;
+prompts frozen in the gate script from `vqa_gate_v8_screen.py`):
+- `old`: the tool at 7eed548 (the screen's shipped prompt and presence check).
+- `NE`: `old` with `clean_ocr_page` then `smart_ocr_excerpt` (the screen's NE).
+- `NER`: `NE` with R's routing (the screen's R regex; removed routes take the presence check).
+
+Every question gets `old` live. An arm whose prompt equals `old`'s reuses that answer. Grading uses
+`vqa_round23.grade`, as rounds 29-30 did.
+
+**Rule A, NE confirm** (NE vs `old`, on the questions NE changes): gained >= lost. If it fails, NE's shipping goes back
+to the user; nothing is reverted automatically. Reported: CI, by type and kind.
+
+**Rule B, R** (NER vs NE, on the questions R changes). R ships only if all of these hold:
+1. At least 20 questions are touched. Fewer is too little evidence, so R does not ship, and that is reported as a
+   result.
+2. Gained > lost.
+3. On removed routes alone: gained >= lost.
+4. No question type with 10+ touched questions has gained < lost.
+
+If R fails, Track 11 stops, and R stays on record as fitted to the seen sets.
+
+**Reported, not gated:** each arm by type and kind, gained and lost lists, routes added and removed, latency on
+touched questions (OCR included), and errors.
 
 #### P2.0.5 Revised order (replaces P2.5)
 
