@@ -178,6 +178,16 @@ Live plan: [Future_Ideas/Query_Image_Improvement_Plan.md](Future_Ideas/Query_Ima
 - **Text and name lookups get the `ocr` reading** in front: `VQA_TEXT_QUESTION` (text words, plus What/Which/Who/Where
   questions naming a name, number, price, sign, logo or UI element, not "what colour"), `VQA_OCR_PREFIX`, at most 160
   words (`VQA_OCR_WORDS`), `VQA_TEXT_SUFFIX`.
+- **The OCR context is cleaned, then excerpted** (2026-11-04, `analysis.clean_ocr_page` then `smart_ocr_excerpt`, called
+  by `lfm_vqa_prompt`): a reading under 2 word characters (kept for a letter/digit/number/numeral/initial question when
+  ASCII) or, **from PP-OCRv6 English only** (`_english_ocr`: the engine sets `sharpened_pass`; EasyOCR readings keep
+  their CJK), a CJK-only reading of 6 or fewer characters on a question that does not mention CJK, is treated as empty;
+  a reading over 160 words keeps those and appends up to 2 `[-6, +18]`-word windows around question anchors found only
+  past them, after " / ... / ". Quote it as **+17 of 3,789, screened on seen sets, not gated** (Gate V8 screen, arm NE:
+  N +10, E +7, none lost); round 31 (Gate V9) confirms it on fresh questions. The prompts are frozen in VisionBench
+  `vqa_gate_v8_screen.py`, checked by `vqa_v8_src_parity.py` (1,712/1,712 routed prompts identical); changing them needs
+  a fresh round. The CJK rule is engine-specific noise: re-check it when `ocr` changes engine. `VQA_TEXT_QUESTION` is
+  unchanged (the R regex waits for round 31).
 - **Other What/Which/Who/Where questions get a presence check first** (`presence_check`, default on;
   `VQA_PRESENCE_CHECK`, a "no" adds `VQA_ABSENT_SUFFIX`). It failed one gate rule (-1.7 on other changed questions,
   limit -1.0) and shipped on the user's decision: quote -1.7 as the measured figure. Control questions start

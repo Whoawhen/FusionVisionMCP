@@ -103,7 +103,9 @@ def register(mcp: MCPServer) -> None:
         in a median 4.9 s against 9.8 s. A question that mentions text (written, says, label, ...), or
         a What/Which/Who/Where question asking for a name, number, price, date, sign, logo, menu item
         and so on (not a colour), gets the `ocr` engine's reading of the image as context, told to keep
-        its exact spelling and to say "none" when the text or item is not there. Since 2026-11-02 that
+        its exact spelling and to say "none" when the text or item is not there (a lone character or
+        short CJK noise counts as no text; a long page keeps its first 160 words plus windows around
+        the question's key words). Since 2026-11-02 that
         wider routing answers 80.2% of 917 fresh questions against 76.8% before. Other
         What/Which/Who/Where questions first get a presence check (`presence_check`, default on):
         on 780 fresh questions 81.2% right vs 76.0%, false-premise questions 72% -> 94% right, though

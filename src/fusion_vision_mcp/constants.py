@@ -294,6 +294,43 @@ VQA_TEXT_SUFFIX: Final[str] = (
     "If the question asks about text or an item that is not in the image, answer that there is none."
 )
 VQA_OCR_WORDS: Final[int] = 160
+#: `query_image`'s OCR context since 2026-11-04 (`analysis.clean_ocr_page`, `smart_ocr_excerpt`; Gate V8 screen, NE arm,
+#: VisionBench `vqa_gate_v8_screen.py`, rules fixed before any arm answer existed): a routed question's reading is
+#: treated as empty when under 2 word characters (unless the question asks for a letter, digit, number, numeral or
+#: initial and the reading is ASCII) or, from PP-OCRv6 English only, when it is CJK-only, at most VQA_OCR_CJK_NOISE_CHARS
+#: characters, on a question that does not mention CJK; a reading over VQA_OCR_WORDS words keeps those and appends up to
+#: VQA_OCR_WINDOWS windows of VQA_OCR_WINDOW_BEFORE / VQA_OCR_WINDOW_AFTER words around question anchors found only
+#: past them. +17 of 3,789 questions, none lost (N +10, E +7; +0.45 pts, CI 0.24 to 0.66), screened on seen sets, not
+#: gated: round 31 (Gate V9) confirms it on fresh questions. The prompts and rules are frozen in the screen script;
+#: changing them means a fresh round. Engine-specific: the CJK noise is PP-OCRv6's, so re-check when `ocr` changes engine.
+VQA_OCR_CJK_ONLY: Final[str] = r"^[一-鿿　-〿＀-￯\s/]+$"
+VQA_OCR_CJK_QUESTION: Final[str] = (
+    r"\b(chinese|japanese|korean|kanji|hanzi|hangul|mandarin|cjk|asian|character|characters)\b|"
+    r"[一-鿿぀-ヿ가-힯]"
+)
+VQA_OCR_SINGLE_CHAR_QUESTION: Final[str] = r"\b(letter|digit|number|numeral|initial)\b"
+VQA_OCR_CJK_NOISE_CHARS: Final[int] = 6
+VQA_OCR_WINDOWS: Final[int] = 2
+VQA_OCR_WINDOW_BEFORE: Final[int] = 6
+VQA_OCR_WINDOW_AFTER: Final[int] = 18
+VQA_ANCHOR_QUOTES: Final[str] = "'\"‘’“”"
+VQA_ANCHOR_STOPWORDS: Final[frozenset[str]] = frozenset({
+    "what", "which", "where", "when", "who", "whom", "whose", "why", "how",
+    "does", "did", "is", "are", "was", "were", "has", "have", "had", "can",
+    "will", "would", "should", "could", "the", "a", "an", "in", "on", "at",
+    "to", "for", "of", "with", "by", "from", "into", "onto", "upon", "about",
+    "above", "below", "under", "over", "between", "among", "through", "during",
+    "before", "after", "inside", "outside", "near", "next", "beside", "behind",
+    "front", "top", "bottom", "left", "right", "middle", "center", "side",
+    "upper", "lower", "shown", "visible", "displayed", "written", "printed",
+    "labeled", "labelled", "marked", "listed", "located", "seen", "found",
+    "read", "reads", "say", "says", "said", "text", "word", "words", "number",
+    "numbers", "name", "names", "title", "label", "heading", "caption", "line",
+    "image", "picture", "photo", "photograph", "screenshot", "diagram", "chart",
+    "table", "page", "screen", "window", "box", "button", "field", "column",
+    "row", "value", "values", "many", "much", "there", "this", "that", "these",
+    "those", "its", "their", "his", "her", "and", "or", "not", "according",
+})  # fmt: skip
 #: `query_image`'s presence check since 2026-11-02 (Track 8, Gate V6's pick `A_suffix`): a What/Which/Who/Where question
 #: VQA_TEXT_QUESTION does not route first gets VQA_PRESENCE_CHECK (at most VQA_PRESENCE_CHECK_TOKENS tokens); when
 #: `analysis._polarity` of the reply is "no", the question is answered with VQA_ABSENT_SUFFIX after it. Gate V6 screened

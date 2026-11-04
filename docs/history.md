@@ -324,6 +324,24 @@ trades one error for the other rather than adding accuracy, at ~3.8 s more on th
 30; O and S failed the premise rule (-5.5). Seen sets, extractor written while looking at them. Not taken to a fresh
 round 31: the user chose to keep the shipped check and its -1.7.
 
+## `query_image` cleans and excerpts its OCR context -- shipped on a screen of seen sets, not a gate (2026-11-04)
+
+Gate V8 screen (VisionBench `vqa_gate_v8_screen.py`, rules fixed before any arm answer existed; round 23, phase 11,
+rounds 29 and 30, 3,789 questions, 0 errors, seed parity 20/20 so cached answers were the base). Arm **NE** shipped on
+the user's decision (P2.0.4: prompt hygiene on routed questions only, quoted as "screened on seen sets, not gated"):
+- `analysis.clean_ocr_page` (arm N, +10 / -0): a routed reading under 2 word characters, or a CJK-only reading of 6 or
+  fewer characters on a question that does not mention CJK, becomes the empty-page prompt. The single-character
+  exception (letter, digit, number, numeral, initial; ASCII only) is kept. `oriental` is not a trigger. **The CJK rule
+  applies to PP-OCRv6 English readings only** (P2.0.2 item 7); under `--ocr-languages` the reading came from EasyOCR and
+  a short CJK sign is real. It tunes around PP-OCRv6's noise, so re-check it when `ocr` changes engine.
+- `analysis.smart_ocr_excerpt` (arm E, +7 / -0): a reading over `VQA_OCR_WORDS` words keeps its first 160 and appends up
+  to 2 windows of 6 words before and 18 after question anchors found only past them (`question_anchors`), after
+  " / ... / "; 285 of 1,712 routed pages were over 160 words. At or under 160 it is the shipped string byte for byte.
+- Pooled 83.93 -> 84.38% (+17, CI 0.24 to 0.66 pts); on the frontier 240 +3 (195 -> 198).
+Parity (VisionBench `vqa_v8_src_parity.py`): `lfm_vqa_prompt` equals the screen's NE prompt on 1,712 of 1,712 routed
+questions. The regexes, stopwords and window sizes are in `constants.py` (`VQA_OCR_*`, `VQA_ANCHOR_*`). Not shipped: arm
+R (routing regex, +13 / -0, fitted to these sets), which goes to round 31 (Gate V9, rules in the plan's P2.0.7).
+
 ## `query_image` and `caption` keep the first OCR reading: LFM's transcription did not help them (2026-11-03)
 
 `ocr(lfm_read=true)` appends the lines LFM2.5-VL's transcription adds; `caption`'s text line and `query_image`'s OCR

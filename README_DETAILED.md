@@ -584,7 +584,8 @@ about.
 Ask a free-form question about an image (visual question answering). Backed by **LFM2.5-VL-3B on ONNX Runtime**
 since 2026-10-24 (Moondream2 before), the same loaded model as `caption`'s default, so it costs no extra memory when
 both are used. The question goes in verbatim, except that one mentioning text (written, says, label, title, brand
-name, ...: `VQA_TEXT_QUESTION`) gets the `ocr` engine's reading of the image in front of it (at most 160 words) and
+name, ...: `VQA_TEXT_QUESTION`) gets the `ocr` engine's reading of the image in front of it (at most 160 words, plus up to two windows around the question's
+anchors on a longer page; noise such as a lone character is treated as no text) and
 "If the question asks about text that is not in the image, answer that there is none." after it.
 
 Measured on VisionBench round 23, 892 questions the Gemini worker wrote for 223 fresh images (three ordinary

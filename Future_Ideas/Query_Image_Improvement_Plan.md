@@ -801,6 +801,12 @@ h. **Track 4's tiling has no server path.** `processor_for("tiles4")` belongs to
   `no_object` **29/34**. Strict 90.8 vs 81.2 (+9.6, CI 4.58 to 14.58); adjusted 93.3 vs 84.2 (+9.1); ordinary
   80.0 / 87.8 unchanged, false premise 85.0 (was 68.3). `frontier_capability_gaps.md` row 100 and a dated entry updated
   from that output. No `src/` change; Step 13A not started.
+- **NE shipped 2026-11-04** (P2.0.5 step 5, NE only): `analysis.clean_ocr_page`, `question_anchors`, `smart_ocr_excerpt`
+  in `lfm_vqa_prompt`; constants `VQA_OCR_*` / `VQA_ANCHOR_*` in `constants.py`; `VQA_TEXT_QUESTION` untouched (R goes
+  to round 31). The CJK rule runs only on PP-OCRv6 English readings (`_english_ocr`). Parity: VisionBench
+  `vqa_v8_src_parity.py` 1,712/1,712. Tests in `tests/test_vqa_answers.py`. Quote as "+17 of 3,789, screened on seen
+  sets, not gated". Note for round 31: the frozen arm N empties a lone CJK character even on a question that mentions
+  Chinese characters (the 2-character floor has no CJK exception), kept for parity.
 
 ### R.5 Kept from the plan
 

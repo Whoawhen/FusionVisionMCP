@@ -276,3 +276,110 @@ def test_query_image_passes_presence_check(
     query = _query_image_tool(_app(ans), monkeypatch)
     query(_png(tmp_path), "Where is the cat?", structured_analysis=False, presence_check=False)
     assert ans.prompts == ["Where is the cat?"]
+
+
+# -- clean_ocr_page / smart_ocr_excerpt (Gate V8 screen, arm NE) ----------------------------------------------------
+# Questions marked "cached" are real ones from VisionBench's vqa_gate_v8_scored.jsonl; the rest are synthetic.
+_RELIGIOUS = "What religious symbol stands at the peak of the chapel gable roof?"  # cached, r30 n=284: OCR read "十"
+_ARTIKEL = "What person's name is the subject of 'Artikel des Tages'?"  # cached, r23 n=440, a 2,688-character page
+
+
+def _quoted(prompt: str) -> str:
+    return prompt.split("\n")[0]
+
+
+def test_noise_reading_is_treated_as_empty() -> None:
+    empty = "An OCR pass found no readable text in this image.\n" + _RELIGIOUS + SUFFIX
+    assert lfm_vqa_prompt(_RELIGIOUS, "十") == empty
+    # cached: r23 n=3 / r29 n=346 read a lone "8" / "A" on a brand and a street-name question
+    assert lfm_vqa_prompt("What brand name is printed on the rim of the broth pot?", "8").startswith("An OCR pass")
+    assert lfm_vqa_prompt("What street name is printed on the metal curbside sign?", "A").startswith("An OCR pass")
+
+
+def test_single_character_is_kept_for_a_letter_question() -> None:
+    # synthetic: a one-letter answer is the point of the question
+    assert lfm_vqa_prompt("Which letter is printed on the sign?", "A") == (
+        'Text read from the image by OCR: "A"\nWhich letter is printed on the sign?' + SUFFIX
+    )
+    # but not a non-ASCII one: that is PP-OCRv6 noise
+    assert lfm_vqa_prompt("Which letter is printed on the sign?", "人").startswith("An OCR pass")
+
+
+def test_cjk_reading_is_kept_when_the_question_mentions_cjk() -> None:
+    # synthetic; r23 n=869 is the cached Chinese-characters question (its reading there was "111")
+    question = "What English translation is written below the Chinese characters?"
+    assert lfm_vqa_prompt(question, "人民") == f'Text read from the image by OCR: "人民"\n{question}{SUFFIX}'
+    assert lfm_vqa_prompt("What does the sign say?", "人民").startswith("An OCR pass")  # no CJK in the question
+    # a lone character is under the 2-character floor whatever the question (frozen arm N), so it is emptied too
+    assert lfm_vqa_prompt(question, "人").startswith("An OCR pass")
+    assert lfm_vqa_prompt(question, "出口\n中") == f'Text read from the image by OCR: "出口 / 中"\n{question}{SUFFIX}'
+
+
+def test_multi_line_latin_reading_is_untouched() -> None:
+    assert lfm_vqa_prompt("What is the total?", "Item\n2\nTotal") == (
+        'Text read from the image by OCR: "Item / 2 / Total"\nWhat is the total?' + SUFFIX
+    )
+
+
+def test_long_cjk_reading_is_not_noise() -> None:
+    assert lfm_vqa_prompt(_RELIGIOUS, "管家\n天文\n管家人").startswith('Text read from the image by OCR: "管家')
+
+
+def test_cjk_noise_rule_is_for_the_english_engine_only() -> None:
+    # synthetic: under EasyOCR (non-English --ocr-languages) a short CJK sign is a real reading
+    assert lfm_vqa_prompt(_RELIGIOUS, "出口", english_engine=False).startswith(
+        'Text read from the image by OCR: "出口"'
+    )
+    assert lfm_vqa_prompt(_RELIGIOUS, "出口").startswith("An OCR pass")
+    assert lfm_vqa_prompt(_RELIGIOUS, "x", english_engine=False).startswith(
+        "An OCR pass"
+    )  # the short rule is engine-free
+
+
+@pytest.mark.parametrize(("sharpened_pass", "empty"), [(True, True), (False, False)])
+def test_vqa_answers_scopes_the_cjk_rule_to_the_engine(
+    monkeypatch: pytest.MonkeyPatch, sharpened_pass: bool, empty: bool
+) -> None:
+    monkeypatch.setattr(analysis, "ocr_pages", lambda *a, **k: [{"text": "出口"}])
+    ans = _Answerer()
+    app = cast(
+        AppContext,
+        SimpleNamespace(answerer=ans, vqa=_Moondream(), ocr_engine=SimpleNamespace(sharpened_pass=sharpened_pass)),
+    )
+    vqa_answers(app, [Image.new("RGB", (8, 8))], "What text is written on the door?")
+    assert ans.prompts[0].startswith("An OCR pass") is empty
+
+
+def test_reading_within_the_limit_is_unchanged_byte_for_byte() -> None:
+    words = " ".join(f"w{i}" for i in range(160))
+    assert lfm_vqa_prompt(_ARTIKEL, words) == f'Text read from the image by OCR: "{words}"\n{_ARTIKEL}{SUFFIX}'
+
+
+def test_anchor_past_the_cut_gets_a_window() -> None:
+    page = [f"w{i}" for i in range(250)] + ["Artikel", "des", "Tages", "Zephyrine", "Quill"] + ["x"] * 40
+    quoted = _quoted(lfm_vqa_prompt(_ARTIKEL, " ".join(page)))
+    head, _, windows = quoted.partition(" / ... / ")
+    assert head.endswith("w159")  # the 160-word head, as shipped
+    assert windows.startswith("w") and "Artikel des Tages Zephyrine Quill" in windows
+
+
+def test_windows_are_capped_at_two() -> None:
+    page = []
+    for anchor in ("Alphabet", "Bravo99", "Charlie77"):
+        page += ["filler"] * 200 + [anchor]
+    question = "Which of Alphabet, Bravo99 and Charlie77 is listed?"
+    quoted = _quoted(lfm_vqa_prompt(question, " ".join(page)))
+    assert quoted.count(" / ... / ") == 1
+    tail = quoted.split(" / ... / ", 1)[1]
+    assert "Alphabet" in tail and "Bravo99" in tail and "Charlie77" not in tail
+    assert tail.count(" / ") == 1
+
+
+def test_anchor_already_in_the_head_adds_nothing() -> None:
+    page = ["Artikel", "des", "Tages"] + [f"w{i}" for i in range(250)]
+    assert " / ... / " not in lfm_vqa_prompt(_ARTIKEL, " ".join(page))
+
+
+def test_question_anchors() -> None:
+    assert analysis.question_anchors(_ARTIKEL) == ["s name is the subject of", "person", "subject", "Artikel", "Tages"]
+    assert analysis.question_anchors("What colour is it?") == ["colour"]

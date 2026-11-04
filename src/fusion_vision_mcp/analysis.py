@@ -47,8 +47,17 @@ from fusion_vision_mcp.constants import (
     OCR_SHARPEN_RADIUS,
     VQA_ABSENT_SUFFIX,
     VQA_AGREE_COVER,
+    VQA_ANCHOR_QUOTES,
+    VQA_ANCHOR_STOPWORDS,
     VQA_COUNT_QUESTION,
+    VQA_OCR_CJK_NOISE_CHARS,
+    VQA_OCR_CJK_ONLY,
+    VQA_OCR_CJK_QUESTION,
     VQA_OCR_PREFIX,
+    VQA_OCR_SINGLE_CHAR_QUESTION,
+    VQA_OCR_WINDOW_AFTER,
+    VQA_OCR_WINDOW_BEFORE,
+    VQA_OCR_WINDOWS,
     VQA_OCR_WORDS,
     VQA_PRESENCE_CHECK,
     VQA_PRESENCE_CHECK_TOKENS,
@@ -1088,14 +1097,113 @@ def presence_prompts(answerer: Answerer, images: Sequence[Image], question: str)
     return replies, [question + VQA_ABSENT_SUFFIX if _polarity(r) == "no" else question for r in replies]
 
 
-def lfm_vqa_prompt(question: str, ocr_text: str) -> str:
-    """The prompt LFM gets for a text question: the `ocr` reading in front, VQA_TEXT_SUFFIX after (VisionBench
-    `vqa_gate_v1.ocr_prompt` with VERBATIM_PREFIX / VERBATIM_SUFFIX, which Gate V5 measured, byte for byte)."""
+_OCR_CJK_ONLY_RE: Final = re.compile(VQA_OCR_CJK_ONLY)
+_OCR_CJK_QUESTION_RE: Final = re.compile(VQA_OCR_CJK_QUESTION, re.IGNORECASE)
+_OCR_SINGLE_CHAR_QUESTION_RE: Final = re.compile(VQA_OCR_SINGLE_CHAR_QUESTION, re.IGNORECASE)
+
+
+def clean_ocr_page(question: str, ocr_text: str, *, english_engine: bool = True) -> str:
+    """`ocr_text`, or "" when it is noise for `question`: under 2 word characters (kept when the question asks for a
+    letter, digit, number, numeral or initial and the reading is ASCII), or, with `english_engine` (PP-OCRv6 English,
+    where any CJK is noise by construction), CJK-only, VQA_OCR_CJK_NOISE_CHARS or fewer characters, on a question that
+    does not mention CJK (Gate V8 screen's arm N, VisionBench `vqa_gate_v8_screen.clean_ocr_page`)."""
+    if not ocr_text.strip():
+        return ""
+    key = re.sub(r"\W+", " ", ocr_text.lower()).strip().replace(" ", "")
+    if not key:
+        return ""
+    if (
+        english_engine
+        and _OCR_CJK_ONLY_RE.match(ocr_text)
+        and len(key) <= VQA_OCR_CJK_NOISE_CHARS
+        and not _OCR_CJK_QUESTION_RE.search(question)
+    ):
+        return ""
+    if len(key) < 2 and not (_OCR_SINGLE_CHAR_QUESTION_RE.search(question) and key.isascii()):
+        return ""
+    return ocr_text
+
+
+def question_anchors(question: str) -> list[str]:
+    """The words of `question` worth finding in a long OCR reading: quoted strings, capitalised words after the first,
+    tokens with a digit or one of `_-/`, and other tokens of 5+ letters that are not stopwords (VisionBench
+    `vqa_gate_v8_screen.question_anchors`)."""
+    anchors: list[str] = []
+    quotes = VQA_ANCHOR_QUOTES
+    for m in re.finditer(f"[{quotes}]([^{quotes}]{{2,40}})[{quotes}]", question):
+        val = m.group(1).strip()
+        if val and val.lower() not in VQA_ANCHOR_STOPWORDS:
+            anchors.append(val)
+    for idx, tok in enumerate(re.findall(r"[A-Za-z0-9_.\-/]{2,}", question)):
+        clean = tok.strip("._-/")
+        if len(clean) < 2 or clean.lower() in VQA_ANCHOR_STOPWORDS:
+            continue
+        if (
+            idx > 0
+            and any(c.isupper() for c in clean)
+            or any(c.isdigit() for c in clean)
+            or any(c in clean for c in "_-/")
+            or len(clean) >= 5
+        ):
+            anchors.append(clean)
+    seen: set[str] = set()
+    out: list[str] = []
+    for a in anchors:
+        if a.lower() not in seen:
+            seen.add(a.lower())
+            out.append(a)
+    return out
+
+
+def smart_ocr_excerpt(ocr_text: str, question: str, max_words: int = VQA_OCR_WORDS) -> str:
+    """The OCR reading as one line (lines joined with " / "), cut at `max_words` words; a longer reading also gets up
+    to VQA_OCR_WINDOWS windows around `question`'s anchors that occur only past the cut, after " / ... / ". A reading
+    of `max_words` words or fewer comes back whole (VisionBench `vqa_gate_v8_screen.smart_ocr_excerpt`)."""
     words = " / ".join(line.strip() for line in ocr_text.splitlines() if line.strip()).split()
-    if not words:
+    if len(words) <= max_words:
+        return " ".join(words)
+    head = " ".join(words[:max_words])
+    tail_words = words[max_words:]
+    tail_str = " ".join(tail_words)
+    anchors = question_anchors(question)
+    if not anchors:
+        return head
+    spans: list[tuple[int, int]] = []
+    tail_lower = [w.lower() for w in tail_words]
+    for anc in anchors:
+        anc_l = anc.lower()
+        if anc_l in head.lower() and anc_l not in tail_str.lower():
+            continue
+        for i, w in enumerate(tail_lower):
+            if anc_l in w or (len(anc_l) >= 4 and w in anc_l and len(w) >= 4):
+                spans.append((max(0, i - VQA_OCR_WINDOW_BEFORE), min(len(tail_words), i + VQA_OCR_WINDOW_AFTER)))
+                break
+    if not spans:
+        return head
+    spans.sort()
+    merged = [spans[0]]
+    for lo, hi in spans[1:]:
+        if lo <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], hi))
+        else:
+            merged.append((lo, hi))
+    return head + " / ... / " + " / ".join(" ".join(tail_words[lo:hi]) for lo, hi in merged[:VQA_OCR_WINDOWS])
+
+
+def lfm_vqa_prompt(question: str, ocr_text: str, *, english_engine: bool = True) -> str:
+    """The prompt LFM gets for a text question: the `ocr` reading in front (`clean_ocr_page`, then
+    `smart_ocr_excerpt`), VQA_TEXT_SUFFIX after (VisionBench `vqa_gate_v8_screen.arm_prompt` for arm NE, whose
+    unchanged pages are `vqa_gate_v1.ocr_prompt` with VERBATIM_PREFIX / VERBATIM_SUFFIX, Gate V5's, byte for byte).
+    `english_engine` is whether the reading came from PP-OCRv6 English (see `clean_ocr_page`)."""
+    quoted = smart_ocr_excerpt(clean_ocr_page(question, ocr_text, english_engine=english_engine), question)
+    if not quoted:
         return "An OCR pass found no readable text in this image.\n" + question + VQA_TEXT_SUFFIX
-    quoted = " ".join(words[:VQA_OCR_WORDS])
     return f'{VQA_OCR_PREFIX}"{quoted}"\n' + question + VQA_TEXT_SUFFIX
+
+
+def _english_ocr(app: AppContext) -> bool:
+    """Whether `app.ocr_engine` is PP-OCRv6 English (the engine that sets `sharpened_pass`), not EasyOCR."""
+    return bool(getattr(getattr(app, "ocr_engine", None), "sharpened_pass", False))
 
 
 def text_question_readings(app: AppContext, images: Sequence[Image], *questions: str) -> list[dict[str, Any]] | None:
@@ -1126,7 +1234,8 @@ def vqa_answers(
             if _TEXT_QUESTION_RE.search(question):
                 if ocr_readings is None:
                     ocr_readings = ocr_pages(app, images, sharpened=False, lfm_read=False)
-                prompts = [lfm_vqa_prompt(question, p["text"]) for p in ocr_readings]
+                english = _english_ocr(app)
+                prompts = [lfm_vqa_prompt(question, p["text"], english_engine=english) for p in ocr_readings]
             elif presence_check and presence_checked(question):
                 prompts = presence_prompts(app.answerer, images, question)[1]
             else:
