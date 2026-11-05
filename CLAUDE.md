@@ -170,7 +170,7 @@ passed (same prompts, same decisions on cached replies).
 
 ### `query_image`
 
-Live plan: [Future_Ideas/Query_Image_Improvement_Plan.md](Future_Ideas/Query_Image_Improvement_Plan.md).
+Plan (done 2026-11-05): [Future_Ideas/archive/Query_Image_Improvement_Plan.md](Future_Ideas/archive/Query_Image_Improvement_Plan.md).
 
 - **LFM2.5-VL-3B ONNX answers** (`analysis.vqa_answers`, `AppContext.answerer`, the default caption's proxy, so one
   loaded copy serves both). `--vqa-model moondream`, or a load failing with `OSError`, `ImportError` or

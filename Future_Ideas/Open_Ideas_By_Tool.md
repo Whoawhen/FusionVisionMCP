@@ -4,10 +4,8 @@ The one list of ideas that are still worth doing, gathered 2026-11-02 from every
 [`archive/`](archive/). Each line names where its detail lives. An idea that gets picked up becomes its own plan
 at the top of `Future_Ideas/`; when that plan is done it moves to `archive/` and its line here goes.
 
-Two tools have a live plan, and their open steps live there, not here:
+One tool has a live plan, and its open steps live there, not here:
 
-- `query_image`: [Query_Image_Improvement_Plan.md](Query_Image_Improvement_Plan.md) (Track 8 presence check
-  shipped after Gate V7; its follow-ups closed 2026-11-03).
 - `critique_composition`: [Critique_Composition_Improvement_Plan.md](Critique_Composition_Improvement_Plan.md)
   (R3 step 0 next). Whether LFM can take over Moondream2's two questions here, and so retire Moondream2, rides on
   this plan.
@@ -59,11 +57,12 @@ file, "What good means").
   written wrongly and waits on a fresh held-object set (round 12b). Source:
   [archive/sam3_expansion_plan.md](archive/sam3_expansion_plan.md).
 
-## `query_image` (beyond its live plan)
+## `query_image`
 
-- **Route multiple-choice questions to `classify_image`.** CLIP beat `query_image` 98.5 vs 77.5% on listed labels,
-  but no `query_image` question has been routed there; it needs its own gate. Source: [docs/history.md](../docs/history.md), "`classify_image`
-  is CLIP zero-shot".
+Nothing open. Its plan is done ([archive/Query_Image_Improvement_Plan.md](archive/Query_Image_Improvement_Plan.md)).
+Routing multiple-choice questions to `classify_image` was closed 2026-11-05 without a gate: only 62 of the 3,789
+seen questions offer a choice (mostly "left or right"), the shipped tool already gets 55 of them right, and most of the
+7 misses have "yes" as their label, which a pick among the options cannot give. At most 2-3 were winnable.
 
 ## `query_image(structured_analysis)` and the defect probe
 

@@ -6,7 +6,6 @@ Every plan for this repo lives in this folder. Reorganised 2026-11-02.
 
 | File | What it is |
 | --- | --- |
-| [Query_Image_Improvement_Plan.md](Query_Image_Improvement_Plan.md) | `query_image` plan; Track 8 and round 30 open |
 | [Critique_Composition_Improvement_Plan.md](Critique_Composition_Improvement_Plan.md) | `critique_composition` plan; R3 step 0 next |
 | [Open_Ideas_By_Tool.md](Open_Ideas_By_Tool.md) | Every still-valid idea from the archived plans, by tool, with its source |
 | [frontier_capability_gaps.md](frontier_capability_gaps.md) | The scoreboard against frontier models (a living reference, not a plan) |
@@ -43,5 +42,6 @@ Finished, superseded or parked. Older commits, VisionBench scripts and notes cit
 | detector_ocr_replacement_plan.md | `Future_Ideas/` | `detect_objects`, `count_objects`, `ocr` | Sprint R done; SAM 3 detect and the 0.425 count floor shipped |
 | sam3_expansion_plan.md | `Future_Ideas/` | `detect_objects`, `spatial_relations` | Flat detection shipped; spatial reverted |
 | Query_Image_Track1_handoff.md | `Future_Ideas/` | `query_image` | Track 1 shipped 2026-10-31 |
+| Query_Image_Improvement_Plan.md | `Future_Ideas/` | `query_image` | Done 2026-11-05: V5, presence check and OCR cleaning/excerpts shipped; routing regex failed Gate V9 |
 | memory_manager.md | `Future_Ideas/` | server | M1-M4 done; M5 conditional |
 | model_variants_and_loras.md | `Future_Ideas/` | all | Matrix measured or ruled out; remaining ideas in the backlog |
