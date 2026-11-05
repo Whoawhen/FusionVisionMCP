@@ -6,6 +6,7 @@ Every plan for this repo lives in this folder. Reorganised 2026-11-02.
 
 | File | What it is |
 | --- | --- |
+| [Tool_Assertions_Plan.md](Tool_Assertions_Plan.md) | What each tool may assert, reliability in outputs, signals for the weak tools; step S (scorer fix) next |
 | [Critique_Composition_Improvement_Plan.md](Critique_Composition_Improvement_Plan.md) | `critique_composition` plan; R3 step 0 next |
 | [Open_Ideas_By_Tool.md](Open_Ideas_By_Tool.md) | Every still-valid idea from the archived plans, by tool, with its source |
 | [frontier_capability_gaps.md](frontier_capability_gaps.md) | The scoreboard against frontier models (a living reference, not a plan) |
