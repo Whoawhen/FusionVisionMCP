@@ -184,10 +184,11 @@ Live plan: [Future_Ideas/Query_Image_Improvement_Plan.md](Future_Ideas/Query_Ima
   their CJK), a CJK-only reading of 6 or fewer characters on a question that does not mention CJK, is treated as empty;
   a reading over 160 words keeps those and appends up to 2 `[-6, +18]`-word windows around question anchors found only
   past them, after " / ... / ". Quote it as **+17 of 3,789, screened on seen sets, not gated** (Gate V8 screen, arm NE:
-  N +10, E +7, none lost); round 31 (Gate V9) confirms it on fresh questions. The prompts are frozen in VisionBench
+  N +10, E +7, none lost), **confirmed on fresh questions by Gate V9** (round 31, 918 questions: +4 / 0 on the 55 it
+  changes, 78.5 -> 79.0%). The prompts are frozen in VisionBench
   `vqa_gate_v8_screen.py`, checked by `vqa_v8_src_parity.py` (1,712/1,712 routed prompts identical); changing them needs
   a fresh round. The CJK rule is engine-specific noise: re-check it when `ocr` changes engine. `VQA_TEXT_QUESTION` is
-  unchanged (the R regex waits for round 31).
+  unchanged: the wider R regex (+13 / 0 on the seen sets) tied +5 / -5 on round 31 and does not ship (Track 11 closed).
 - **Other What/Which/Who/Where questions get a presence check first** (`presence_check`, default on;
   `VQA_PRESENCE_CHECK`, a "no" adds `VQA_ABSENT_SUFFIX`). It failed one gate rule (-1.7 on other changed questions,
   limit -1.0) and shipped on the user's decision: quote -1.7 as the measured figure. Control questions start

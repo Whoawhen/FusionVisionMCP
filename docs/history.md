@@ -342,6 +342,16 @@ Parity (VisionBench `vqa_v8_src_parity.py`): `lfm_vqa_prompt` equals the screen'
 questions. The regexes, stopwords and window sizes are in `constants.py` (`VQA_OCR_*`, `VQA_ANCHOR_*`). Not shipped: arm
 R (routing regex, +13 / -0, fitted to these sets), which goes to round 31 (Gate V9, rules in the plan's P2.0.7).
 
+**Gate V9, round 31 (2026-11-05, VisionBench `vqa_gate_v9.py`, rules fixed before sourcing).** 230 fresh images, 920
+questions (Gemini 3.8 Flash slice a, Claude Sonnet 5.5 slice b); the user's spot-check passed the premise floor (20/20)
+and dropped 2 ordinary labels, leaving 918. 0 errors.
+- **NE confirmed** (rule A): on the 55 questions it changes, +4 / 0 (CI 0.11 to 0.87 pts on the round); 78.5 -> 79.0%.
+  Gains: two `no_text` "There is none.", a quoted pet name, an add-on version number. Latency on touched questions
+  9.96 -> 10.38 s.
+- **R fails** (rule B): 31 touched (27 added routes, 4 removed), +5 / -5, so "gained > lost" fails. Its two
+  `no_object` questions both lost (OCR context talked LFM into naming an absent solar panel and slider). Track 11 stops;
+  R stays on record as fitted to the seen sets, and `VQA_TEXT_QUESTION` is unchanged.
+
 ## `query_image` and `caption` keep the first OCR reading: LFM's transcription did not help them (2026-11-03)
 
 `ocr(lfm_read=true)` appends the lines LFM2.5-VL's transcription adds; `caption`'s text line and `query_image`'s OCR

@@ -1,6 +1,6 @@
 # `query_image` Frontier-Grade Improvement Plan
 
-**Status:** Phase 1 (Tracks 1–8, Gates V1–V7) shipped 2026-10-31 to 2026-11-02; post-V7 screens (`vqa_ocr_lfm_screen`, `vqa_presence_veto_screen`, `vqa_gap_screen`) closed 2026-11-03 to 2026-11-04. Phase 2 (Tracks 9–13) drafted 2026-11-04. **Reviewed 2026-11-04: P2.0 below supersedes P2.1–P2.5 where they disagree.** Gate path decided (P2.0.4). Track 9 done (`48687e1`). Step 13A screen done (P2.0.6): NE +17/0 ships on the screen; R +13/0 goes to round 31. NE shipped 2026-11-04 (`e3d08f2`; src prompts = the screen's NE on 1,712/1,712, VisionBench `vqa_v8_src_parity.py`). Round 31 built (230 images, 192 a / 38 b); stage Q with the workers. Next: the user's blind check of a question sample, then Gate V9 (P2.0.7).
+**Status:** Phase 1 (Tracks 1–8, Gates V1–V7) shipped 2026-10-31 to 2026-11-02; post-V7 screens (`vqa_ocr_lfm_screen`, `vqa_presence_veto_screen`, `vqa_gap_screen`) closed 2026-11-03 to 2026-11-04. Phase 2 (Tracks 9–13) drafted 2026-11-04. **Reviewed 2026-11-04: P2.0 below supersedes P2.1–P2.5 where they disagree.** Gate path decided (P2.0.4). Track 9 done (`48687e1`). Step 13A screen done (P2.0.6): NE +17/0 ships on the screen; R +13/0 goes to round 31. NE shipped 2026-11-04 (`e3d08f2`; src prompts = the screen's NE on 1,712/1,712, VisionBench `vqa_v8_src_parity.py`). Round 31 built (230 images, 192 a / 38 b). **Gate V9 done 2026-11-05 (P2.0.8): NE confirmed +4/0 on fresh questions; R tied +5/-5 and does not ship, so Track 11 is closed.** No further Phase 2 run is queued.
 **Target tool:** `query_image` (`src/fusion_vision_mcp/tools/vqa.py:29–191`) and its supporting pipeline in `src/fusion_vision_mcp/analysis.py:1070–1142` and `src/fusion_vision_mcp/constants.py:267–313`.
 
 ---
@@ -170,6 +170,21 @@ If R fails, Track 11 stops, and R stays on record as fitted to the seen sets.
 **Reported, not gated:** each arm by type and kind, gained and lost lists, routes added and removed, latency on
 touched questions (OCR included), and errors.
 
+#### P2.0.8 Gate V9 result (2026-11-05)
+
+VisionBench `vqa_gate_v9.py` (rules `8189c49`, run 2026-11-05, 0 errors). 918 questions after the user dropped 2
+(premise floor 20/20). Overall: old 78.5, NE 79.0, NER 79.0%.
+
+| Rule | Touched | Gained | Lost | Result |
+|---|---|---|---|---|
+| A: NE vs old | 55 | 4 | 0 | **pass**: NE confirmed (CI 0.11 to 0.87 pts) |
+| B: NER vs NE | 31 (27 added, 4 removed) | 5 | 5 | **fail** on "gained > lost"; removed routes 1/1, no type with 10+ below |
+
+R's losses: two `no_object` questions (OCR context led LFM to name an absent solar panel and slider), "x4" answered "4",
+"Salz." read as Salzgitter, and one object answer. Its gains: a table's column headers, a voltage, "ANFITEATRO", a
+Wikipedia article count, an anchor. The seen-set +13/0 did not carry over: R was fitted to those sets' misses. Track 11
+stops.
+
 #### P2.0.5 Revised order (replaces P2.5)
 
 Stop for the user's go-ahead between steps.
@@ -229,9 +244,9 @@ Before touching any code, the worker must note what has already been tested and 
 | 2026-11-02 | `vqa_gate_v6.py` (`A_fixed`, `B_fixed`) | Returning canned `"There is none."` directly when `presence_check` says `"no"` | Other changed `-2.7 / -1.4 pts`, `color -5.9 / -5.1 pts` | Must use `VQA_ABSENT_SUFFIX` (`A_suffix`), never canned refusal. |
 | 2026-11-03 | `vqa_ocr_lfm_screen.py` | Running `ocr_pages(lfm_read=True)` inside `query_image` on short OCR pages | `r29` `80.2 -> 79.1%` (`-1.1 pts`, `7 gained / 17 lost`), `+2.1 s` | `lfm_read`'s full-page transcription helps `ocr` (`+8.9%`), not `query_image`'s targeted question prompt. |
 | 2026-11-03 | `vqa_presence_veto_screen.py` | Object-only check (`O`) and SAM 3 box veto (`S`) on `presence_check`'s `"no"` | Picked `O` leveled non-premise (`-0.6`), but `no_object -4.5` vs shipped, pooled `-0.1 pts` | A trade, not a gain; shipped `presence_check` stays. |
-| 2026-11-04 | `vqa_gap_screen.py` (`C_list`, `C_hint`, `C_marks`) | Count prompts (`List each with its position...`, `Look carefully...`, SAM 3 box marks) | All 3 failed on `r29` + `r30`: `count -8.7` to `-4.2 pts` (`r29`), `-11.0` to `-1.1 pts` (`r30`) | Prompting LFM to enumerate or drawing SAM 3 marks degrades `count`. |
-| 2026-11-04 | `vqa_gap_screen.py` (`O_dense`) | Raising `VQA_OCR_WORDS` from `160` to `320` globally | `r29 -0.2 pts`, `r30 -0.8 pts` (`text` flat/`-1.3 pts`) | Dumping 320 words unconditionally dilutes attention when the answer is in the first 160 words. Use targeted `smart_ocr_excerpt` (Track 12) instead. |
-| 2026-11-04 | `vqa_gap_screen.py` (`O_deep`) | Running `ocr_pages(sharpened=True)` globally on dense pages | `r29 -0.5 pts`, `r30 -0.8 pts`, `+2.5 s` latency | Extra sharpened crops add duplicate/noisy lines on already-readable pages. |
+| 2026-11-04 | `vqa_gap_screen.py` (`C_list`, `C_hint`, `C_marks`) | Count prompts (list each object first, a `count_objects` hint, SAM 3 numbered box marks) | Count questions (270, A 78.9%) on r29 + r30: `C_list -8.9`, `C_hint -0.4` (12 gained / 13 lost), `C_marks -42.6 pts` | Enumerating drifts onto labels; drawn marks cap the answer at the detector's box count. (Corrected 2026-11-04 from the script's result docstring.) |
+| 2026-11-04 | `vqa_gap_screen.py` (`O_dense`) | Florence-2-large dense region labels (at most 20) added to object questions | Object questions (160, A 76.2%): `-5.6 pts` (CI -11.3 to 0.0) | Region labels mislead more than they help. (Corrected 2026-11-04: this arm was dense labels, not 320 OCR words; no 320-word arm was ever run.) |
+| 2026-11-04 | `vqa_gap_screen.py` (`O_deep`) | Answering object questions with the bf16 4-tile LFM2.5-VL-3B (`caption(deep=true)`'s model) | Object questions: `-1.2 pts` (CI -6.3 to 3.8), 23 gained / 23 lost, 19.6 s median | No gain for ~4x the cost. (Corrected 2026-11-04: this arm was the deep model, not sharpened OCR.) |
 | 2026-11-04 | Phase 2 Probe (`task-177`) | **Line-level** `<2`-char OCR filtering inside multi-line pages | Perturbed `240` questions across 3,789 by stripping valid single-digit table cells (`'2'`, `'5'`) | Must filter at **page level** (`clean_ocr_page`, Track 10), which touches only 37 pages and wins `+10 / -0`. |
 | 2026-11-04 | Phase 2 Probe (`task-207`) | Adding bare `letter` to `_VQA_TEXT_LOOKUP` | `0 gained, 2 lost` (`What letter represents each of the input variables...`, `What animal is shown next to the letter A?`) | Keep `lettering|letters` in `_VQA_TEXT_WORDS`, do **not** add bare `letter` to `_VQA_TEXT_LOOKUP`. |
 | 2026-11-04 | Phase 2 Probe (`task-274`) | Removing `VQA_OCR_EMPTY` on routed questions with empty OCR | `no_text` (`128/131 = 97.7%`) and `no_object` (`19/19 = 100.0%`) rely on `VQA_OCR_EMPTY` | Keep `VQA_OCR_EMPTY` unchanged. |
@@ -370,7 +385,7 @@ Three actionable, root-cause failure modes account for the recoverable gap witho
 
 #### Track 12: Question-Anchored Tail Excerpting (`smart_ocr_excerpt`) in `src/fusion_vision_mcp/analysis.py`
 
-- **Goal:** Recover OCR answers truncated past `VQA_OCR_WORDS = 160` on dense pages **without** raising `VQA_OCR_WORDS` globally (which failed `O_dense` in `vqa_gap_screen.py`).
+- **Goal:** Recover OCR answers truncated past `VQA_OCR_WORDS = 160` on dense pages **without** raising `VQA_OCR_WORDS` globally (never screened; the `O_dense` arm once cited here was dense labels).
 - **Mechanism:**
   - When `len(words) <= VQA_OCR_WORDS` (`93%` of routed questions), `smart_ocr_excerpt` returns the exact same string as today (`" ".join(words)`), byte for byte.
   - When `len(words) > VQA_OCR_WORDS`, `smart_ocr_excerpt` keeps `head = " ".join(words[:VQA_OCR_WORDS])` unchanged and extracts high-specificity anchors from `question` (quoted strings `'...'`/`"..."`, non-initial capitalized words, alphanumeric/hyphenated tokens, and non-stopword tokens of length `>= 5`).
